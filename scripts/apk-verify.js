@@ -95,12 +95,26 @@ ok('MaterialSymbols font excluded', ttfs.length === 1,
 const bundle = entries.find((e) => e.name === 'assets/index.android.bundle');
 ok('Hermes/JS bundle present', !!bundle, 'release bundle missing from APK');
 
-// crunchPngs re-encodes the file, so match the logo on its DIMENSIONS, not its byte size.
-const logo = entries.filter((e) => e.name.endsWith('.png') && e.uncompressed > 20000)
+// Assets are matched on DIMENSIONS, not filename or byte size: crunchPngs re-encodes every PNG,
+// and shrinkResources renames them to res/xx.png, so the size is the only stable identity left.
+//
+// These are checked because shrinkResources decides what to keep by scanning for references it
+// can see statically, and a JS `require()` is not one of those. If it ever guesses wrong, the app
+// installs and launches perfectly and simply has no logo and no product photos — a failure that
+// looks like a design change rather than a build fault.
+const pngDims = entries
+  .filter((e) => e.name.endsWith('.png'))
   .map((e) => { try { return pngSize(read(e)); } catch { return null; } })
-  .filter(Boolean)
-  .some((d) => d.w === 512 && d.h === 512);
-ok('app logo (512x512) present', logo, 'shrinkResources stripped the logo drawable');
+  .filter(Boolean);
+
+const countOf = (w, h) => pngDims.filter((d) => d.w === w && d.h === h).length;
+
+ok('brand mark (349x512) present', countOf(349, 512) >= 1,
+  'shrinkResources stripped assets/logo-mark.png — the login and menu logo');
+ok('brand lockup (563x1024) present', countOf(563, 1024) >= 1,
+  'shrinkResources stripped assets/logo-lockup.png — the splash lockup');
+ok('9 product tiles (360x360) present', countOf(360, 360) >= 9,
+  `expected 9 drink photos for the request grid, found ${countOf(360, 360)}`);
 
 ok('dex present', entries.some((e) => /^classes\d*\.dex$/.test(e.name)), 'no dex in APK');
 
