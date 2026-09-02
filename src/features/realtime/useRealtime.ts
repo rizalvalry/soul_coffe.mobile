@@ -84,6 +84,13 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
     const key = (extra['reverbAppKey'] as string | undefined) ?? 'soulmate-local-key';
     const host = (extra['reverbHost'] as string | undefined) ?? '10.0.2.2';
     const port = (extra['reverbPort'] as number | undefined) ?? 8080;
+    // Port 443 means a public HTTPS host (e.g. behind Cloudflare) — those only ever terminate
+    // TLS, so a plain `ws://` handshake is refused before Reverb even sees it. Local dev against
+    // Laragon (10.0.2.2:8080 or a LAN IP) has no TLS in front of it, hence the hardcoded 8080
+    // fallback above staying plaintext. `forceTLS: false` unconditionally here was never
+    // exercised against a real HTTPS host — every prior run pointed at shared hosting where
+    // Reverb was never running in the first place (see app.json's _comment_reverb).
+    const useTLS = port === 443;
 
     let echo: Echo<'reverb'> | null = null;
 
@@ -94,8 +101,8 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
         wsHost: host,
         wsPort: port,
         wssPort: port,
-        forceTLS: false,
-        enabledTransports: ['ws'],
+        forceTLS: useTLS,
+        enabledTransports: useTLS ? ['wss'] : ['ws'],
         authorizer: (channel: { name: string }) => ({
           authorize: (
             socketId: string,

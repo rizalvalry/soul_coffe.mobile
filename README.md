@@ -30,6 +30,52 @@ npm run android      # straight to a connected device/emulator
 npm run typecheck    # tsc --noEmit — must stay clean
 ```
 
+## Real backend
+
+`app.json`'s `extra.demoMode` is `false` and `extra.apiBaseUrl` points at
+`https://soulcoffee.rafancloud.com/api/v1` (soul_coffe.backend, Cloudflare-proxied). As of this
+writing that domain answers **HTTP 525** — Cloudflare cannot TLS-handshake the origin — on every
+path, including `/api/v1/auth/login`. That is a hosting-side problem, not something this app
+works around; confirm the fix with `curl -I https://soulcoffee.rafancloud.com/api/v1/auth/login`
+before assuming a build against it will actually authenticate.
+
+This app had never been run against a real backend before demoMode was flipped off — every
+screen, and the whole `RefillRequest`/`Allocation` shape in `domain/types.ts`, had only ever been
+validated against `src/features/demo/router.ts`'s in-memory fixtures. Comparing the real Laravel
+resources (soul_coffe.backend `app/Http/Resources/*.php`) against that assumed contract surfaced
+real gaps, reconciled in `src/lib/mappers.ts` (full rationale in its docblock) rather than in
+every screen:
+
+- **`POST /auth/login`'s response was never unwrapped.** `features/auth/api.ts` read
+  `body.token`/`body.user` directly; the real API wraps every response in `{ data: ... }` like
+  every other endpoint. Login against a real backend failed 100% of the time with "Respons
+  server tidak valid." before this was fixed — demo mode's login path bypasses this entirely, so
+  nothing had ever exercised it.
+- **`RefillRequestResource` nests relations as objects** (`cart: {id, code}`,
+  `staff: {id, name}`, `finance`/`barista`/`rider: {id, name} | null`); every screen reads flat
+  strings (`cart_code`, `staff_name`, ...). `mappers.ts`'s `toRefillRequest` flattens these; demo
+  mode's serializer was updated to emit the same nested shape so it stays a faithful fixture.
+- **Two fields the real API genuinely never returns, at all:** `RefillRequest.location_name`
+  (a refill request has no location relation on the backend) and `Allocation.barista_name` (the
+  `barista` relation is never eager-loaded by `AllocationController`, and `AllocationResource`
+  has no key for it even if it were). Both are mapped to `null` — every render site already had
+  a "tidak diketahui" fallback for the first; one was added to `staff/allocation.tsx` for the
+  second. Closing this for real needs a change in soul_coffe.backend, not here.
+- **`RefillLineResource`/`StockRowResource` never return a product's `unit`**, and
+  `StockRowResource` names the on-hand field `qty`, not `on_hand`. Cross-referenced client-side
+  against the already-cached `/products` list (`unitLookup()` in `features/refill/queries.ts`).
+- **`total_requested`/`total_qty`** are computed client-side from `lines`, matching what
+  `demo/router.ts` already did.
+- **`reverbHost`/`reverbPort`** point at the same subdomain on 443. `useRealtime.ts` now sets
+  `forceTLS`/`enabledTransports` from the port instead of hardcoding plaintext `ws://` — Reverb
+  behind Cloudflare only ever accepts `wss://`. Whether Reverb is actually reachable there at all
+  depends on the host being able to keep `php artisan reverb:start` running under
+  supervisor/systemd; if it can't, `useRealtime()` degrades to its documented 10s-refetch
+  fallback rather than failing silently.
+
+None of the above was guesswork — every gap was confirmed by reading the actual PHP resource
+source in soul_coffe.backend before writing the corresponding mapper or fallback.
+
 ## Build an APK locally
 
 This is the primary release path, and per task 0.12 it must be proven **before** feature work.

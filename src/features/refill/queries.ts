@@ -1,15 +1,38 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { request, uploadFile, uploadFileWithStatus, uuidv4 } from '@/lib/api';
-import type {
-  Allocation,
-  AppNotification,
-  BadgeCounts,
-  CartStockRow,
-  Product,
-  RefillRequest,
-  RefillStatus,
-  StaffOnShift,
-} from '@/domain/types';
+import {
+  toAllocation,
+  toAppNotification,
+  toRefillRequest,
+  toStockRow,
+  type RawAllocation,
+  type RawAppNotification,
+  type RawRefillRequest,
+  type RawStockRow,
+} from '@/lib/mappers';
+import type { BadgeCounts, Product, RefillRequest, RefillStatus, StaffOnShift } from '@/domain/types';
+
+/**
+ * Neither `RefillLineResource` nor `StockRowResource` (soul_coffe.backend) return a product's
+ * `unit` — the only place it lives is the `/products` master-data list, already cached under
+ * `qk.products` by `useProducts()`. `ensureQueryData` reuses that cache when fresh instead of
+ * issuing a second request, and populates it for `useProducts()` if this happens to be the
+ * first thing on screen to ask for it. Falls back to a blank unit rather than failing the
+ * whole refill/stock query over a label if `/products` itself is unreachable.
+ */
+async function unitLookup(client: QueryClient): Promise<(productId: number) => string> {
+  try {
+    const products = await client.ensureQueryData({
+      queryKey: qk.products,
+      queryFn: () => request<Product[]>('/products'),
+      staleTime: 10 * 60_000,
+    });
+    const byId = new Map(products.map((p) => [p.id, p.unit]));
+    return (productId) => byId.get(productId) ?? '';
+  } catch {
+    return () => '';
+  }
+}
 
 /**
  * Query keys are declared in one place so realtime invalidation cannot drift from the keys the
@@ -60,21 +83,38 @@ export function useBadges() {
 export function useNotifications() {
   return useQuery({
     queryKey: qk.notifications,
-    queryFn: () => request<AppNotification[]>('/notifications?unread=1'),
+    queryFn: async () => {
+      const rows = await request<RawAppNotification[]>('/notifications?unread=1');
+      return rows.map(toAppNotification);
+    },
   });
 }
 
 export function useRefills(status?: RefillStatus | RefillStatus[]) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: qk.refills({ ...(status ? { status } : {}) }),
-    queryFn: () => request<RefillRequest[]>(`/refills${statusParam(status)}`),
+    queryFn: async () => {
+      const [rows, unitOf] = await Promise.all([
+        request<RawRefillRequest[]>(`/refills${statusParam(status)}`),
+        unitLookup(client),
+      ]);
+      return rows.map((r) => toRefillRequest(r, unitOf));
+    },
   });
 }
 
 export function useRefill(id: number) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: qk.refill(id),
-    queryFn: () => request<RefillRequest>(`/refills/${id}`),
+    queryFn: async () => {
+      const [raw, unitOf] = await Promise.all([
+        request<RawRefillRequest>(`/refills/${id}`),
+        unitLookup(client),
+      ]);
+      return toRefillRequest(raw, unitOf);
+    },
     enabled: Number.isFinite(id) && id > 0,
   });
 }
@@ -89,21 +129,38 @@ export function useStaffOnShift() {
 export function useMyAllocation() {
   return useQuery({
     queryKey: qk.myAllocation,
-    queryFn: () => request<Allocation | null>('/me/allocation/today'),
+    queryFn: async () => {
+      const raw = await request<RawAllocation | null>('/me/allocation/today');
+      return raw ? toAllocation(raw) : null;
+    },
   });
 }
 
 export function useMyStock() {
+  const client = useQueryClient();
   return useQuery({
     queryKey: qk.myStock,
-    queryFn: () => request<CartStockRow[]>('/me/stock'),
+    queryFn: async () => {
+      const [rows, unitOf] = await Promise.all([
+        request<RawStockRow[]>('/me/stock'),
+        unitLookup(client),
+      ]);
+      return rows.map((r) => toStockRow(r, unitOf));
+    },
   });
 }
 
 export function useKitchenStock() {
+  const client = useQueryClient();
   return useQuery({
     queryKey: qk.kitchenStock,
-    queryFn: () => request<CartStockRow[]>('/kitchen/stock'),
+    queryFn: async () => {
+      const [rows, unitOf] = await Promise.all([
+        request<RawStockRow[]>('/kitchen/stock'),
+        unitLookup(client),
+      ]);
+      return rows.map((r) => toStockRow(r, unitOf));
+    },
   });
 }
 
@@ -143,21 +200,26 @@ export type SubmitRefillInput = {
 export function useSubmitRefill() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: SubmitRefillInput) =>
-      request<RefillRequest>('/refills', {
-        method: 'POST',
-        idempotencyKey: uuidv4(),
-        body: {
-          uuid: uuidv4(),
-          cart_id: input.cartId,
-          evidence_media_id: input.evidenceMediaId,
-          gps_lat: input.gps?.lat ?? null,
-          gps_lng: input.gps?.lng ?? null,
-          gps_unavailable: input.gps === null,
-          client_submitted_at: new Date().toISOString(),
-          lines: input.lines,
-        },
-      }),
+    mutationFn: async (input: SubmitRefillInput) => {
+      const [raw, unitOf] = await Promise.all([
+        request<RawRefillRequest>('/refills', {
+          method: 'POST',
+          idempotencyKey: uuidv4(),
+          body: {
+            uuid: uuidv4(),
+            cart_id: input.cartId,
+            evidence_media_id: input.evidenceMediaId,
+            gps_lat: input.gps?.lat ?? null,
+            gps_lng: input.gps?.lng ?? null,
+            gps_unavailable: input.gps === null,
+            client_submitted_at: new Date().toISOString(),
+            lines: input.lines,
+          },
+        }),
+        unitLookup(client),
+      ]);
+      return toRefillRequest(raw, unitOf);
+    },
     onSuccess: () => invalidateRefillData(client),
   });
 }
@@ -168,12 +230,17 @@ function useTransition<TInput>(
 ) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: TInput) =>
-      request<RefillRequest>(buildPath(input), {
-        method: 'POST',
-        idempotencyKey: uuidv4(),
-        ...(buildBody ? { body: buildBody(input) } : {}),
-      }),
+    mutationFn: async (input: TInput) => {
+      const [raw, unitOf] = await Promise.all([
+        request<RawRefillRequest>(buildPath(input), {
+          method: 'POST',
+          idempotencyKey: uuidv4(),
+          ...(buildBody ? { body: buildBody(input) } : {}),
+        }),
+        unitLookup(client),
+      ]);
+      return toRefillRequest(raw, unitOf);
+    },
     onSuccess: (data) => invalidateRefillData(client, data?.id),
   });
 }
@@ -241,23 +308,29 @@ export function useDeliverRefill() {
   const client = useQueryClient();
   return useMutation<DeliverResult, Error, DeliverInput>({
     mutationFn: async (input: DeliverInput) => {
-      const result = await uploadFileWithStatus<RefillRequest | null>(
-        `/refills/${input.id}/deliver`,
-        { uri: input.signatureUri, name: 'signature.png', type: 'image/png' },
-        {
-          signature_method: input.method,
-          ...(input.staffPin ? { staff_pin: input.staffPin } : {}),
-          lines: JSON.stringify(input.lines),
-          stroke_count: String(input.strokeCount),
-          gps_lat: input.gps ? String(input.gps.lat) : '',
-          gps_lng: input.gps ? String(input.gps.lng) : '',
-          gps_unavailable: input.gps === null ? '1' : '0',
-        },
-        // The deliver endpoint names this part `signature`, not `file` (docs/04).
-        'signature',
-      );
+      const [result, unitOf] = await Promise.all([
+        uploadFileWithStatus<RawRefillRequest | null>(
+          `/refills/${input.id}/deliver`,
+          { uri: input.signatureUri, name: 'signature.png', type: 'image/png' },
+          {
+            signature_method: input.method,
+            ...(input.staffPin ? { staff_pin: input.staffPin } : {}),
+            lines: JSON.stringify(input.lines),
+            stroke_count: String(input.strokeCount),
+            gps_lat: input.gps ? String(input.gps.lat) : '',
+            gps_lng: input.gps ? String(input.gps.lng) : '',
+            gps_unavailable: input.gps === null ? '1' : '0',
+          },
+          // The deliver endpoint names this part `signature`, not `file` (docs/04).
+          'signature',
+        ),
+        unitLookup(client),
+      ]);
 
-      return { refill: result.data ?? null, ledgerPending: result.status === 202 };
+      return {
+        refill: result.data ? toRefillRequest(result.data, unitOf) : null,
+        ledgerPending: result.status === 202,
+      };
     },
     onSuccess: (result) => invalidateRefillData(client, result.refill?.id),
   });
@@ -275,8 +348,8 @@ export type CreateAllocationInput = {
 export function useCreateAllocation() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateAllocationInput) =>
-      request<Allocation>('/allocations', {
+    mutationFn: async (input: CreateAllocationInput) => {
+      const raw = await request<RawAllocation>('/allocations', {
         method: 'POST',
         idempotencyKey: uuidv4(),
         body: {
@@ -287,7 +360,9 @@ export function useCreateAllocation() {
           lines: input.lines,
           ...(input.correctionReason ? { correction_reason: input.correctionReason } : {}),
         },
-      }),
+      });
+      return toAllocation(raw);
+    },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: qk.allocationsToday });
       void client.invalidateQueries({ queryKey: qk.kitchenStock });

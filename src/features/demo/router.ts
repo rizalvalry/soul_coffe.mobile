@@ -9,7 +9,6 @@ import {
   DemoError,
   effectiveLineQty,
   getAllocationById,
-  getAssignedLocationName,
   getBadges,
   getCartById,
   getCartStock,
@@ -81,13 +80,23 @@ function serializeLocation(l: { id: number; name: string; lat: number; lng: numb
   return { id: l.id, name: l.name, lat: l.lat, lng: l.lng };
 }
 
+/**
+ * Neither this nor `serializeRefillRequest`/`serializeAllocation`/`serializeNotification` below
+ * emits `unit` on a line, `location_name` on a refill, `barista_name` on an allocation, or a
+ * flat `refill_request_id` on a notification — because the REAL Laravel resources
+ * (`RefillLineResource`, `RefillRequestResource`, `AllocationResource`, `NotificationResource`
+ * in soul_coffe.backend) do not either. This file's whole job is fidelity to what the real API
+ * actually sends over the wire, not to the mobile UI's convenience shape — `src/lib/mappers.ts`
+ * is what reconciles the two, uniformly for both demo and real data. Serializing a nicer shape
+ * here would have hidden every gap `mappers.ts`'s docblock lists, the same way it did until this
+ * app was first pointed at a real backend.
+ */
 function serializeRefillLine(actor: Actor, line: DemoRefillLine) {
   const product = getProductById(line.productId);
   const base = {
     id: line.id,
     product_id: line.productId,
     product_name: product?.name ?? 'Produk',
-    unit: product?.unit ?? 'cup',
     qty_requested: line.qtyRequested,
     qty_approved: line.qtyApproved,
     qty_prepared: line.qtyPrepared,
@@ -108,18 +117,16 @@ function serializeRefillRequest(actor: Actor, r: DemoRefillRequest) {
     code: r.code,
     status: r.status,
     operating_date: r.operatingDate,
-    cart_code: cart?.code ?? '-',
-    staff_name: r.staffName,
-    staff_id: r.staffId,
-    location_name: getAssignedLocationName(r.staffId, r.operatingDate),
+    cart: cart ? { id: cart.id, code: cart.code } : null,
+    staff: { id: r.staffId, name: r.staffName },
+    finance: finance ? { id: finance.id, name: finance.name } : null,
+    barista: barista ? { id: barista.id, name: barista.name } : null,
+    rider: rider ? { id: rider.id, name: rider.name } : null,
     evidence_photo_url: r.evidencePhotoUrl,
     gps_unavailable: r.gpsUnavailable,
     out_of_hours: r.outOfHours,
     decision_reason: r.decisionReason,
     shortfall_reason: r.shortfallReason,
-    finance_name: finance?.name ?? null,
-    barista_name: barista?.name ?? null,
-    rider_name: rider?.name ?? null,
     signature_url: r.signatureUrl,
     signature_method: r.signatureMethod,
     submitted_at: r.submittedAt,
@@ -127,20 +134,8 @@ function serializeRefillRequest(actor: Actor, r: DemoRefillRequest) {
     prepared_at: r.preparedAt,
     picked_up_at: r.pickedUpAt,
     delivered_at: r.deliveredAt,
-    total_requested: r.lines.reduce((sum, l) => sum + l.qtyRequested, 0),
     lines: r.lines.map((l) => serializeRefillLine(actor, l)),
     can: refillCapabilities(actor, r),
-    // Not part of the `RefillRequest` domain type (the mobile UI derives its timeline from the
-    // timestamp fields above — see `components/refill/RefillTimeline.tsx`), but part of the
-    // docs/04 contract for `GET /refills/{id}` and kept for parity/audit (R8).
-    status_history: r.statusHistory.map((h) => ({
-      from_status: h.fromStatus,
-      to_status: h.toStatus,
-      actor_name: h.actorName,
-      actor_role: h.actorRole,
-      reason: h.reason,
-      at: h.at,
-    })),
   };
 
   if (!hasCostAccess(actor)) return base;
@@ -151,7 +146,6 @@ function serializeRefillRequest(actor: Actor, r: DemoRefillRequest) {
 function serializeAllocation(a: DemoAllocation) {
   const cart = getCartById(a.cartId);
   const staff = getUserById(a.staffId);
-  const barista = getUserById(a.baristaId);
   const location = a.locationId !== null ? getLocationById(a.locationId) : undefined;
   return {
     id: a.id,
@@ -159,10 +153,8 @@ function serializeAllocation(a: DemoAllocation) {
     cart_code: cart?.code ?? '-',
     staff_name: staff?.name ?? '-',
     location_name: location?.name ?? null,
-    barista_name: barista?.name ?? '-',
     status: a.status,
     over_target_pct: a.overTargetPct,
-    total_qty: a.lines.reduce((sum, l) => sum + l.qtyIssued, 0),
     is_correction: a.isCorrection,
     issued_at: a.issuedAt,
     lines: a.lines.map((l) => ({
@@ -200,7 +192,9 @@ function serializeNotification(n: {
     type: n.type,
     title: n.title,
     body: n.body,
-    refill_request_id: n.refillRequestId,
+    // Nested, not flat — mirrors NotificationResource, which stores refill_request_id inside
+    // payload_json rather than as a top-level column (see mappers.ts's toAppNotification).
+    payload: { refill_request_id: n.refillRequestId },
     read_at: n.readAt,
     created_at: n.createdAt,
   };

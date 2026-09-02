@@ -53,7 +53,10 @@ export type Allocation = {
   cart_code: string;
   staff_name: string;
   location_name: string | null;
-  barista_name: string;
+  /** Null against the real API: AllocationResource never loads/returns this relation
+   *  (backend gap, not a client bug — see README's "Real backend" section). Always
+   *  present in demo mode. */
+  barista_name: string | null;
   status: 'ISSUED' | 'PENDING_FINANCE';
   over_target_pct: number;
   total_qty: number;

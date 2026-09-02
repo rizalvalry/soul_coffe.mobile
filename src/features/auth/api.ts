@@ -104,9 +104,15 @@ export async function login(credentials: Credentials): Promise<Session> {
     throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
   }
 
-  const body = (await response.json()) as { token?: string; user?: Record<string, unknown> };
+  const raw = (await response.json()) as { data?: { token?: string; user?: Record<string, unknown> } };
+  // Every other endpoint goes through lib/api.ts's `request()`, which unwraps the `{ data: ... }`
+  // envelope Laravel's JsonResource wraps every response in. This fetch bypasses that helper
+  // (login has no token to attach yet), so it must unwrap the same envelope itself — reading
+  // `body.token` directly here always failed against the real API with "Respons server tidak
+  // valid.", because the token actually arrives as `body.data.token`.
+  const body = raw.data;
 
-  if (!body.token || !body.user || !isRole(body.user['role'])) {
+  if (!body?.token || !body.user || !isRole(body.user['role'])) {
     throw new AuthError('Respons server tidak valid.', 'server');
   }
 

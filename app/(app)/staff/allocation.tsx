@@ -99,7 +99,7 @@ function AllocationSlip({ allocation }: { allocation: Allocation }) {
         <MetaRow label="Kode Sepeda" value={allocation.cart_code} />
         <MetaRow label="Nama Karyawan" value={allocation.staff_name} />
         {allocation.location_name ? <MetaRow label="Lokasi" value={allocation.location_name} /> : null}
-        <MetaRow label="Disiapkan Oleh" value={allocation.barista_name} />
+        <MetaRow label="Disiapkan Oleh" value={allocation.barista_name ?? 'Tidak diketahui'} />
       </View>
 
       <View style={styles.table}>

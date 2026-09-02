@@ -77,14 +77,14 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "https://rafancloud.com/soulcoffee/public/api/v1",
-      "reverbHost": "rafancloud.com",
+      "apiBaseUrl": "https://soulcoffee.rafancloud.com/api/v1",
+      "reverbHost": "soulcoffee.rafancloud.com",
       "reverbPort": 443,
       "reverbAppKey": "soulmate-local-key",
-      "demoMode": true,
-      "_comment_api": "Points at the shared hosting deployment so the APK works without a laptop. For local development against Laragon use http://10.0.2.2:8000/api/v1 (Android emulator) or http://<LAN-IP>:8000/api/v1 (physical device), then rebuild.",
-      "_comment_reverb": "Shared hosting cannot run `php artisan reverb:start` (no supervisor/systemd/screen), so this socket will not connect there and useRealtime() falls back to a 10s refetch. Requirement 3 is only met on a host that can keep the Reverb process alive.",
-      "_comment_demoMode": "When true, src/features/demo/router.ts answers every API call from an in-memory fabricated dataset — no server, no database, no network (see src/features/demo/config.ts). This is what lets a release APK demonstrate the full flow standalone; DemoBanner shows MODE DEMO — DATA TIDAK NYATA on every screen whenever this is true. Set to false and rebuild for any build that must talk to the real backend above."
+      "demoMode": false,
+      "_comment_api": "Production Laravel API on its own subdomain (Cloudflare-proxied). As of this build the domain answers HTTP 525 (Cloudflare cannot TLS-handshake the origin) — a hosting-side problem, not something this app can work around. Verify with `curl -I https://soulcoffee.rafancloud.com/api/v1/auth/login` before shipping a build that assumes this is live. For local development against Laragon use http://10.0.2.2:8000/api/v1 (Android emulator) or http://<LAN-IP>:8000/api/v1 (physical device), then rebuild.",
+      "_comment_reverb": "reverbAppKey must match REVERB_APP_KEY in the backend's .env on this host — it was never confirmed against a live server (see _comment_api) and is still the placeholder used for local Laragon testing. If the host can't keep `php artisan reverb:start` alive under supervisor/systemd, the socket will never connect and useRealtime() permanently falls back to a 10s refetch — that degrades gracefully, but requirement 3 (true realtime) is only met when Reverb is actually kept running.",
+      "_comment_demoMode": "false: every screen now calls the real Laravel API at apiBaseUrl instead of src/features/demo/router.ts's in-memory fixtures. DemoBanner and the role-switcher (loginAsDemoRole) are gone from the UI — real accounts must exist in the backend's users table with is_active=1. Flip back to true only for an offline standalone demo build; see README's \"Real backend\" section for the wire-format gaps that src/lib/mappers.ts papers over."
     }
   }
 }
