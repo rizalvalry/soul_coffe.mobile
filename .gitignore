@@ -1,0 +1,10 @@
+node_modules/
+.expo/
+dist/
+.export-check/
+android/
+ios/
+*.apk
+*.aab
+.env
+.env.local

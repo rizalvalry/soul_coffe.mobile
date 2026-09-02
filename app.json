@@ -1,0 +1,73 @@
+{
+  "expo": {
+    "name": "Soul Coffeemate",
+    "slug": "soul-coffeemate",
+    "scheme": "soulcoffeemate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#00A3AA"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "id.soulcoffeemate.ops"
+    },
+    "android": {
+      "package": "id.soulcoffeemate.ops.demo",
+      "versionCode": 1,
+      "minSdkVersion": 26,
+      "adaptiveIcon": {
+        "backgroundColor": "#00A3AA",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.INTERNET"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Soul Coffeemate memerlukan kamera untuk mengambil foto bukti kondisi frozen gerobak saat request refill.",
+          "photosPermission": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiBaseUrl": "https://rafancloud.com/soulcoffee/public/api/v1",
+      "reverbHost": "rafancloud.com",
+      "reverbPort": 443,
+      "reverbAppKey": "soulmate-local-key",
+      "demoMode": true,
+      "_comment_api": "Points at the shared hosting deployment so the APK works without a laptop. For local development against Laragon use http://10.0.2.2:8000/api/v1 (Android emulator) or http://<LAN-IP>:8000/api/v1 (physical device), then rebuild.",
+      "_comment_reverb": "Shared hosting cannot run `php artisan reverb:start` (no supervisor/systemd/screen), so this socket will not connect there and useRealtime() falls back to a 10s refetch. Requirement 3 is only met on a host that can keep the Reverb process alive.",
+      "_comment_demoMode": "When true, src/features/demo/router.ts answers every API call from an in-memory fabricated dataset — no server, no database, no network (see src/features/demo/config.ts). This is what lets a release APK demonstrate the full flow standalone; DemoBanner shows MODE DEMO — DATA TIDAK NYATA on every screen whenever this is true. Set to false and rebuild for any build that must talk to the real backend above."
+    }
+  }
+}
