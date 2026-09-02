@@ -10,19 +10,29 @@ import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { QtyStepper } from '@/components/ui/QtyStepper';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
 import { RefillCard, formatRupiah } from '@/components/refill/RefillCard';
 import { useApproveRefill, useRefills, useRejectRefill } from '@/features/refill/queries';
+import { useRealtime } from '@/features/realtime/useRealtime';
 import { ApiError } from '@/lib/api';
 import { brand, feedback, radius, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 const MIN_REASON_LENGTH = 10;
 
-/** requirement 4 — the approval gate the whole state machine hinges on (R1). */
+/**
+ * requirement 4 — the approval gate the whole state machine hinges on (R1).
+ *
+ * This is the single most time-sensitive screen in the app: nothing downstream (barista prep,
+ * rider pickup, delivery) can move until a SUBMITTED request is decided here. It must not rely
+ * on the operator remembering to pull-to-refresh — see `useRealtime()`'s docblock for what
+ * "connected" actually means and what the polling fallback covers when it isn't.
+ */
 export default function FinanceApprovalsScreen() {
   const router = useRouter();
   const refillsQuery = useRefills('SUBMITTED');
   const rows = refillsQuery.data ?? [];
+  const realtime = useRealtime();
 
   return (
     <Screen scroll={false}>
@@ -39,6 +49,7 @@ export default function FinanceApprovalsScreen() {
           <Text variant="caption" color={semantic.textMuted}>
             Permintaan menunggu keputusan Anda
           </Text>
+          <ConnectionBanner state={realtime.state} />
         </View>
 
         {refillsQuery.isLoading ? (

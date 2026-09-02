@@ -66,12 +66,19 @@ every screen:
   against the already-cached `/products` list (`unitLookup()` in `features/refill/queries.ts`).
 - **`total_requested`/`total_qty`** are computed client-side from `lines`, matching what
   `demo/router.ts` already did.
-- **`reverbHost`/`reverbPort`** point at the same subdomain on 443. `useRealtime.ts` now sets
-  `forceTLS`/`enabledTransports` from the port instead of hardcoding plaintext `ws://` — Reverb
-  behind Cloudflare only ever accepts `wss://`. Whether Reverb is actually reachable there at all
-  depends on the host being able to keep `php artisan reverb:start` running under
-  supervisor/systemd; if it can't, `useRealtime()` degrades to its documented 10s-refetch
-  fallback rather than failing silently.
+- **Realtime moved from self-hosted Reverb to Pusher Channels** (`pusherKey`/`pusherCluster` in
+  `app.json`, `useRealtime.ts`). Confirmed directly against this host that self-hosted Reverb
+  cannot work here: a raw WebSocket upgrade to the API domain returned Laravel's own 404 page
+  (nothing proxies it to a Reverb process — shared hosting has no way to add that reverse-proxy
+  rule), and the raw Reverb port (8080) timed out (host firewall). Pusher is a hosted service, so
+  the mobile client only needs a public `key` + `cluster` — no host/port to keep in sync between
+  environments, and `App Secret` never leaves the Laravel `.env`.
+  **This does not by itself make notifications arrive**: `PublishOutboxEvent` — the job that
+  actually calls the broadcaster — is a queued job (`QUEUE_CONNECTION=database`), and nothing on
+  this shared hosting processes that queue (no cron entry, no `supervisorctl`/`systemd` for a
+  persistent `queue:work`). Until that's added on the backend, events never reach Pusher either;
+  `useRealtime()` degrades to its documented 10s-refetch fallback and an honest "Mode luring"
+  banner rather than failing silently either way.
 
 None of the above was guesswork — every gap was confirmed by reading the actual PHP resource
 source in soul_coffe.backend before writing the corresponding mapper or fallback.

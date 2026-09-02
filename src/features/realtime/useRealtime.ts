@@ -70,7 +70,7 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
   const [state, setState] = useState<ConnectionState>('connecting');
 
   const seen = useRef<Set<string>>(new Set());
-  const echoRef = useRef<Echo<'reverb'> | null>(null);
+  const echoRef = useRef<Echo<'pusher'> | null>(null);
   const handlerRef = useRef(onEvent);
   handlerRef.current = onEvent;
 
@@ -81,28 +81,31 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
     }
 
     const extra = Constants.expoConfig?.extra ?? {};
-    const key = (extra['reverbAppKey'] as string | undefined) ?? 'soulmate-local-key';
-    const host = (extra['reverbHost'] as string | undefined) ?? '10.0.2.2';
-    const port = (extra['reverbPort'] as number | undefined) ?? 8080;
-    // Port 443 means a public HTTPS host (e.g. behind Cloudflare) — those only ever terminate
-    // TLS, so a plain `ws://` handshake is refused before Reverb even sees it. Local dev against
-    // Laragon (10.0.2.2:8080 or a LAN IP) has no TLS in front of it, hence the hardcoded 8080
-    // fallback above staying plaintext. `forceTLS: false` unconditionally here was never
-    // exercised against a real HTTPS host — every prior run pointed at shared hosting where
-    // Reverb was never running in the first place (see app.json's _comment_reverb).
-    const useTLS = port === 443;
+    const key = extra['pusherKey'] as string | undefined;
+    const cluster = extra['pusherCluster'] as string | undefined;
 
-    let echo: Echo<'reverb'> | null = null;
+    if (!key || !cluster) {
+      // Nothing to connect to — degrade to the polling fallback below rather than throwing.
+      setState('disconnected');
+      return;
+    }
+
+    let echo: Echo<'pusher'> | null = null;
 
     try {
+      // Pusher Channels is a hosted service (not something this app's own backend runs), so
+      // there is no host/port to configure per environment — `key` + `cluster` alone resolve
+      // the right regional endpoint (wss://ws-{cluster}.pusher.com), the same pair for local
+      // dev and production, as long as both point the Laravel backend's BROADCAST_CONNECTION
+      // at the same Pusher app. This replaced self-hosted Reverb specifically because shared
+      // hosting here cannot expose a persistent WebSocket process behind a reverse proxy (no
+      // supervisor/systemd, and a raw TCP port never reaches the internet) — Pusher's own
+      // infrastructure is what actually terminates the socket now.
       echo = new Echo({
-        broadcaster: 'reverb',
+        broadcaster: 'pusher',
         key,
-        wsHost: host,
-        wsPort: port,
-        wssPort: port,
-        forceTLS: useTLS,
-        enabledTransports: useTLS ? ['wss'] : ['ws'],
+        cluster,
+        forceTLS: true,
         authorizer: (channel: { name: string }) => ({
           authorize: (
             socketId: string,
