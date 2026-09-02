@@ -4,7 +4,14 @@
  *
  * Reference: docs/02-context-business-process.md §2
  */
-export const ROLES = ['ADMINISTRATOR', 'FINANCE', 'BARISTA', 'RIDER', 'STAFF'] as const;
+export const ROLES = [
+  'ADMINISTRATOR',
+  'FINANCE',
+  'BARISTA',
+  'RIDER',
+  'STAFF',
+  'CONTENT_CREATOR',
+] as const;
 
 export type Role = (typeof ROLES)[number];
 
@@ -55,6 +62,15 @@ export const roleMeta: Record<Role, RoleMeta> = {
     label: 'Staff',
     description: 'Berjualan di gerobak & request refill cups',
     icon: 'storefront',
+    home: '/menu',
+  },
+  // Writes the in-app news feed and touches no part of the operational flow, which is why it
+  // sits last rather than anywhere in the hierarchy above.
+  CONTENT_CREATOR: {
+    priority: 6,
+    label: 'Content Creator',
+    description: 'Menulis artikel & kabar untuk seluruh tim',
+    icon: 'pencil-outline',
     home: '/menu',
   },
 };

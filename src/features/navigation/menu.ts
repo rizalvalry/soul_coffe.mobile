@@ -50,6 +50,7 @@ export const IMPLEMENTED_ROUTES: ReadonlySet<string> = new Set([
   '/rider/available',
   '/rider/active',
   '/rider/history',
+  '/news',
   '/settings',
 ]);
 
@@ -285,17 +286,47 @@ const roleMenus: Record<Role, MenuItem[]> = {
       requirement: 'Flow C, Q1',
     },
   ],
+  CONTENT_CREATOR: [
+    {
+      id: 'creator-feed',
+      label: 'News Feed',
+      sublabel: 'Lihat artikel seperti yang dibaca tim',
+      icon: 'newspaper-variant-outline',
+      route: '/news',
+      requirement: 'News Feed',
+      primary: true,
+    },
+    {
+      id: 'creator-studio',
+      label: 'Tulis Artikel',
+      sublabel: 'Dibuka di panel web Soul Coffeemate',
+      icon: 'pencil-outline',
+      route: '/creator/studio',
+      requirement: 'News Feed — CMS',
+    },
+  ],
 };
 
 /**
- * Entries every role gets, appended rather than repeated five times.
+ * Entries every role gets, appended rather than repeated six times.
  *
- * Settings is universal on purpose: the sign-in PIN it manages is an account-level convenience,
- * not a role capability, and a Rider needs it exactly as much as a staff member does. Appending
- * here also means a future shared screen cannot be added to four roles and forgotten on the
- * fifth — which is precisely the kind of gap five hand-maintained arrays produce.
+ * Settings is universal because the sign-in PIN it manages is an account-level convenience, not a
+ * role capability — a Rider needs it exactly as much as a staff member does. News is universal
+ * because the server already decides who sees which article, by `audience_roles`: duplicating
+ * that decision in the client menu would only create a second place for it to be wrong.
+ *
+ * Appending also means a future shared screen cannot be added to five roles and forgotten on the
+ * sixth, which is precisely the gap six hand-maintained arrays produce.
  */
 const SHARED_ITEMS: MenuItem[] = [
+  {
+    id: 'news',
+    label: 'News Feed',
+    sublabel: 'Kabar, promo & tips dari tim konten',
+    icon: 'newspaper-variant-outline',
+    route: '/news',
+    requirement: 'News Feed',
+  },
   {
     id: 'settings',
     label: 'Pengaturan',
@@ -307,5 +338,11 @@ const SHARED_ITEMS: MenuItem[] = [
 ];
 
 export const menuByRole: Record<Role, MenuItem[]> = Object.fromEntries(
-  Object.entries(roleMenus).map(([role, items]) => [role, [...items, ...SHARED_ITEMS]]),
+  Object.entries(roleMenus).map(([role, items]) => {
+    // A role that already lists a shared route keeps its own entry — CONTENT_CREATOR puts News
+    // first as its primary tile, and appending the shared copy would show it the same screen
+    // twice.
+    const own = new Set(items.map((item) => item.route));
+    return [role, [...items, ...SHARED_ITEMS.filter((item) => !own.has(item.route))]];
+  }),
 ) as Record<Role, MenuItem[]>;

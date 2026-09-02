@@ -173,6 +173,7 @@ export async function loginAsDemoRole(role: Role): Promise<Session> {
     },
     RIDER: { id: 'demo-rider', name: 'Rider Demo', role: 'RIDER' },
     STAFF: { id: 'demo-staff', name: 'Maufu', role: 'STAFF', cartCode: '0018', cartId: 1 },
+    CONTENT_CREATOR: { id: 'demo-creator', name: 'Creator Demo', role: 'CONTENT_CREATOR' },
   };
 
   return { token: `demo-token-${role.toLowerCase()}`, user: demoUsers[role] };

@@ -143,3 +143,28 @@ export type BadgeCounts = {
   readyToPick: number;
   myRequests: number;
 };
+
+/** One article in the in-app feed. Authored in the Filament panel by a CONTENT_CREATOR. */
+export type NewsPost = {
+  id: number;
+  slug: string;
+  title: string;
+  /** The short, loud line above the title. Optional — the card drops the strip when absent. */
+  kicker: string | null;
+  excerpt: string | null;
+  cover_url: string | null;
+  tags: string[];
+  /** Hex, set per-post in the CMS so a creator can re-theme a card without a new APK. */
+  accent_color: string | null;
+  is_highlighted: boolean;
+  published_at: string | null;
+  author_name: string | null;
+  reaction_counts: Partial<Record<NewsReaction, number>>;
+  my_reaction: NewsReaction | null;
+  is_read: boolean;
+  /** Only present on the detail response — the list deliberately omits it. */
+  body?: string;
+};
+
+export const NEWS_REACTIONS = ['api', 'mantap', 'semangat', 'bingung'] as const;
+export type NewsReaction = (typeof NEWS_REACTIONS)[number];

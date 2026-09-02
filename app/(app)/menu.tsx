@@ -9,9 +9,10 @@ import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { CountBadge } from '@/components/ui/Badge';
 import { SoulLogo } from '@/components/brand/SoulLogo';
+import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { IMPLEMENTED_ROUTES, menuByRole, type MenuItem } from '@/features/navigation/menu';
-import { roleMeta } from '@/domain/roles';
+import { ROLES, roleMeta } from '@/domain/roles';
 import { brand, elevation, neutral, radius, semantic, space, touch } from '@/theme';
 
 /**
@@ -105,7 +106,7 @@ export default function MenuScreen() {
           </View>
           <View style={styles.roleText}>
             <Text variant="micro" color={brand[700]}>
-              ROLE {meta.priority} DARI 5
+              ROLE {meta.priority} DARI {ROLES.length}
             </Text>
             <Text variant="h2">{meta.label}</Text>
             <Text variant="caption" color={semantic.textMuted}>
@@ -135,6 +136,11 @@ export default function MenuScreen() {
           </View>
         ) : null}
       </Card>
+
+      {/* Sits above the menu because it is the only thing on this screen that changes without the
+          user doing anything, and it renders nothing at all when there is no highlighted post —
+          see NewsSlider for why a permanent empty state here would be worse than no slider. */}
+      <NewsSlider />
 
       <Text variant="micro" color={semantic.textSubtle} style={styles.sectionLabel}>
         MENU UTAMA
