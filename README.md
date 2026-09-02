@@ -60,6 +60,55 @@ Before distributing anything, generate an upload keystore and wire it into
 exists. Adopt this for CI and store releases; the local Gradle path stays the fastest loop for
 day-to-day APKs.
 
+## APK size
+
+Every setting that controls release size lives in the `expo-build-properties` block of
+`app.json`, never in `android/` — that directory is generated and `prebuild --clean` throws
+away anything edited there by hand.
+
+```bash
+npm run apk:release        # arm64-v8a + armeabi-v7a  → 22.7 MB
+npm run apk:release:arm64  # arm64-v8a only           → 17.1 MB
+npm run apk:size           # compressed breakdown by group
+npm run apk:verify         # asserts nothing needed was stripped
+```
+
+Measured on this project, release build, same commit:
+
+| Configuration | APK |
+| --- | --- |
+| Expo defaults (4 ABIs, no R8) | 95.5 MB |
+| Published `v1.0.0` demo (2 ABIs, no R8) | 56 MB |
+| **Published `v1.0.1` demo — current settings (2 ABIs)** | **22.7 MB** |
+| Current settings, `apk:release:arm64` | 17.1 MB |
+
+What each setting is worth, largest first:
+
+- **`buildArchs`** — the default bundles four ABIs into one universal APK. `x86` and `x86_64`
+  are emulator-only and were **40 MB of the 95 MB baseline**: 42% of the download, unusable on
+  every real phone. Dropping them is the single biggest win.
+- **`useLegacyPackaging: true`** — stores `.so` DEFLATEd instead of STORED. Native code is
+  still ~55% of what remains, so this roughly halves it. Costs a little first-launch time as
+  the libraries are extracted at install.
+- **`enableMinifyInReleaseBuilds` + `enableShrinkResourcesInReleaseBuilds`** — R8. Took dex
+  from 14.5 MB to 6.0 MB.
+- **`enableBundleCompression: true`** — compresses the Hermes bundle in `assets/` (off by
+  default since RN 0.79, which favours startup time over size).
+
+`metro.config.js` additionally aliases away `@expo-google-fonts/material-symbols`. `expo-router`
+pulls in `expo-symbols` for its NativeTabs icons, and that reads the 963 KB Material Symbols
+font at module-evaluation time, so Metro — which has no tree shaking — bundles it even though
+this app uses `<Stack>` only and draws every icon with MaterialCommunityIcons. See
+`stubs/material-symbols-font.js` for the invariant that keeps the alias safe.
+
+**Verify after changing any of this.** R8 and `shrinkResources` are the risky half: React
+Native resolves fonts and images by name through `Resources.getIdentifier()`, which the
+resource shrinker cannot see, so a stripped font shows up as blank icons at runtime rather
+than as a build error. `npm run apk:verify` reads the built APK and checks the assets by
+content — the shrinker renames `res/raw/…MaterialCommunityIcons.ttf` to `res/oI.ttf`, so
+matching on path gives false failures.
+
+
 ## Where the built APK lives
 
 The demo APK is published in the backend repository, alongside the credentials and install
@@ -67,18 +116,26 @@ instructions it needs, so everything a tester opens on their phone is in one pla
 
 **https://github.com/rizalvalry/soul_coffe.backend/tree/main/dist**
 
-- `soul-coffeemate-DEMO-v1.0.0.apk` — 55 MB, `id.soulcoffeemate.ops.demo`, Android 7.0+,
-  arm64-v8a + armeabi-v7a. Runs with no server, no database, no network.
+- `soul-coffeemate-DEMO-v1.0.1.apk` — 22.7 MB, `id.soulcoffeemate.ops.demo`, Android 7.0+,
+  arm64-v8a + armeabi-v7a. Runs with no server, no database, no network. Same signing
+  certificate as v1.0.0, so it installs over it in place.
+- `soul-coffeemate-DEMO-v1.0.0-legacy.apk` — 56 MB, kept as a rollback: same behaviour, built
+  before R8/shrinkResources/native-lib compression were turned on. Prefer v1.0.1; fall back to
+  this only if something in it misbehaves, and report what broke before switching.
 - `DEMO-ACCESS.md` in that repo has the five login accounts, the staff PIN, the install steps,
   and the 8-step walkthrough.
 
-It is deliberately NOT duplicated here: two copies of a 55 MB binary in two public repos invites
-the question of which one is current, and the answer would eventually be wrong.
+It is deliberately NOT duplicated here: two copies of a multi-megabyte binary in two public
+repos invites the question of which one is current, and the answer would eventually be wrong.
 
-**This APK has never been executed.** The build machine had no emulator and no device attached.
-Its signature, manifest, permissions and bundled contents were all verified against the file
-itself, and the flow logic was proven by executing the state machine directly — but nobody has
-yet tapped a button in it.
+**v1.0.1 has never been executed.** The build machine had no emulator matching either shipped
+ABI and no device attached. Its signature, manifest, permissions and bundled contents were all
+verified against the file itself — including a byte-for-byte diff of every native module
+against the last APK that *was* running in the field — but nobody has yet tapped a button in
+this build. R8 is now enabled, which is the one change class of bug that a static diff cannot
+rule out: code reached only through reflection can be stripped without any build error. If the
+four flows that touch native modules (login, refill photo, signature capture, rider location)
+misbehave, that is the first thing to suspect — see "APK size" above for what changed and why.
 
 ## Structure
 

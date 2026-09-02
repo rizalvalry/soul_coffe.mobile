@@ -8,6 +8,7 @@
     "@react-native-community/netinfo": "^12.0.1",
     "@tanstack/react-query": "^5.102.8",
     "expo": "~57.0.18",
+    "expo-build-properties": "~57.0.16",
     "expo-constants": "~57.0.16",
     "expo-crypto": "~57.0.2",
     "expo-file-system": "~57.0.6",
@@ -40,7 +41,11 @@
     "typecheck": "tsc --noEmit",
     "prebuild": "expo prebuild -p android --clean",
     "apk:debug": "cd android && gradlew.bat assembleDebug",
-    "apk:release": "cd android && gradlew.bat assembleRelease"
+    "apk:release": "cd android && gradlew.bat assembleRelease",
+    "apk:release:arm64": "cd android && gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a",
+    "apk:bundle": "cd android && gradlew.bat bundleRelease",
+    "apk:size": "node scripts/apk-size.js",
+    "apk:verify": "node scripts/apk-verify.js"
   },
   "private": true,
   "overrides": {
