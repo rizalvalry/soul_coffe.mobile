@@ -100,6 +100,45 @@ function messageFrom(body: unknown, status: number): string {
   return `Permintaan gagal (${status}).`;
 }
 
+/**
+ * A 401 is the only thing that ends a session other than the user tapping Keluar, so it must be
+ * believed only when it is actually about the token.
+ *
+ * The server issues Sanctum tokens with `'expiration' => null` — they never lapse. A 401 that
+ * arrives anyway is far more often something else: a request that raced ahead of `restore()` and
+ * carried no token at all, or an edge/error page that answered 401 on the server's behalf.
+ * Signing out on those is what produced the repeated re-logins, because each one silently threw
+ * away a token that was still perfectly valid.
+ *
+ * So the token is re-checked once against `/me` before anything is discarded. `probing` keeps
+ * that check from recursing when it is itself answered with a 401.
+ */
+let probing = false;
+
+async function tokenIsStillValid(token: string): Promise<boolean> {
+  if (probing) return false;
+  probing = true;
+  try {
+    const response = await fetch(`${apiBaseUrl()}/me`, {
+      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+    });
+    return response.ok;
+  } catch {
+    // The probe could not reach the server, so nothing was learned about the token. Keep the
+    // session: losing it over a dead network is the failure being fixed here.
+    return true;
+  } finally {
+    probing = false;
+  }
+}
+
+async function handleUnauthorized(token: string | undefined): Promise<void> {
+  // Nothing was sent, so nothing was rejected — there is no session to invalidate.
+  if (!token) return;
+  if (await tokenIsStillValid(token)) return;
+  void useAuth.getState().signOut();
+}
+
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, idempotencyKey, signal } = options;
 
@@ -136,9 +175,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const parsed = await parseBody(response);
 
   if (response.status === 401) {
-    // The token is gone or revoked. Drop the session so the UI returns to login rather than
-    // looping on 401s behind every screen.
-    void useAuth.getState().signOut();
+    await handleUnauthorized(token);
     throw new ApiError('Sesi berakhir. Silakan masuk kembali.', 401, parsed);
   }
 
@@ -269,7 +306,7 @@ export async function uploadFileWithStatus<T>(
     const parsed = parseText(result.body);
 
     if (result.status === 401) {
-      void useAuth.getState().signOut();
+      await handleUnauthorized(token);
       throw new ApiError('Sesi berakhir. Silakan masuk kembali.', 401, parsed);
     }
 

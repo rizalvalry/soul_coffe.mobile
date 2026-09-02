@@ -1,31 +1,22 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/features/auth/store';
-import { SoulLogo } from '@/components/brand/SoulLogo';
-import { brand, semantic, space } from '@/theme';
+import { useOnboarding } from '@/features/onboarding/store';
 
-/** Entry gate: hold on the splash while the stored session is read, then route by auth state. */
+/**
+ * Entry gate.
+ *
+ * Renders nothing while state is still loading — the branded splash in `_layout.tsx` is painted
+ * over the whole stack until then, so anything drawn here would only flash underneath it.
+ */
 export default function Index() {
   const status = useAuth((s) => s.status);
+  const onboarding = useOnboarding((s) => s.status);
 
-  if (status === 'restoring') {
-    return (
-      <View style={styles.splash}>
-        <SoulLogo size={120} />
-        <ActivityIndicator color={brand[600]} style={styles.spinner} />
-      </View>
-    );
-  }
+  if (status === 'restoring' || onboarding === 'loading') return null;
+
+  // The tour comes before the login screen: it explains what the app is for, which is worth more
+  // to someone opening it for the first time than a password prompt.
+  if (onboarding === 'pending') return <Redirect href="/onboarding" />;
 
   return <Redirect href={status === 'authenticated' ? '/menu' : '/login'} />;
 }
-
-const styles = StyleSheet.create({
-  splash: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: semantic.surface,
-  },
-  spinner: { marginTop: space['3xl'] },
-});

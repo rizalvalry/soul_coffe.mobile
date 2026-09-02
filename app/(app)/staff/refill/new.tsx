@@ -9,7 +9,7 @@ import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { QtyStepper } from '@/components/ui/QtyStepper';
+import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
@@ -174,7 +174,12 @@ export default function NewRefillScreen() {
   }
 
   return (
-    <Screen>
+    <Screen
+      refreshing={productsQuery.isRefetching}
+      // Disabled mid-submit: pulling the list out from under an in-flight upload would be a
+      // surprising way to lose a photo that is already on the wire.
+      {...(isSubmitting ? {} : { onRefresh: () => void productsQuery.refetch() })}
+    >
       <View style={styles.top}>
         <Button
           label="Kembali"
@@ -217,24 +222,22 @@ export default function NewRefillScreen() {
           />
         </Card>
       ) : (
-        <Card style={styles.linesCard}>
+        /* A grid of photographs, not a list of names. Staff recognise the drink they are out of
+           by sight long before they read its name, and two columns keeps every tile inside a
+           thumb's reach. */
+        <View style={styles.grid}>
           {productsQuery.data.map((product) => (
-            <View key={product.id} style={styles.lineRow}>
-              <View style={styles.lineInfo}>
-                <Text variant="bodyStrong">{product.name}</Text>
-                <Text variant="caption" color={semantic.textMuted}>
-                  {product.unit}
-                </Text>
-              </View>
-              <QtyStepper
+            <View key={product.id} style={styles.gridCell}>
+              <ProductPickerCard
+                product={product}
                 value={qty[product.id] ?? 0}
-                onChange={(next) => setQty((prev) => ({ ...prev, [product.id]: next }))}
                 max={MAX_PER_LINE}
                 disabled={isSubmitting}
+                onChange={(next) => setQty((prev) => ({ ...prev, [product.id]: next }))}
               />
             </View>
           ))}
-        </Card>
+        </View>
       )}
 
       <Card accent style={styles.totalCard}>
@@ -332,14 +335,8 @@ const styles = StyleSheet.create({
   top: { alignItems: 'flex-start' },
   stateCard: { gap: space.md },
 
-  linesCard: { gap: space.md },
-  lineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: space.md,
-  },
-  lineInfo: { flex: 1, gap: space.xxs },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  gridCell: { width: '47.5%', flexGrow: 1 },
 
   totalCard: { alignItems: 'center', gap: space.xxs },
 

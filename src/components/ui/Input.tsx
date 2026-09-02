@@ -27,6 +27,8 @@ export function Input({
   hint,
   secure = false,
   containerStyle,
+  onFocus,
+  onBlur,
   ...rest
 }: InputProps) {
   const [focused, setFocused] = useState(false);
@@ -57,10 +59,18 @@ export function Input({
           style={styles.input}
           placeholderTextColor={semantic.textSubtle}
           secureTextEntry={secure && !revealed}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
           accessibilityLabel={label}
           {...rest}
+          // After the spread, so a caller passing onFocus/onBlur adds to the focus ring rather
+          // than silently replacing it — react-hook-form's onBlur used to do exactly that.
+          onFocus={(e) => {
+            setFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={(e) => {
+            setFocused(false);
+            onBlur?.(e);
+          }}
         />
 
         {secure ? (

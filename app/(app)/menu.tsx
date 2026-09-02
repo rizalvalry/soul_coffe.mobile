@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { Screen } from '@/components/ui/Screen';
@@ -29,9 +30,18 @@ export default function MenuScreen() {
   const session = useAuth((s) => s.session);
   const signOut = useAuth((s) => s.signOut);
   const badges = useMenuBadges();
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
 
   const user = session?.user;
   const items = useMemo(() => (user ? menuByRole[user.role] : []), [user]);
+
+  // Declared above the `!user` bail-out: a hook after an early return runs conditionally, which
+  // is exactly the ordering violation React cannot recover from.
+  const refreshAll = useCallback(() => {
+    setRefreshing(true);
+    void queryClient.invalidateQueries().finally(() => setRefreshing(false));
+  }, [queryClient]);
 
   if (!user) return null;
 
@@ -61,7 +71,9 @@ export default function MenuScreen() {
   };
 
   return (
-    <Screen>
+    // The menu owns no query of its own, so its pull-to-refresh drops every cached read instead.
+    // That is what a user actually means by pulling here: refresh the app, not this one screen.
+    <Screen refreshing={refreshing} onRefresh={refreshAll}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <SoulLogo size={44} showWordmark={false} />

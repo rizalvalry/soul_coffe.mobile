@@ -46,7 +46,7 @@ export default function StaffRequestDetailScreen() {
   }, [doCancel]);
 
   return (
-    <Screen>
+    <Screen refreshing={refillQuery.isRefetching} onRefresh={() => void refillQuery.refetch()}>
       <View style={styles.top}>
         <Button
           label="Kembali"

@@ -125,8 +125,14 @@ export default function BaristaAllocationScreen() {
     );
   }
 
+  const refreshing = staffQuery.isRefetching || productsQuery.isRefetching;
+  const refresh = () => {
+    void staffQuery.refetch();
+    void productsQuery.refetch();
+  };
+
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={refresh}>
       <Text variant="h2">Alokasi Harian</Text>
       <Text variant="caption" color={semantic.textMuted}>
         Pilih staff yang bertugas, sesuaikan jumlah dari target standar, lalu kirim.

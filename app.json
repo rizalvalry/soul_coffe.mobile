@@ -3,23 +3,18 @@
     "name": "Soul Coffeemate",
     "slug": "soul-coffeemate",
     "scheme": "soulcoffeemate",
-    "version": "1.0.3",
+    "version": "1.0.5",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#00A3AA"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "id.soulcoffeemate.ops"
     },
     "android": {
       "package": "id.soulcoffeemate.ops.demo",
-      "versionCode": 4,
+      "versionCode": 6,
       "minSdkVersion": 26,
       "adaptiveIcon": {
         "backgroundColor": "#00A3AA",
@@ -42,6 +37,15 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FFFFFF",
+          "image": "./assets/logo-lockup.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ],
       [
         "expo-image-picker",
         {

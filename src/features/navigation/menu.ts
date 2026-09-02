@@ -50,9 +50,10 @@ export const IMPLEMENTED_ROUTES: ReadonlySet<string> = new Set([
   '/rider/available',
   '/rider/active',
   '/rider/history',
+  '/settings',
 ]);
 
-export const menuByRole: Record<Role, MenuItem[]> = {
+const roleMenus: Record<Role, MenuItem[]> = {
   ADMINISTRATOR: [
     {
       id: 'admin-users',
@@ -285,3 +286,26 @@ export const menuByRole: Record<Role, MenuItem[]> = {
     },
   ],
 };
+
+/**
+ * Entries every role gets, appended rather than repeated five times.
+ *
+ * Settings is universal on purpose: the sign-in PIN it manages is an account-level convenience,
+ * not a role capability, and a Rider needs it exactly as much as a staff member does. Appending
+ * here also means a future shared screen cannot be added to four roles and forgotten on the
+ * fifth — which is precisely the kind of gap five hand-maintained arrays produce.
+ */
+const SHARED_ITEMS: MenuItem[] = [
+  {
+    id: 'settings',
+    label: 'Pengaturan',
+    sublabel: 'PIN masuk dan info akun',
+    icon: 'cog-outline',
+    route: '/settings',
+    requirement: '§14 Q8 — akses perangkat',
+  },
+];
+
+export const menuByRole: Record<Role, MenuItem[]> = Object.fromEntries(
+  Object.entries(roleMenus).map(([role, items]) => [role, [...items, ...SHARED_ITEMS]]),
+) as Record<Role, MenuItem[]>;

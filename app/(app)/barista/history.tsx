@@ -29,8 +29,14 @@ export default function BaristaHistoryScreen() {
     (a, b) => new Date(b.submitted_at).getTime() - new Date(a.submitted_at).getTime(),
   );
 
+  const refreshing = refillsQuery.isRefetching || staffQuery.isRefetching;
+  const refresh = () => {
+    void refillsQuery.refetch();
+    void staffQuery.refetch();
+  };
+
   return (
-    <Screen>
+    <Screen refreshing={refreshing} onRefresh={refresh}>
       <Text variant="h2">Riwayat</Text>
 
       <View style={styles.section}>

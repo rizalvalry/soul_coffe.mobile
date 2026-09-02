@@ -23,7 +23,10 @@ export default function StaffAllocationScreen() {
   const allocationQuery = useMyAllocation();
 
   return (
-    <Screen>
+    <Screen
+      refreshing={allocationQuery.isRefetching}
+      onRefresh={() => void allocationQuery.refetch()}
+    >
       <View style={styles.top}>
         <Button
           label="Kembali"
