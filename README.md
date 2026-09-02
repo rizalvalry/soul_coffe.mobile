@@ -60,6 +60,26 @@ Before distributing anything, generate an upload keystore and wire it into
 exists. Adopt this for CI and store releases; the local Gradle path stays the fastest loop for
 day-to-day APKs.
 
+## Where the built APK lives
+
+The demo APK is published in the backend repository, alongside the credentials and install
+instructions it needs, so everything a tester opens on their phone is in one place:
+
+**https://github.com/rizalvalry/soul_coffe.backend/tree/main/dist**
+
+- `soul-coffeemate-DEMO-v1.0.0.apk` — 55 MB, `id.soulcoffeemate.ops.demo`, Android 7.0+,
+  arm64-v8a + armeabi-v7a. Runs with no server, no database, no network.
+- `DEMO-ACCESS.md` in that repo has the five login accounts, the staff PIN, the install steps,
+  and the 8-step walkthrough.
+
+It is deliberately NOT duplicated here: two copies of a 55 MB binary in two public repos invites
+the question of which one is current, and the answer would eventually be wrong.
+
+**This APK has never been executed.** The build machine had no emulator and no device attached.
+Its signature, manifest, permissions and bundled contents were all verified against the file
+itself, and the flow logic was proven by executing the state machine directly — but nobody has
+yet tapped a button in it.
+
 ## Structure
 
 ```
