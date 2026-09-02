@@ -313,6 +313,17 @@ export default function NewRefillScreen() {
         loading={isSubmitting}
         disabled={isSubmitting}
       />
+
+      {/* The photo is re-encoded on the device before it is sent (lib/image.ts), so submit is a
+          multi-second operation with two distinct stages. Naming the stage is what stops a staff
+          member from deciding the app has frozen and killing it mid-upload. */}
+      {isSubmitting ? (
+        <Text variant="caption" color={semantic.textSubtle} center>
+          {uploadEvidence.isPending
+            ? 'Mengompres dan mengunggah foto bukti...'
+            : 'Mengirim request...'}
+        </Text>
+      ) : null}
     </Screen>
   );
 }

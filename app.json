@@ -3,7 +3,7 @@
     "name": "Soul Coffeemate",
     "slug": "soul-coffeemate",
     "scheme": "soulcoffeemate",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -19,7 +19,7 @@
     },
     "android": {
       "package": "id.soulcoffeemate.ops.demo",
-      "versionCode": 3,
+      "versionCode": 4,
       "minSdkVersion": 26,
       "adaptiveIcon": {
         "backgroundColor": "#00A3AA",

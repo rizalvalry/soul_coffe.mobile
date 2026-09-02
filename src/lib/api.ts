@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { File, UploadTask, UploadType } from 'expo-file-system';
 import { useAuth } from '@/features/auth/store';
 import { isDemoMode } from '@/features/demo/config';
 import { demoRequest, demoUpload } from '@/features/demo/router';
@@ -157,6 +158,27 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
  *  to tell those apart use the `*WithStatus` variants; everything else keeps the plain shape. */
 export type ApiResult<T> = { data: T; status: number };
 
+/** Transport-level upload attempts. The body is a real file on disk, so a retry re-sends
+ *  identical bytes — see `uploadFileWithStatus()` for why that is safe here. */
+const UPLOAD_ATTEMPTS = 3;
+
+function uploadRetryDelay(attempt: number): number {
+  return 800 * 2 ** attempt; // 800ms, 1.6s
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseText(text: string): unknown {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
 /**
  * Multipart upload for the evidence photo (R3) and the delivery signature (R5).
  *
@@ -164,14 +186,29 @@ export type ApiResult<T> = { data: T; status: number };
  * `/refills/{id}/deliver` expects `signature` (docs/04). Hardcoding `file` made every delivery
  * fail with `422 The signature field is required` — a break only an end-to-end run catches,
  * because unit tests post the correct field name directly.
+ *
+ * This does NOT use `fetch` + `FormData`, and that is deliberate. React Native's Android
+ * multipart encoder derives each file part's `Content-Length` from `InputStream.available()`
+ * (`RequestBodyUtil.kt`) — a guess, not the file size, as React Native's own comment in
+ * `ProgressRequestBody.kt` admits — and marks the part `isOneShot`, so OkHttp may not replay it.
+ * A body whose declared length can disagree with what is actually written, on a connection that
+ * cannot be retried, fails routinely on a cellular uplink: the server tears the connection down
+ * and `fetch` rejects with no HTTP status at all. That is what surfaced to staff as the opaque
+ * "Upload gagal. Periksa koneksi." while the very same request succeeded from cURL every time.
+ *
+ * `UploadTask` streams the file natively instead: an exact `Content-Length` taken from the file
+ * on disk, a replayable body, and — critically for diagnosis — it RESOLVES on every completed
+ * HTTP response including 4xx/5xx, so a validation failure now arrives as its real message
+ * rather than being mistaken for a dead network.
  */
 export async function uploadFile<T>(
   path: string,
   file: { uri: string; name: string; type: string },
   fields: Record<string, string> = {},
   fieldName = 'file',
+  idempotencyKey?: string,
 ): Promise<T> {
-  return (await uploadFileWithStatus<T>(path, file, fields, fieldName)).data;
+  return (await uploadFileWithStatus<T>(path, file, fields, fieldName, idempotencyKey)).data;
 }
 
 export async function uploadFileWithStatus<T>(
@@ -179,6 +216,7 @@ export async function uploadFileWithStatus<T>(
   file: { uri: string; name: string; type: string },
   fields: Record<string, string> = {},
   fieldName = 'file',
+  idempotencyKey?: string,
 ): Promise<ApiResult<T>> {
   if (isDemoMode()) {
     try {
@@ -190,30 +228,71 @@ export async function uploadFileWithStatus<T>(
 
   const token = useAuth.getState().session?.token;
 
-  const form = new FormData();
-  // React Native's FormData accepts this shape; it is not the browser File API.
-  form.append(fieldName, file as unknown as Blob);
-  for (const [key, value] of Object.entries(fields)) form.append(key, value);
-
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
+  // Every state transition the server guards with `idempotent:require` (R12) — `/deliver` is
+  // one — rejects a request without this header, multipart included.
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
-  let response: Response;
-  try {
-    response = await fetch(`${apiBaseUrl()}${path}`, { method: 'POST', headers, body: form });
-  } catch {
-    throw new ApiError('Upload gagal. Periksa koneksi.', 0);
+  const url = `${apiBaseUrl()}${path}`;
+  let lastTransportError: unknown = null;
+
+  for (let attempt = 0; attempt < UPLOAD_ATTEMPTS; attempt++) {
+    const task = new UploadTask(new File(file.uri), url, {
+      httpMethod: 'POST',
+      uploadType: UploadType.MULTIPART,
+      fieldName,
+      mimeType: file.type,
+      headers,
+      parameters: fields,
+    });
+
+    let result: { body: string; status: number };
+    try {
+      result = await task.uploadAsync();
+    } catch (e) {
+      // No HTTP response at all: an unreadable file or a broken connection. Only this class of
+      // failure is retried — a server that answered has already made its decision.
+      lastTransportError = e;
+      if (attempt < UPLOAD_ATTEMPTS - 1) await sleep(uploadRetryDelay(attempt));
+      continue;
+    } finally {
+      // Freeing the native handle is housekeeping — it must never be the thing that fails the
+      // upload the caller is waiting on.
+      try {
+        task.release();
+      } catch {
+        // Already released, or the task never reached native. Nothing to recover.
+      }
+    }
+
+    const parsed = parseText(result.body);
+
+    if (result.status === 401) {
+      void useAuth.getState().signOut();
+      throw new ApiError('Sesi berakhir. Silakan masuk kembali.', 401, parsed);
+    }
+
+    if (result.status < 200 || result.status >= 300) {
+      throw new ApiError(messageFrom(parsed, result.status), result.status, parsed);
+    }
+
+    const data =
+      parsed && typeof parsed === 'object' && 'data' in (parsed as Record<string, unknown>)
+        ? (parsed as { data: T }).data
+        : (parsed as T);
+
+    return { data, status: result.status };
   }
 
-  const parsed = await parseBody(response);
-  if (!response.ok) {
-    throw new ApiError(messageFrom(parsed, response.status), response.status, parsed);
-  }
+  // Every attempt died before the server answered. The underlying reason is carried through
+  // verbatim: swallowing it is what made this failure mode undiagnosable for weeks.
+  const detail =
+    lastTransportError instanceof Error && lastTransportError.message
+      ? lastTransportError.message
+      : String(lastTransportError ?? 'penyebab tidak diketahui');
 
-  const data =
-    parsed && typeof parsed === 'object' && 'data' in (parsed as Record<string, unknown>)
-      ? (parsed as { data: T }).data
-      : (parsed as T);
-
-  return { data, status: response.status };
+  throw new ApiError(`Upload gagal setelah ${UPLOAD_ATTEMPTS} percobaan. ${detail}`, 0, {
+    detail,
+  });
 }

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { request, uploadFile, uploadFileWithStatus, uuidv4 } from '@/lib/api';
+import { compressForUpload } from '@/lib/image';
 import {
   toAllocation,
   toAppNotification,
@@ -179,14 +180,21 @@ export type UploadEvidenceInput = {
   takenAt: string;
 };
 
+/**
+ * Compression lives inside the mutation, not in the screen, so no future caller can reach
+ * `/media/evidence` with a raw multi-megabyte camera frame by forgetting a step — see
+ * `lib/image.ts` for why the size of that frame is the problem.
+ */
 export function useUploadEvidence() {
   return useMutation({
-    mutationFn: (input: UploadEvidenceInput) =>
-      uploadFile<{ id: number; url: string }>(
+    mutationFn: async (input: UploadEvidenceInput) => {
+      const compressed = await compressForUpload(input.uri);
+      return uploadFile<{ id: number; url: string }>(
         '/media/evidence',
-        { uri: input.uri, name: 'evidence.jpg', type: 'image/jpeg' },
+        { uri: compressed.uri, name: 'evidence.jpg', type: 'image/jpeg' },
         { taken_at: input.takenAt },
-      ),
+      );
+    },
   });
 }
 
@@ -323,6 +331,9 @@ export function useDeliverRefill() {
           },
           // The deliver endpoint names this part `signature`, not `file` (docs/04).
           'signature',
+          // `/deliver` carries `idempotent:require`; without this header the server answers 422
+          // "Header Idempotency-Key wajib dikirim untuk aksi ini." before the handler ever runs.
+          uuidv4(),
         ),
         unitLookup(client),
       ]);
