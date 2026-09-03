@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   Animated,
-  FlatList,
   Image,
   Pressable,
   StyleSheet,

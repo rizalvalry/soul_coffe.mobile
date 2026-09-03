@@ -3,7 +3,7 @@
     "name": "Soul Coffeemate",
     "slug": "soul-coffeemate",
     "scheme": "soulcoffeemate",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "id.soulcoffeemate.ops.demo",
-      "versionCode": 7,
+      "versionCode": 8,
       "minSdkVersion": 26,
       "adaptiveIcon": {
         "backgroundColor": "#00A3AA",
@@ -72,7 +72,7 @@
             ],
             "networkInspector": false,
             "enableBundleCompression": true,
-            "extraProguardRules": "# OkHttp (via React Native networking) references optional TLS providers that are\n# never on the runtime classpath. AGP 8 escalates the missing-class warning to a\n# build failure, so they are silenced explicitly rather than left to chance.\n-dontwarn org.conscrypt.**\n-dontwarn org.bouncycastle.**\n-dontwarn org.openjsse.**\n\n# Hermes + Expo module registries resolve these through JNI/reflection, so R8\n# cannot see the call sites and would otherwise strip them.\n-keepclasseswithmembernames class * { native <methods>; }\n\n# expo-splash-screen resolves these Expo Kotlin type helpers reflectively from its module\n# definition, so R8 sees the reference but never the call site and reports them missing.\n# AGP 8 turns that warning into a build failure, so they are named explicitly.\n-dontwarn expo.modules.kotlin.types.**\n-keep class expo.modules.kotlin.types.** { *; }"
+            "extraProguardRules": "# OkHttp (via React Native networking) references optional TLS providers that are\n# never on the runtime classpath. AGP 8 escalates the missing-class warning to a\n# build failure, so they are silenced explicitly rather than left to chance.\n-dontwarn org.conscrypt.**\n-dontwarn org.bouncycastle.**\n-dontwarn org.openjsse.**\n\n# Hermes + Expo module registries resolve these through JNI/reflection, so R8\n# cannot see the call sites and would otherwise strip them.\n-keepclasseswithmembernames class * { native <methods>; }"
           }
         }
       ]
