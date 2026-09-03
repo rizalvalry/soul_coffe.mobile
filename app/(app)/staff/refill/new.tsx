@@ -64,6 +64,7 @@ export default function NewRefillScreen() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [gps, setGps] = useState<GpsCoords | null>(null);
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
+  const [placeName, setPlaceName] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
   // GPS is best-effort — a denial or an unavailable service must never block submit (E10).
@@ -80,9 +81,33 @@ export default function NewRefillScreen() {
         const position = await Location.getCurrentPositionAsync({
           accuracy: Location.LocationAccuracy.Balanced,
         });
-        if (!cancelled) {
-          setGps({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setGpsStatus('granted');
+        if (cancelled) return;
+
+        setGps({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setGpsStatus('granted');
+
+        // The address is for the human reading this screen; the request itself carries the raw
+        // coordinates either way (submitted below via `gps`), so this runs after the coordinates
+        // are already committed above, and its failure is silent — a staff member must never be
+        // blocked from filing a request because the device's geocoder was slow or offline.
+        try {
+          const [place] = await Location.reverseGeocodeAsync({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+
+          if (cancelled || !place) return;
+
+          // Street then district then city, which is how a field address is actually read out
+          // loud here. Falsy and duplicate parts are dropped so a village that repeats its city
+          // does not read "Cilandak, Cilandak".
+          const parts = [place.street, place.district ?? place.subregion, place.city ?? place.region]
+            .filter((part): part is string => Boolean(part))
+            .filter((part, index, all) => all.indexOf(part) === index);
+
+          if (parts.length > 0) setPlaceName(parts.join(', '));
+        } catch {
+          // Leave placeName null; the header falls back to the plain "Lokasi terdeteksi".
         }
       } catch {
         if (!cancelled) setGpsStatus('unavailable');
@@ -202,13 +227,33 @@ export default function NewRefillScreen() {
         <IconButton icon="chevron-left" label="Kembali" tone="translucent" disabled={isSubmitting} onPress={() => router.back()} />
       </View>
 
-      <View>
+      <View style={styles.headerBlock}>
         <Text variant="h2" color={LIGHT_TEXT}>
           Request Refill
         </Text>
         <Text variant="caption" color={LIGHT_MUTED}>
           Gerobak {user.cartCode ?? '-'}
         </Text>
+
+        {/* The address a coordinate pair alone cannot tell a reviewer — reverse-geocoded from the
+            same fix that goes into the request, on-device, so it works with no server round trip
+            and needs no separate maps key. Placed directly under the cart code because this is
+            the two-line answer to "which cart, and where" that everyone downstream (barista,
+            finance, rider) actually reads this screen for. */}
+        <View style={styles.locationRow}>
+          <MaterialCommunityIcons
+            name={gpsStatus === 'granted' ? 'map-marker' : 'map-marker-off-outline'}
+            size={14}
+            color={gpsStatus === 'granted' ? brand[300] : LIGHT_SUBTLE}
+          />
+          <Text variant="caption" color={gpsStatus === 'granted' ? LIGHT_MUTED : LIGHT_SUBTLE} numberOfLines={1} style={styles.locationText}>
+            {gpsStatus === 'checking'
+              ? 'Mendeteksi lokasi...'
+              : gpsStatus === 'granted'
+                ? (placeName ?? 'Lokasi terdeteksi')
+                : 'Tanpa GPS — tetap bisa dikirim'}
+          </Text>
+        </View>
       </View>
 
       <SectionTitle
@@ -286,17 +331,6 @@ export default function NewRefillScreen() {
         </Card>
       </Animated.View>
 
-      <View style={styles.gpsRow}>
-        <MaterialCommunityIcons
-          name={gpsStatus === 'granted' ? 'map-marker-check-outline' : 'map-marker-off-outline'}
-          size={16}
-          color={gpsStatus === 'granted' ? brand[300] : LIGHT_SUBTLE}
-        />
-        <Text variant="caption" color={LIGHT_SUBTLE}>
-          {gpsStatus === 'checking' ? 'Mendeteksi lokasi...' : gpsStatus === 'granted' ? 'Lokasi terdeteksi' : 'Tanpa GPS — tetap bisa dikirim'}
-        </Text>
-      </View>
-
       {formError ? <Banner message={formError} tone="danger" /> : null}
 
       <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={isSubmitting} />
@@ -328,5 +362,7 @@ const styles = StyleSheet.create({
   photo: { width: '100%', height: 200 },
   photoBadge: { position: 'absolute', left: space.md, bottom: space.md },
 
-  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.xs },
+  headerBlock: { gap: space.xxs },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.xxs },
+  locationText: { flex: 1 },
 });
