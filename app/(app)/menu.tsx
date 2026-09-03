@@ -13,7 +13,7 @@ import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { IMPLEMENTED_ROUTES, menuByRole, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
-import { brand, elevation, neutral, radius, semantic, space, touch } from '@/theme';
+import { brand, neutral, radius, shadow, semantic, space, touch } from '@/theme';
 
 /**
  * Live badge counters.
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: space.lg,
     minHeight: touch.tileMinHeight,
-    ...elevation.md,
+    ...shadow.raised,
   },
   primaryIcon: {
     width: 48,
@@ -265,11 +265,9 @@ const styles = StyleSheet.create({
     minHeight: touch.tileMinHeight,
     backgroundColor: neutral[0],
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: semantic.border,
+    ...shadow.card,
     padding: space.md,
     gap: space.xs,
-    ...elevation.sm,
   },
   tileTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   tileIcon: {

@@ -83,11 +83,13 @@ export function Button({
 const styles = StyleSheet.create({
   base: {
     minHeight: touch.buttonHeight,
-    borderRadius: radius.md,
+    // Pill, not a rounded rectangle. Paired with the softer card radii it is the single change
+    // that reads most strongly as the reference layout's language.
+    borderRadius: radius.pill,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: space.xl,
+    paddingHorizontal: space['2xl'],
   },
   fullWidth: { alignSelf: 'stretch' },
   pressed: { opacity: 0.82 },

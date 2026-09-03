@@ -2,7 +2,7 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Text } from '@/components/ui/Text';
 import { productImage } from '@/domain/productImages';
-import { brand, feedback, neutral, radius, semantic, space, touch } from '@/theme';
+import { brand, feedback, neutral, radius, shadow, semantic, space, touch } from '@/theme';
 import type { Product } from '@/domain/types';
 
 export type ProductPickerCardProps = {
@@ -134,10 +134,13 @@ const styles = StyleSheet.create({
   card: {
     flex: 1,
     borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: semantic.border,
+    // The ring is transparent at rest so selecting a tile colours it in rather than adding a
+    // border and nudging the grid; depth is the shadow's job, not the outline's.
+    borderWidth: 2,
+    borderColor: 'transparent',
     backgroundColor: neutral[0],
     overflow: 'hidden',
+    ...shadow.card,
   },
   cardSelected: { borderColor: brand[500] },
 
@@ -183,7 +186,7 @@ const styles = StyleSheet.create({
   stepButton: {
     width: touch.minTarget - 8,
     height: touch.minTarget - 8,
-    borderRadius: radius.md,
+    borderRadius: (touch.minTarget - 8) / 2,
     borderWidth: 1,
     borderColor: brand[200],
     backgroundColor: brand[50],

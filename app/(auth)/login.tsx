@@ -64,41 +64,72 @@ export default function LoginScreen() {
   const offset = useRef(new Animated.Value(0)).current;
   const settled = useRef(0);
 
+  // Widens and darkens while the sheet is being handled, so the grab registers instantly even
+  // before the sheet has visibly moved.
+  const grabbed = useRef(new Animated.Value(0)).current;
+
+  const setGrabbed = useCallback(
+    (on: boolean) => {
+      Animated.timing(grabbed, {
+        toValue: on ? 1 : 0,
+        duration: 140,
+        useNativeDriver: false, // width is not a transform
+      }).start();
+    },
+    [grabbed],
+  );
+
   const snapTo = useCallback(
     (next: number) => {
       settled.current = next;
+      // tension/friction rather than speed/bounciness: this lands with one soft settle instead of
+      // the springy overshoot the old values gave, which read as the sheet bouncing loose.
       Animated.spring(offset, {
         toValue: next,
         useNativeDriver: true,
-        bounciness: 2,
-        speed: 14,
+        tension: 62,
+        friction: 11,
       }).start();
     },
     [offset],
   );
 
+  /** Tapping the grab area is the whole gesture — no drag needed. */
+  const toggleSheet = useCallback(() => {
+    snapTo(settled.current > travel / 2 ? 0 : travel);
+  }, [snapTo, travel]);
+
   const pan = useMemo(
     () =>
       PanResponder.create({
-        // Claim the gesture only once it is clearly a vertical drag, so a tap on a field inside
-        // the sheet still reaches the field.
-        onMoveShouldSetPanResponder: (_e, g) => Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx),
+        // 3px, not 8: the old threshold made the sheet feel dead for the first third of a
+        // centimetre of movement, which is exactly what "had to be felt around for" describes.
+        // Still a movement test rather than a touch test, so a tap continues to reach the
+        // Pressable underneath instead of being swallowed by the responder.
+        onMoveShouldSetPanResponder: (_e, g) =>
+          Math.abs(g.dy) > 3 && Math.abs(g.dy) > Math.abs(g.dx),
+        onPanResponderGrant: () => setGrabbed(true),
         onPanResponderMove: (_e, g) => {
           const next = Math.min(travel, Math.max(0, settled.current + g.dy));
           offset.setValue(next);
         },
         onPanResponderRelease: (_e, g) => {
+          setGrabbed(false);
           const next = Math.min(travel, Math.max(0, settled.current + g.dy));
-          const movingDown = g.vy > 0.4;
-          const movingUp = g.vy < -0.4;
 
-          if (movingDown) return snapTo(travel);
-          if (movingUp) return snapTo(0);
+          // A deliberate flick wins over position: releasing mid-travel while still moving fast
+          // should finish the movement, not snap back to whichever stop happens to be nearer.
+          if (g.vy > 0.35) return snapTo(travel);
+          if (g.vy < -0.35) return snapTo(0);
           snapTo(next > travel * SNAP_THRESHOLD ? travel : 0);
         },
+        onPanResponderTerminate: () => setGrabbed(false),
       }),
-    [offset, snapTo, travel],
+    [offset, snapTo, travel, setGrabbed],
   );
+
+  const handleWidth = grabbed.interpolate({ inputRange: [0, 1], outputRange: [48, 72] });
+  const handleOpacity = grabbed.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
 
   // Typing always brings the sheet to its highest stop: a form the user has just focused must
   // never be left sitting behind the keyboard because they had dragged the sheet down earlier.
@@ -184,10 +215,32 @@ export default function LoginScreen() {
           },
         ]}
       >
-        {/* The grab handle is the drag target, but the whole header area responds too so the
-            gesture is not a pixel hunt on a moving bus. */}
-        <View {...pan.panHandlers} style={styles.handleArea}>
-          <View style={styles.handle} />
+        {/* The grab area is the handle AND the heading beneath it — roughly 110px tall rather
+            than the 24px strip it used to be. A drag target you have to feel around for is not a
+            target, and on this screen it was the first thing anyone touched. */}
+        <View {...pan.panHandlers} style={styles.grabZone}>
+          <Pressable
+            onPress={toggleSheet}
+            accessibilityRole="button"
+            accessibilityLabel="Perbesar atau perkecil area masuk"
+            hitSlop={12}
+            style={styles.handleHit}
+          >
+            <Animated.View
+              style={[styles.handle, { width: handleWidth, opacity: handleOpacity }]}
+            />
+          </Pressable>
+
+          <View style={styles.intro}>
+            <Text variant="h1" center>
+              {mode === 'pin' ? 'Masuk dengan PIN' : 'Login'}
+            </Text>
+            <Text variant="caption" color={semantic.textMuted} center>
+              {mode === 'pin'
+                ? `Gunakan PIN 6 angka untuk ${lastPhone ?? 'akun ini'}`
+                : 'Gunakan nomor HP yang terdaftar oleh Administrator'}
+            </Text>
+          </View>
         </View>
 
         <ScrollView
@@ -202,17 +255,6 @@ export default function LoginScreen() {
           keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.intro}>
-            <Text variant="h1" center>
-              {mode === 'pin' ? 'Masuk dengan PIN' : 'Login'}
-            </Text>
-            <Text variant="caption" color={semantic.textMuted} center>
-              {mode === 'pin'
-                ? `Gunakan PIN 6 angka untuk ${lastPhone ?? 'akun ini'}`
-                : 'Gunakan nomor HP yang terdaftar oleh Administrator'}
-            </Text>
-          </View>
-
           {mode === 'password' ? (
             <>
               <Controller
@@ -443,12 +485,22 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
   },
-  handleArea: { paddingTop: space.sm, paddingBottom: space.xs, alignItems: 'center' },
+  // ~110px of grabbable surface. The handle alone was 24px, which is below the size of the
+  // fingertip meant to find it.
+  grabZone: {
+    paddingTop: space.sm,
+    paddingBottom: space.md,
+    // Its own horizontal padding: the grab zone sits outside the ScrollView, so it does not
+    // inherit the content padding and its heading would otherwise run to the screen edge.
+    paddingHorizontal: space.lg,
+    gap: space.sm,
+  },
+  // A generous hit box around a small visual handle: the bar stays discreet, the target does not.
+  handleHit: { alignItems: 'center', paddingVertical: space.sm },
   handle: {
-    width: 44,
-    height: 5,
+    height: 6,
     borderRadius: radius.pill,
-    backgroundColor: semantic.border,
+    backgroundColor: brand[400],
   },
   sheetContent: { paddingHorizontal: space.lg, paddingTop: space.md, gap: space.lg },
 

@@ -65,9 +65,12 @@ export const feedback = {
 } as const;
 
 export const semantic = {
-  bg: neutral[50],
+  // A pale wash of the brand teal rather than a grey. It is what makes white cards read as
+  // floating surfaces instead of blending into the page — the whole reason the reference layout
+  // can drop its borders. Light enough (L≈97%) that dark body text still clears AA comfortably.
+  bg: '#F1F8F8',
   surface: neutral[0],
-  surfaceSunken: neutral[100],
+  surfaceSunken: brand[50],
 
   border: neutral[200],
   borderStrong: neutral[300],
@@ -121,11 +124,17 @@ export const space = {
   '6xl': 64,
 } as const;
 
+/**
+ * Corner radii, opened up to match the soft-card layout language.
+ *
+ * The old scale (8/12/16/24) read as a utility form; the reference design's warmth comes almost
+ * entirely from larger radii on big surfaces paired with pill-shaped controls.
+ */
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
+  sm: 10,
+  md: 14,
+  lg: 20,
+  xl: 28,
   pill: 999,
 } as const;
 
@@ -163,6 +172,34 @@ export const elevation = {
   lg: { elevation: 6 },
 } as const;
 
+/**
+ * Soft depth for the card-based layout.
+ *
+ * Separation is carried by shadow rather than a 1px border, which is what makes the reference
+ * design feel light — a hairline outline around every surface reads as a form, not a card. The
+ * shadow is tinted with the brand's deep teal instead of black: a neutral grey shadow over a
+ * teal-tinted page looks dirty on the cheap panels these are read on.
+ *
+ * `elevation` is the only half Android honours and `shadow*` the only half iOS does, so both are
+ * declared and each platform quietly ignores the other.
+ */
+export const shadow = {
+  card: {
+    ...elevation.sm,
+    shadowColor: '#0A4E52',
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  raised: {
+    ...elevation.md,
+    shadowColor: '#0A4E52',
+    shadowOpacity: 0.1,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+  },
+} as const;
+
 export const tokens = {
   brand,
   neutral,
@@ -174,6 +211,7 @@ export const tokens = {
   type,
   touch,
   elevation,
+  shadow,
 } as const;
 
 export type Tokens = typeof tokens;

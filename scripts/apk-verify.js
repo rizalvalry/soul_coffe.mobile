@@ -109,10 +109,14 @@ const pngDims = entries
 
 const countOf = (w, h) => pngDims.filter((d) => d.w === w && d.h === h).length;
 
-ok('brand mark (349x512) present', countOf(349, 512) >= 1,
-  'shrinkResources stripped assets/logo-mark.png — the login and menu logo');
+// Two at these dimensions: the teal mark and its reversed white twin, which share a size because
+// one is generated from the other.
+ok('brand marks (349x512 x2) present', countOf(349, 512) >= 2,
+  `expected logo-mark.png AND logo-mark-white.png, found ${countOf(349, 512)}`);
 ok('brand lockup (563x1024) present', countOf(563, 1024) >= 1,
-  'shrinkResources stripped assets/logo-lockup.png — the splash lockup');
+  'shrinkResources stripped assets/logo-lockup.png');
+ok('splash wave (1080x420) present', countOf(1080, 420) >= 1,
+  'shrinkResources stripped assets/splash-wave.png — the splash loses its lower band');
 ok('9 product tiles (360x360) present', countOf(360, 360) >= 9,
   `expected 9 drink photos for the request grid, found ${countOf(360, 360)}`);
 

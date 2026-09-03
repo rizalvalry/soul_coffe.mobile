@@ -100,10 +100,12 @@ export function QtyStepper({
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  // Circular, like the reference design's quantity controls. The diameter is still the full
+  // touch minimum, so rounding the corners costs no reachable area.
   step: {
     width: touch.minTarget,
     height: touch.minTarget,
-    borderRadius: radius.md,
+    borderRadius: touch.minTarget / 2,
     borderWidth: 1,
     borderColor: brand[200],
     backgroundColor: brand[50],
@@ -116,9 +118,8 @@ const styles = StyleSheet.create({
     width: 58,
     height: touch.minTarget,
     borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    backgroundColor: neutral[0],
+    borderWidth: 0,
+    backgroundColor: neutral[100],
     textAlign: 'center',
     fontSize: 17,
     fontWeight: '600',

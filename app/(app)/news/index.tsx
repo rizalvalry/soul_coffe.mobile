@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useNewsFeed } from '@/features/news/queries';
-import { brand, neutral, radius, semantic, space } from '@/theme';
+import { brand, neutral, radius, shadow, semantic, space } from '@/theme';
 import type { NewsPost } from '@/domain/types';
 
 /** Tag filtering is client-side on purpose: the feed is capped at 40 posts, so a round trip to
@@ -175,9 +175,8 @@ const styles = StyleSheet.create({
     gap: space.md,
     backgroundColor: neutral[0],
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: semantic.border,
     padding: space.sm,
+    ...shadow.card,
   },
   rowPressed: { opacity: 0.75 },
   thumbWrap: { width: 76, height: 76 },

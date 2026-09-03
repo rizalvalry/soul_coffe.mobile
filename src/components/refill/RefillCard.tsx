@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { Text } from '@/components/ui/Text';
 import { StatusBadge } from '@/components/ui/Badge';
-import { elevation, neutral, radius, semantic, space } from '@/theme';
+import { neutral, radius, shadow, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 export function formatRupiah(amount: number): string {
@@ -109,11 +109,9 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: neutral[0],
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: semantic.border,
+    ...shadow.card,
     padding: space.lg,
     gap: space.sm,
-    ...elevation.sm,
   },
   pressed: { opacity: 0.8 },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
