@@ -1,5 +1,17 @@
+import { useEffect } from 'react';
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+
 import { Text } from '@/components/ui/Text';
+import { enter } from '@/components/ui/Motion';
 import { brand, neutral, space } from '@/theme';
 
 /**
@@ -13,34 +25,60 @@ import { brand, neutral, space } from '@/theme';
  * The mark is `logo-mark-white.png`, the two-colour artwork with its teal and white swapped: on
  * this background the original would be teal-on-teal and all but vanish. See scripts that built
  * it for why swapping beats tinting.
+ *
+ * The mark breathes gently once it has settled — a slow, near-imperceptible scale pulse — so a
+ * launch that takes a little longer than usual (a cold SecureStore read, a slow phone) still
+ * reads as "working" rather than "stuck". The wordmark and tagline arrive a beat after the mark,
+ * in the order a person would actually read them.
  */
 export function AppSplash({ message = 'Menyiapkan aplikasi...' }: { message?: string }) {
+  const breathe = useSharedValue(0);
+
+  useEffect(() => {
+    breathe.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
+        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
+      ),
+      -1,
+      false,
+    );
+  }, [breathe]);
+
+  const markStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + breathe.value * 0.035 }],
+  }));
+
   return (
     <View style={styles.root}>
       <View style={styles.center}>
-        <Image
-          source={require('../../../assets/logo-mark-white.png')}
-          style={styles.mark}
-          resizeMode="contain"
-          accessibilityRole="image"
-          accessibilityLabel="Logo Soul Coffeemate"
-        />
+        <Animated.View entering={enter('scale')} style={markStyle}>
+          <Image
+            source={require('../../../assets/logo-mark-white.png')}
+            style={styles.mark}
+            resizeMode="contain"
+            accessibilityRole="image"
+            accessibilityLabel="Logo Soul Coffeemate"
+          />
+        </Animated.View>
 
-        <Text variant="h1" color={neutral[0]} center style={styles.title}>
-          SOUL COFFEEMATE
-        </Text>
+        <Animated.View entering={enter('below', 1)}>
+          <Text variant="h1" color={neutral[0]} center style={styles.title}>
+            SOUL COFFEEMATE
+          </Text>
 
-        <Text variant="body" center style={styles.tagline}>
-          Operasional gerobak yang rapi,{'\n'}dari request sampai serah terima.
-        </Text>
+          <Text variant="body" center style={styles.tagline}>
+            Operasional gerobak yang rapi,{'\n'}dari request sampai serah terima.
+          </Text>
+        </Animated.View>
       </View>
 
-      <View style={styles.loader}>
+      <Animated.View entering={enter('fade', 2)} style={styles.loader}>
         <ActivityIndicator size="large" color={neutral[0]} />
         <Text variant="caption" style={styles.loaderText} center>
           {message}
         </Text>
-      </View>
+      </Animated.View>
 
       {/* Sits under everything else and is purely decorative, so it is hidden from screen
           readers rather than announced as an unnamed image. */}

@@ -1,18 +1,18 @@
 import { useMemo } from 'react';
-import { ActivityIndicator, Alert, SectionList, StyleSheet, View } from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { Alert, SectionList, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills, useStartPreparing } from '@/features/refill/queries';
 import { useRealtime } from '@/features/realtime/useRealtime';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest, RefillStatus } from '@/domain/types';
-import { brand, feedback, semantic, space } from '@/theme';
+import { semantic, space } from '@/theme';
 
 type Section = { key: RefillStatus; title: string; data: RefillRequest[] };
 
@@ -57,29 +57,6 @@ export default function BaristaRequestsScreen() {
     }
   };
 
-  if (refillsQuery.isLoading) {
-    return (
-      <Screen scroll={false} contentStyle={styles.center}>
-        <ActivityIndicator color={brand[700]} />
-      </Screen>
-    );
-  }
-
-  if (refillsQuery.isError) {
-    return (
-      <Screen scroll={false} contentStyle={styles.center}>
-        <Card style={styles.stateCard}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={28} color={feedback.dangerFg} />
-          <Text variant="bodyStrong" center>Gagal memuat permintaan</Text>
-          <Text variant="caption" color={semantic.textMuted} center>
-            {(refillsQuery.error as Error).message}
-          </Text>
-          <Button label="Coba Lagi" onPress={() => void refillsQuery.refetch()} />
-        </Card>
-      </Screen>
-    );
-  }
-
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
       <View style={styles.header}>
@@ -87,56 +64,65 @@ export default function BaristaRequestsScreen() {
         <ConnectionBanner state={realtime.state} />
       </View>
 
-      <SectionList
-        sections={sections}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        stickySectionHeadersEnabled={false}
-        refreshing={refillsQuery.isRefetching}
-        onRefresh={() => void refillsQuery.refetch()}
-        renderSectionHeader={({ section }) => (
-          <Text variant="micro" color={semantic.textSubtle} style={styles.sectionTitle}>
-            {section.title.toUpperCase()}
-          </Text>
-        )}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            {/* R15 — cost is never shown to the barista. */}
-            <RefillCard refill={item} showCost={false} />
-
-            {item.status === 'PREPARING' ? (
-              <Text variant="caption" color={semantic.textMuted} style={styles.hint}>
-                Lanjutkan di layar Siapkan Pesanan.
-              </Text>
-            ) : (
-              <Button
-                label="Siapkan"
-                onPress={() => void onStartPreparing(item)}
-                disabled={!item.can.start_preparing}
-                loading={startPreparing.isPending}
-              />
-            )}
-          </View>
-        )}
-        ListEmptyComponent={
-          <Card style={styles.stateCard}>
-            <Text variant="caption" color={semantic.textMuted} center>
-              Belum ada permintaan refill masuk.
+      {refillsQuery.isLoading ? (
+        <View style={styles.listPad}>
+          <SkeletonList count={3} lines={2} />
+        </View>
+      ) : refillsQuery.isError ? (
+        <View style={styles.center}>
+          <EmptyState icon="wifi-off" title="Gagal memuat permintaan" subtitle={(refillsQuery.error as Error).message} tone="danger">
+            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+          </EmptyState>
+        </View>
+      ) : (
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
+          refreshing={refillsQuery.isRefetching}
+          onRefresh={() => void refillsQuery.refetch()}
+          renderSectionHeader={({ section }) => (
+            <Text variant="micro" color={semantic.textSubtle} style={styles.sectionTitle}>
+              {section.title.toUpperCase()}
             </Text>
-          </Card>
-        }
-      />
+          )}
+          renderItem={({ item, index }) => (
+            <View style={styles.item}>
+              {/* R15 — cost is never shown to the barista. */}
+              <RefillCard refill={item} showCost={false} index={index} />
+
+              {item.status === 'PREPARING' ? (
+                <Text variant="caption" color={semantic.textMuted} style={styles.hint}>
+                  Lanjutkan di layar Siapkan Pesanan.
+                </Text>
+              ) : (
+                <Button
+                  label="Siapkan"
+                  icon="coffee-maker-outline"
+                  onPress={() => void onStartPreparing(item)}
+                  disabled={!item.can.start_preparing}
+                  loading={startPreparing.isPending}
+                />
+              )}
+            </View>
+          )}
+          ListEmptyComponent={
+            <EmptyState icon="bell-off-outline" title="Belum ada permintaan masuk" subtitle="Permintaan refill dari staff akan muncul di sini." />
+          }
+        />
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  center: { alignItems: 'center', justifyContent: 'center' },
   header: { padding: space.lg, gap: space.md },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
+  listPad: { paddingHorizontal: space.lg },
+  center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg },
   sectionTitle: { letterSpacing: 1, marginTop: space.md, marginBottom: space.xs },
   item: { gap: space.sm, marginBottom: space.sm },
   hint: { paddingHorizontal: space.xs },
-  stateCard: { gap: space.md, alignItems: 'center', margin: space.lg },
 });

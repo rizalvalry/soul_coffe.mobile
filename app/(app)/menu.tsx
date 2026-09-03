@@ -1,19 +1,24 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { useRouter, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
-import { CountBadge } from '@/components/ui/Badge';
+import { CountBadge, Chip } from '@/components/ui/Badge';
+import { IconButton } from '@/components/ui/Button';
+import { Touchable } from '@/components/ui/Touchable';
+import { Gradient, GradientBloom } from '@/components/ui/Gradient';
+import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
 import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { IMPLEMENTED_ROUTES, menuByRole, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
-import { brand, neutral, radius, shadow, semantic, space, touch } from '@/theme';
+import { brand, gradients, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
 
 /**
  * Live badge counters.
@@ -24,6 +29,15 @@ import { brand, neutral, radius, shadow, semantic, space, touch } from '@/theme'
  */
 function useMenuBadges(): Partial<Record<NonNullable<MenuItem['badge']>, number>> {
   return {};
+}
+
+/** Time-of-day greeting. These shifts start before dawn and run past dark, so all three matter. */
+function greeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 11) return 'Selamat pagi';
+  if (hour < 15) return 'Selamat siang';
+  if (hour < 18) return 'Selamat sore';
+  return 'Selamat malam';
 }
 
 export default function MenuScreen() {
@@ -75,12 +89,14 @@ export default function MenuScreen() {
     // The menu owns no query of its own, so its pull-to-refresh drops every cached read instead.
     // That is what a user actually means by pulling here: refresh the app, not this one screen.
     <Screen refreshing={refreshing} onRefresh={refreshAll}>
-      <View style={styles.header}>
+      <Animated.View entering={enter('above')} style={styles.header}>
         <View style={styles.headerLeft}>
-          <SoulLogo size={44} showWordmark={false} />
+          <View style={styles.avatar}>
+            <SoulLogo size={34} showWordmark={false} />
+          </View>
           <View style={styles.headerText}>
             <Text variant="caption" color={semantic.textMuted}>
-              Selamat bertugas,
+              {greeting()},
             </Text>
             <Text variant="h3" numberOfLines={1}>
               {user.name}
@@ -88,112 +104,123 @@ export default function MenuScreen() {
           </View>
         </View>
 
-        <Pressable
-          onPress={confirmSignOut}
-          hitSlop={12}
-          accessibilityRole="button"
-          accessibilityLabel="Keluar dari aplikasi"
-          style={styles.signOut}
-        >
-          <MaterialCommunityIcons name="logout" size={22} color={semantic.textMuted} />
-        </Pressable>
-      </View>
+        <IconButton icon="logout-variant" label="Keluar dari aplikasi" onPress={confirmSignOut} />
+      </Animated.View>
 
-      <Card style={styles.roleCard} accent>
-        <View style={styles.roleRow}>
-          <View style={styles.roleIcon}>
-            <MaterialCommunityIcons name={meta.icon as never} size={26} color={neutral[0]} />
+      <Animated.View entering={enter('below', 1)}>
+        <Card style={styles.roleCard} accent>
+          <View style={styles.roleRow}>
+            <View style={styles.roleIcon}>
+              <MaterialCommunityIcons name={meta.icon as never} size={26} color={neutral[0]} />
+            </View>
+            <View style={styles.roleText}>
+              <Text variant="micro" color={brand[700]}>
+                ROLE {meta.priority} DARI {ROLES.length}
+              </Text>
+              <Text variant="h2">{meta.label}</Text>
+              <Text variant="caption" color={semantic.textMuted}>
+                {meta.description}
+              </Text>
+            </View>
           </View>
-          <View style={styles.roleText}>
-            <Text variant="micro" color={brand[700]}>
-              ROLE {meta.priority} DARI {ROLES.length}
-            </Text>
-            <Text variant="h2">{meta.label}</Text>
-            <Text variant="caption" color={semantic.textMuted}>
-              {meta.description}
-            </Text>
-          </View>
-        </View>
 
-        {user.cartCode || user.kitchenName ? (
-          <View style={styles.contextStrip}>
-            {user.cartCode ? (
-              <View style={styles.contextItem}>
-                <MaterialCommunityIcons name="moped-outline" size={16} color={brand[700]} />
-                <Text variant="caption" color={semantic.text}>
-                  Kode Sepeda {user.cartCode}
-                </Text>
-              </View>
-            ) : null}
-            {user.kitchenName ? (
-              <View style={styles.contextItem}>
-                <MaterialCommunityIcons name="store-outline" size={16} color={brand[700]} />
-                <Text variant="caption" color={semantic.text}>
-                  {user.kitchenName}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
-      </Card>
+          {user.cartCode || user.kitchenName ? (
+            <View style={styles.contextStrip}>
+              {user.cartCode ? (
+                <Chip
+                  tone="brand"
+                  label={`Kode Sepeda ${user.cartCode}`}
+                  icon={<MaterialCommunityIcons name="moped-outline" size={14} color={brand[700]} />}
+                />
+              ) : null}
+              {user.kitchenName ? (
+                <Chip
+                  tone="brand"
+                  label={user.kitchenName}
+                  icon={<MaterialCommunityIcons name="store-outline" size={14} color={brand[700]} />}
+                />
+              ) : null}
+            </View>
+          ) : null}
+        </Card>
+      </Animated.View>
 
       {/* Sits above the menu because it is the only thing on this screen that changes without the
           user doing anything, and it renders nothing at all when there is no highlighted post —
           see NewsSlider for why a permanent empty state here would be worse than no slider. */}
       <NewsSlider />
 
-      <Text variant="micro" color={semantic.textSubtle} style={styles.sectionLabel}>
-        MENU UTAMA
-      </Text>
+      {primary.length > 0 ? (
+        <Animated.View entering={enter('below', 2)}>
+          <Text variant="micro" color={semantic.textSubtle} style={styles.sectionLabel}>
+            MENU UTAMA
+          </Text>
+        </Animated.View>
+      ) : null}
 
-      {primary.map((item) => (
-        <Pressable
-          key={item.id}
-          onPress={() => open(item)}
-          accessibilityRole="button"
-          accessibilityLabel={item.label}
-          accessibilityHint={item.sublabel}
-          style={({ pressed }) => [styles.primaryTile, pressed && styles.pressed]}
-        >
-          <View style={styles.primaryIcon}>
-            <MaterialCommunityIcons name={item.icon as never} size={28} color={neutral[0]} />
-          </View>
-          <View style={styles.primaryText}>
-            <Text variant="h3" color={neutral[0]}>
-              {item.label}
-            </Text>
-            <Text variant="caption" color={brand[100]}>
-              {item.sublabel}
-            </Text>
-          </View>
-          {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
-          <MaterialCommunityIcons name="chevron-right" size={24} color={brand[200]} />
-        </Pressable>
-      ))}
-
-      <View style={styles.grid}>
-        {secondary.map((item) => (
-          <Pressable
-            key={item.id}
+      {primary.map((item, index) => (
+        <Animated.View key={item.id} entering={enter('below', 3 + index)}>
+          <Touchable
             onPress={() => open(item)}
+            scaleTo={pressScale.surface}
             accessibilityRole="button"
             accessibilityLabel={item.label}
             accessibilityHint={item.sublabel}
-            style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
+            style={styles.primaryTile}
           >
-            <View style={styles.tileTop}>
-              <View style={styles.tileIcon}>
-                <MaterialCommunityIcons name={item.icon as never} size={22} color={brand[700]} />
-              </View>
-              {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
+            <Gradient colors={gradients.brand} fill bands={20} />
+            <GradientBloom size={160} color="rgba(255,255,255,0.12)" style={styles.primaryBloom} />
+
+            <View style={styles.primaryIcon}>
+              <MaterialCommunityIcons name={item.icon as never} size={28} color={neutral[0]} />
             </View>
-            <Text variant="bodyStrong" numberOfLines={2}>
-              {item.label}
-            </Text>
-            <Text variant="caption" color={semantic.textMuted} numberOfLines={2}>
-              {item.sublabel}
-            </Text>
-          </Pressable>
+            <View style={styles.primaryText}>
+              <Text variant="h3" color={neutral[0]}>
+                {item.label}
+              </Text>
+              <Text variant="caption" color={brand[100]}>
+                {item.sublabel}
+              </Text>
+            </View>
+            {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
+            <MaterialCommunityIcons name="chevron-right" size={24} color={neutral[0]} />
+          </Touchable>
+        </Animated.View>
+      ))}
+
+      {secondary.length > 0 ? (
+        <Animated.View entering={enter('below', 4)}>
+          <Text variant="micro" color={semantic.textSubtle} style={styles.sectionLabel}>
+            MENU LAINNYA
+          </Text>
+        </Animated.View>
+      ) : null}
+
+      <View style={styles.grid}>
+        {secondary.map((item, index) => (
+          <Animated.View key={item.id} entering={enter('below', 5 + index)} style={styles.tileWrap}>
+            <Touchable
+              onPress={() => open(item)}
+              scaleTo={pressScale.surface}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+              accessibilityHint={item.sublabel}
+              style={styles.tile}
+            >
+              <View style={styles.tileTop}>
+                <View style={styles.tileIcon}>
+                  <MaterialCommunityIcons name={item.icon as never} size={22} color={brand[700]} />
+                </View>
+                {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
+              </View>
+              <Text variant="bodyStrong" numberOfLines={2}>
+                {item.label}
+              </Text>
+              <Text variant="caption" color={semantic.textMuted} numberOfLines={2}>
+                {item.sublabel}
+              </Text>
+            </Touchable>
+          </Animated.View>
         ))}
       </View>
 
@@ -207,13 +234,16 @@ export default function MenuScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: space.md, flex: 1 },
-  headerText: { flex: 1 },
-  signOut: {
-    width: touch.minTarget,
-    height: touch.minTarget,
+  avatar: {
+    width: touch.minTarget - 4,
+    height: touch.minTarget - 4,
+    borderRadius: radius.pill,
+    backgroundColor: neutral[0],
     alignItems: 'center',
     justifyContent: 'center',
+    ...shadow.card,
   },
+  headerText: { flex: 1 },
 
   roleCard: { gap: space.lg },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
@@ -229,12 +259,11 @@ const styles = StyleSheet.create({
   contextStrip: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: space.md,
+    gap: space.sm,
     borderTopWidth: 1,
     borderTopColor: semantic.border,
     paddingTop: space.md,
   },
-  contextItem: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
 
   sectionLabel: { letterSpacing: 1, marginTop: space.sm },
 
@@ -242,26 +271,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    backgroundColor: brand[700],
     borderRadius: radius.lg,
     padding: space.lg,
     minHeight: touch.tileMinHeight,
+    overflow: 'hidden',
     ...shadow.raised,
   },
+  primaryBloom: { top: -70, right: -40 },
   primaryIcon: {
     width: 48,
     height: 48,
     borderRadius: radius.md,
-    backgroundColor: brand[600],
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.26)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   primaryText: { flex: 1, gap: space.xxs },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
+  tileWrap: { flexBasis: '47%', flexGrow: 1 },
   tile: {
-    flexBasis: '47%',
-    flexGrow: 1,
     minHeight: touch.tileMinHeight,
     backgroundColor: neutral[0],
     borderRadius: radius.lg,
@@ -279,6 +310,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  pressed: { opacity: 0.78 },
   footer: { marginTop: space.lg },
 });

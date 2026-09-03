@@ -1,12 +1,15 @@
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { brand, feedback, radius, semantic, space } from '@/theme';
+import { IconButton } from '@/components/ui/Button';
+import { Banner } from '@/components/ui/Banner';
+import { enter } from '@/components/ui/Motion';
+import { brand, radius, semantic, space } from '@/theme';
 
 /**
  * Honest placeholder for destinations scheduled in Phases 1-8.
@@ -26,54 +29,47 @@ export default function ComingSoonScreen() {
   return (
     <Screen>
       <View style={styles.top}>
-        <Button
-          label="Kembali"
-          icon="chevron-left"
-          variant="ghost"
-          fullWidth={false}
-          onPress={() => router.back()}
-        />
+        <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
       </View>
 
-      <Card style={styles.card}>
-        <View style={styles.iconWrap}>
-          <MaterialCommunityIcons name="hammer-wrench" size={32} color={brand[700]} />
-        </View>
+      <Animated.View entering={enter('below')}>
+        <Card style={styles.card}>
+          <View style={styles.iconWrap}>
+            <MaterialCommunityIcons name="hammer-wrench" size={32} color={brand[700]} />
+          </View>
 
-        <Text variant="h2" center>
-          {title ?? 'Halaman ini'}
-        </Text>
-        <Text variant="body" color={semantic.textMuted} center>
-          Belum dibangun. Layar ini sengaja menampilkan status sebenarnya, bukan tampilan kosong
-          yang menyesatkan.
-        </Text>
-
-        <View style={styles.metaBlock}>
-          {route ? (
-            <View style={styles.metaRow}>
-              <Text variant="micro" color={semantic.textSubtle}>
-                RUTE
-              </Text>
-              <Text variant="caption">{route}</Text>
-            </View>
-          ) : null}
-          {requirement ? (
-            <View style={styles.metaRow}>
-              <Text variant="micro" color={semantic.textSubtle}>
-                ACUAN SPESIFIKASI
-              </Text>
-              <Text variant="caption">{requirement}</Text>
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.note}>
-          <MaterialCommunityIcons name="information-outline" size={16} color={feedback.infoFg} />
-          <Text variant="caption" color={feedback.infoFg} style={styles.noteText}>
-            Lihat docs/03-task-breakdown.md untuk fase dan urutan pengerjaannya.
+          <Text variant="h2" center>
+            {title ?? 'Halaman ini'}
           </Text>
-        </View>
-      </Card>
+          <Text variant="body" color={semantic.textMuted} center>
+            Belum dibangun. Layar ini sengaja menampilkan status sebenarnya, bukan tampilan kosong
+            yang menyesatkan.
+          </Text>
+
+          {route || requirement ? (
+            <View style={styles.metaBlock}>
+              {route ? (
+                <View style={styles.metaRow}>
+                  <Text variant="micro" color={semantic.textSubtle}>
+                    RUTE
+                  </Text>
+                  <Text variant="caption">{route}</Text>
+                </View>
+              ) : null}
+              {requirement ? (
+                <View style={styles.metaRow}>
+                  <Text variant="micro" color={semantic.textSubtle}>
+                    ACUAN SPESIFIKASI
+                  </Text>
+                  <Text variant="caption">{requirement}</Text>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+
+          <Banner tone="info" message="Lihat docs/03-task-breakdown.md untuk fase dan urutan pengerjaannya." />
+        </Card>
+      </Animated.View>
     </Screen>
   );
 }
@@ -97,14 +93,4 @@ const styles = StyleSheet.create({
     padding: space.md,
   },
   metaRow: { gap: space.xxs },
-  note: {
-    flexDirection: 'row',
-    gap: space.sm,
-    backgroundColor: feedback.infoBg,
-    borderColor: feedback.infoBorder,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: space.md,
-  },
-  noteText: { flex: 1 },
 });

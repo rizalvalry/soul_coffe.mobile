@@ -1,12 +1,13 @@
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { Text } from './Text';
+import { Touchable } from './Touchable';
 import { isDemoMode } from '@/features/demo/config';
 import { useAuth } from '@/features/auth/store';
 import { rolesByPriority, roleMeta, type Role } from '@/domain/roles';
-import { feedback, neutral, radius, space, touch } from '@/theme';
+import { feedback, neutral, pressScale, radius, space, touch } from '@/theme';
 
 /**
  * Permanent, non-dismissible notice that this build runs the offline demo backend on fabricated
@@ -43,32 +44,25 @@ export function DemoBanner() {
         </Text>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.roleRow}
-      >
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.roleRow}>
         {rolesByPriority.map((role) => {
           const meta = roleMeta[role];
           const active = role === activeRole;
           return (
-            <Pressable
+            <Touchable
               key={role}
               onPress={() => void switchRole(role)}
+              scaleTo={pressScale.control}
               accessibilityRole="button"
               accessibilityLabel={`Beralih ke role ${meta.label}`}
               accessibilityState={{ selected: active }}
-              style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && styles.chipPressed]}
+              style={[styles.chip, active && styles.chipActive]}
             >
-              <MaterialCommunityIcons
-                name={meta.icon as never}
-                size={13}
-                color={active ? neutral[0] : feedback.warningFg}
-              />
+              <MaterialCommunityIcons name={meta.icon as never} size={13} color={active ? neutral[0] : feedback.warningFg} />
               <Text variant="micro" color={active ? neutral[0] : feedback.warningFg}>
                 {meta.label}
               </Text>
-            </Pressable>
+            </Touchable>
           );
         })}
       </ScrollView>
@@ -85,18 +79,9 @@ const styles = StyleSheet.create({
     paddingBottom: space.xs,
     gap: space.xxs,
   },
-  noticeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: space.xs,
-  },
+  noticeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.xs },
   noticeText: { letterSpacing: 0.5 },
-  roleRow: {
-    flexDirection: 'row',
-    gap: space.xs,
-    paddingHorizontal: space.sm,
-  },
+  roleRow: { flexDirection: 'row', gap: space.xs, paddingHorizontal: space.sm },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -107,9 +92,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     minHeight: touch.minTarget * 0.6,
   },
-  chipActive: {
-    backgroundColor: feedback.warningFg,
-    borderColor: feedback.warningFg,
-  },
-  chipPressed: { opacity: 0.7 },
+  chipActive: { backgroundColor: feedback.warningFg, borderColor: feedback.warningFg },
 });

@@ -1,6 +1,18 @@
+import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  ReduceMotion,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+
 import { Text } from '@/components/ui/Text';
 import { statusLabel } from '@/components/ui/Badge';
+import { enter } from '@/components/ui/Motion';
 import { neutral, radius, semantic, space, statusColor, type RefillStatus } from '@/theme';
 import { formatTime } from './RefillCard';
 import type { RefillRequest } from '@/domain/types';
@@ -81,20 +93,25 @@ function buildSteps(refill: RefillRequest): TimelineStep[] {
  * Vertical timeline of the §6 state machine for one refill request, one row per reached status.
  * Colour and label come from the same tokens the `StatusBadge` uses so a status never renders
  * with a colour or wording that disagrees with the badge shown elsewhere on the same screen.
+ *
+ * The CURRENT (last, non-terminal) step's dot pulses gently — the same "still moving" language
+ * as the badge — so on a screen with no other live indicator, this alone answers "is anything
+ * still happening".
  */
 export function RefillTimeline({ refill }: { refill: RefillRequest }) {
   const steps = buildSteps(refill);
+  const isTerminal = TERMINAL_EXITS.includes(refill.status) || refill.status === 'CLOSED';
 
   return (
     <View>
       {steps.map((step, index) => {
-        const color = statusColor[step.status];
         const isLast = index === steps.length - 1;
+        const isCurrent = isLast && !isTerminal;
 
         return (
-          <View key={step.status} style={styles.row}>
+          <Animated.View key={step.status} entering={enter('below', index, 8)} style={styles.row}>
             <View style={styles.rail}>
-              <View style={[styles.dot, { backgroundColor: color.fg, borderColor: color.border }]} />
+              <TimelineDot status={step.status} pulsing={isCurrent} />
               {!isLast ? <View style={styles.line} /> : null}
             </View>
 
@@ -104,9 +121,38 @@ export function RefillTimeline({ refill }: { refill: RefillRequest }) {
                 {step.actor ?? 'Sistem'} · {formatTime(step.time)}
               </Text>
             </View>
-          </View>
+          </Animated.View>
         );
       })}
+    </View>
+  );
+}
+
+function TimelineDot({ status, pulsing }: { status: RefillStatus; pulsing: boolean }) {
+  const color = statusColor[status];
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    if (!pulsing) return;
+    pulse.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 1000, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.System }),
+        withTiming(0, { duration: 1000, easing: Easing.in(Easing.quad), reduceMotion: ReduceMotion.System }),
+      ),
+      -1,
+      false,
+    );
+  }, [pulsing, pulse]);
+
+  const haloStyle = useAnimatedStyle(() => ({
+    opacity: 0.4 - pulse.value * 0.4,
+    transform: [{ scale: 1 + pulse.value * 1.8 }],
+  }));
+
+  return (
+    <View style={styles.dotWrap}>
+      {pulsing ? <Animated.View style={[styles.halo, { backgroundColor: color.fg }, haloStyle]} pointerEvents="none" /> : null}
+      <View style={[styles.dot, { backgroundColor: color.fg, borderColor: color.border }]} />
     </View>
   );
 }
@@ -114,13 +160,14 @@ export function RefillTimeline({ refill }: { refill: RefillRequest }) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
   rail: { width: 24, alignItems: 'center' },
+  dotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   dot: {
     width: 14,
     height: 14,
     borderRadius: radius.pill,
     borderWidth: 2,
-    marginTop: 2,
   },
+  halo: { position: 'absolute', width: 14, height: 14, borderRadius: radius.pill },
   line: {
     flex: 1,
     width: 2,

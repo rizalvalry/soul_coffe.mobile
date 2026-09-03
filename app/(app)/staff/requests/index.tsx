@@ -1,11 +1,11 @@
-import { useCallback } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills } from '@/features/refill/queries';
 import { useRealtime } from '@/features/realtime/useRealtime';
@@ -18,32 +18,11 @@ export default function StaffRequestsScreen() {
   const refillsQuery = useRefills();
   const { isRealtime } = useRealtime();
 
-  const onRefresh = useCallback(() => {
-    void refillsQuery.refetch();
-  }, [refillsQuery]);
-
-  const renderItem = useCallback(
-    ({ item }: { item: RefillRequest }) => (
-      <RefillCard
-        refill={item}
-        showCost={false}
-        onPress={() => router.push(`/staff/requests/${item.id}`)}
-      />
-    ),
-    [router],
-  );
-
   return (
     <Screen scroll={false}>
       <View style={styles.page}>
         <View style={styles.header}>
-          <Button
-            label="Kembali"
-            icon="chevron-left"
-            variant="ghost"
-            fullWidth={false}
-            onPress={() => router.back()}
-          />
+          <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
           <Text variant="h2">Status Permintaan</Text>
           <Text variant="caption" color={semantic.textMuted}>
             {isRealtime ? 'Realtime aktif' : 'Menyinkronkan secara berkala'}
@@ -51,27 +30,26 @@ export default function StaffRequestsScreen() {
         </View>
 
         {refillsQuery.isLoading ? (
-          <View style={styles.center}>
-            <Text color={semantic.textMuted}>Memuat permintaan...</Text>
+          <View style={styles.listPad}>
+            <SkeletonList count={4} lines={2} />
           </View>
         ) : refillsQuery.isError ? (
           <View style={styles.center}>
-            <EmptyState
-              icon="alert-circle-outline"
-              title="Gagal memuat data"
-              subtitle="Tarik ke bawah untuk mencoba lagi."
-            />
+            <EmptyState icon="wifi-off" title="Gagal memuat data" subtitle="Tarik ke bawah untuk mencoba lagi." tone="danger">
+              <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+            </EmptyState>
           </View>
         ) : (
           <FlatList
             style={styles.list}
             data={refillsQuery.data ?? []}
             keyExtractor={(item) => String(item.id)}
-            renderItem={renderItem}
             contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl refreshing={refillsQuery.isRefetching} onRefresh={onRefresh} />
-            }
+            refreshing={refillsQuery.isRefetching}
+            onRefresh={() => void refillsQuery.refetch()}
+            renderItem={({ item, index }: { item: RefillRequest; index: number }) => (
+              <RefillCard refill={item} showCost={false} index={index} onPress={() => router.push(`/staff/requests/${item.id}`)} />
+            )}
             ListEmptyComponent={
               <EmptyState
                 icon="clipboard-text-off-outline"
@@ -89,7 +67,8 @@ export default function StaffRequestsScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1 },
   header: { padding: space.lg, gap: space.xxs },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg },
+  listPad: { paddingHorizontal: space.lg },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
   listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
 });

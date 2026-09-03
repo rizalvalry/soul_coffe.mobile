@@ -1,10 +1,11 @@
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills } from '@/features/refill/queries';
 import { radius, semantic, space } from '@/theme';
@@ -32,13 +33,7 @@ export default function FinanceHistoryScreen() {
     <Screen scroll={false}>
       <View style={styles.page}>
         <View style={styles.header}>
-          <Button
-            label="Kembali"
-            icon="chevron-left"
-            variant="ghost"
-            fullWidth={false}
-            onPress={() => router.back()}
-          />
+          <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
           <Text variant="h2">Riwayat Approval</Text>
           <Text variant="caption" color={semantic.textMuted}>
             Semua keputusan beserta alasannya
@@ -46,17 +41,19 @@ export default function FinanceHistoryScreen() {
         </View>
 
         {refillsQuery.isLoading ? (
-          <View style={styles.center}>
-            <Text color={semantic.textMuted}>Memuat riwayat...</Text>
+          <View style={styles.listPad}>
+            <SkeletonList count={4} lines={2} />
           </View>
         ) : refillsQuery.isError ? (
           <View style={styles.center}>
             <EmptyState
-              icon="alert-circle-outline"
+              icon="wifi-off"
               title="Gagal memuat riwayat"
               subtitle="Periksa koneksi internet Anda."
-            />
-            <Button label="Coba Lagi" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+              tone="danger"
+            >
+              <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+            </EmptyState>
           </View>
         ) : (
           <FlatList
@@ -64,15 +61,11 @@ export default function FinanceHistoryScreen() {
             data={rows}
             keyExtractor={(item) => String(item.id)}
             contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refillsQuery.isRefetching}
-                onRefresh={() => void refillsQuery.refetch()}
-              />
-            }
-            renderItem={({ item }: { item: RefillRequest }) => (
-              <View style={styles.item}>
-                <RefillCard refill={item} showCost />
+            refreshing={refillsQuery.isRefetching}
+            onRefresh={() => void refillsQuery.refetch()}
+            renderItem={({ item, index }: { item: RefillRequest; index: number }) => (
+              <View style={styles.itemCard}>
+                <RefillCard refill={item} showCost index={index} />
                 {item.decision_reason ? (
                   <View style={styles.reasonBox}>
                     <Text variant="caption" color={semantic.textMuted}>
@@ -99,10 +92,11 @@ export default function FinanceHistoryScreen() {
 const styles = StyleSheet.create({
   page: { flex: 1 },
   header: { padding: space.lg, gap: space.xxs },
+  listPad: { paddingHorizontal: space.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
   listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
-  item: { gap: space.xs },
+  itemCard: { gap: space.sm },
   reasonBox: {
     backgroundColor: semantic.surfaceSunken,
     borderRadius: radius.md,

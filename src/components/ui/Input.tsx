@@ -1,15 +1,12 @@
-import { useState } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-  type TextInputProps,
-  type ViewStyle,
-} from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+
 import { Text } from './Text';
-import { feedback, neutral, radius, semantic, space, touch } from '@/theme';
+import { Touchable } from './Touchable';
+import { enter } from './Motion';
+import { brand, feedback, neutral, pressScale, radius, semantic, space, timing, touch } from '@/theme';
 
 export type InputProps = Omit<TextInputProps, 'style'> & {
   label: string;
@@ -20,6 +17,15 @@ export type InputProps = Omit<TextInputProps, 'style'> & {
   containerStyle?: ViewStyle;
 };
 
+/**
+ * Text field.
+ *
+ * The focus ring now transitions colour on the UI thread instead of snapping between transparent
+ * and `focusRing` on the same frame. The field itself stays a filled, borderless shape at rest —
+ * the reference layout's inputs are shapes, not outlined boxes — and the ring only lights up on
+ * focus, still drawn as a real border so it stays visible on a sunlit phone rather than depending
+ * on a colour shift too subtle to see outdoors.
+ */
 export function Input({
   label,
   icon,
@@ -31,16 +37,29 @@ export function Input({
   onBlur,
   ...rest
 }: InputProps) {
-  const [focused, setFocused] = useState(false);
   const [revealed, setRevealed] = useState(false);
+  const focus = useSharedValue(0);
+  const hasError = Boolean(error);
 
-  // Transparent rather than absent when at rest: the ring is always 2px wide, so gaining focus
-  // colours it in instead of growing it, and the field never shifts the layout under the thumb.
-  const borderColor = error
-    ? feedback.dangerFg
-    : focused
-      ? semantic.focusRing
-      : 'transparent';
+  const handleFocus = useCallback<NonNullable<TextInputProps['onFocus']>>(
+    (event) => {
+      focus.value = withTiming(1, timing.base);
+      onFocus?.(event);
+    },
+    [focus, onFocus],
+  );
+
+  const handleBlur = useCallback<NonNullable<TextInputProps['onBlur']>>(
+    (event) => {
+      focus.value = withTiming(0, timing.base);
+      onBlur?.(event);
+    },
+    [focus, onBlur],
+  );
+
+  const fieldStyle = useAnimatedStyle(() => ({
+    borderColor: hasError ? feedback.dangerFg : interpolateColor(focus.value, [0, 1], ['transparent', brand[500]]),
+  }));
 
   return (
     <View style={containerStyle}>
@@ -48,12 +67,12 @@ export function Input({
         {label}
       </Text>
 
-      <View style={[styles.field, { borderColor, borderWidth: 2 }]}>
+      <Animated.View style={[styles.field, fieldStyle]}>
         {icon ? (
           <MaterialCommunityIcons
             name={icon as never}
             size={20}
-            color={error ? feedback.dangerFg : semantic.textMuted}
+            color={hasError ? feedback.dangerFg : semantic.textMuted}
           />
         ) : null}
 
@@ -65,19 +84,14 @@ export function Input({
           {...rest}
           // After the spread, so a caller passing onFocus/onBlur adds to the focus ring rather
           // than silently replacing it — react-hook-form's onBlur used to do exactly that.
-          onFocus={(e) => {
-            setFocused(true);
-            onFocus?.(e);
-          }}
-          onBlur={(e) => {
-            setFocused(false);
-            onBlur?.(e);
-          }}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
         />
 
         {secure ? (
-          <Pressable
+          <Touchable
             onPress={() => setRevealed((v) => !v)}
+            scaleTo={pressScale.icon}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={revealed ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
@@ -87,17 +101,17 @@ export function Input({
               size={20}
               color={semantic.textMuted}
             />
-          </Pressable>
+          </Touchable>
         ) : null}
-      </View>
+      </Animated.View>
 
       {error ? (
-        <View style={styles.messageRow}>
+        <Animated.View entering={enter('below', 0, 6)} style={styles.messageRow}>
           <MaterialCommunityIcons name="alert-circle-outline" size={14} color={feedback.dangerFg} />
           <Text variant="caption" color={feedback.dangerFg} style={styles.messageText}>
             {error}
           </Text>
-        </View>
+        </Animated.View>
       ) : hint ? (
         <Text variant="caption" color={semantic.textSubtle} style={styles.hint}>
           {hint}
@@ -109,12 +123,10 @@ export function Input({
 
 const styles = StyleSheet.create({
   label: { marginBottom: space.xs },
-  // A filled, borderless field on a soft ground — the reference design's inputs are shapes, not
-  // outlined boxes. The focus ring is still drawn as a border, so focus stays visible: a filled
-  // field whose only focus cue is a colour shift is not enough on a sunlit phone.
   field: {
     minHeight: touch.inputHeight,
     borderRadius: radius.md,
+    borderWidth: 2,
     backgroundColor: neutral[100],
     flexDirection: 'row',
     alignItems: 'center',

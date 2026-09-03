@@ -1,14 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Location from 'expo-location';
 import { File, Paths } from 'expo-file-system';
@@ -16,15 +7,18 @@ import { File, Paths } from 'expo-file-system';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { QtyStepper } from '@/components/ui/QtyStepper';
-import { StatusBadge } from '@/components/ui/Badge';
+import { StatusBadge, Chip } from '@/components/ui/Badge';
+import { Banner } from '@/components/ui/Banner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonList } from '@/components/ui/Skeleton';
 import { SignaturePad, type SignatureResult } from '@/components/ui/SignaturePad';
 import { useDeliverRefill, useRefills } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest } from '@/domain/types';
-import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
+import { brand, feedback, semantic, space } from '@/theme';
 
 type DeliveryMethod = 'staff_signature' | 'pin_fallback';
 type GpsCoords = { lat: number; lng: number };
@@ -136,26 +130,31 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
   return (
     <View style={styles.sheetRoot}>
       <View style={styles.sheetHeader}>
-        <Text variant="h3">Selesaikan Pengiriman</Text>
-        <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel="Tutup">
-          <MaterialCommunityIcons name="close" size={22} color={semantic.textMuted} />
-        </Pressable>
+        <View>
+          <Text variant="h3">Selesaikan Pengiriman</Text>
+          <Text variant="caption" color={semantic.textMuted}>
+            {refill.code}
+          </Text>
+        </View>
+        <IconButton icon="close" label="Tutup" onPress={onClose} />
       </View>
 
       <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
         <Card style={styles.card}>
-          <Text variant="bodyStrong">{refill.code}</Text>
-          <View style={styles.metaRow}>
-            <MaterialCommunityIcons name="map-marker-outline" size={15} color={semantic.textMuted} />
-            <Text variant="caption" color={semantic.text}>{refill.location_name ?? 'Lokasi tidak diketahui'}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <MaterialCommunityIcons name="account-outline" size={15} color={semantic.textMuted} />
-            <Text variant="caption" color={semantic.text}>{refill.staff_name}</Text>
-          </View>
-          <View style={styles.metaRow}>
-            <MaterialCommunityIcons name="moped-outline" size={15} color={semantic.textMuted} />
-            <Text variant="caption" color={semantic.text}>Gerobak {refill.cart_code}</Text>
+          <Text variant="h3">{refill.code}</Text>
+          <View style={styles.metaChips}>
+            <Chip
+              label={refill.location_name ?? 'Lokasi tidak diketahui'}
+              icon={<MaterialCommunityIcons name="map-marker-outline" size={14} color={semantic.textMuted} />}
+            />
+            <Chip
+              label={refill.staff_name}
+              icon={<MaterialCommunityIcons name="account-outline" size={14} color={semantic.textMuted} />}
+            />
+            <Chip
+              label={`Gerobak ${refill.cart_code}`}
+              icon={<MaterialCommunityIcons name="moped-outline" size={14} color={semantic.textMuted} />}
+            />
           </View>
         </Card>
 
@@ -164,7 +163,9 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           {/* R15 — no cost shown to Rider. */}
           {refill.lines.map((line) => (
             <View key={line.id} style={styles.lineRow}>
-              <Text variant="body" style={styles.lineText}>{line.product_name}</Text>
+              <Text variant="body" style={styles.lineText} numberOfLines={1}>
+                {line.product_name}
+              </Text>
               <QtyStepper
                 value={qty[line.id] ?? 0}
                 onChange={(next) => setQty((prev) => ({ ...prev, [line.id]: next }))}
@@ -175,35 +176,22 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           ))}
         </Card>
 
-        <Card style={styles.card}>
-          <View style={styles.gpsRow}>
-            <MaterialCommunityIcons
-              name={gpsStatus === 'ok' ? 'map-marker-check-outline' : 'map-marker-off-outline'}
-              size={16}
-              color={gpsStatus === 'unavailable' ? feedback.warningFg : semantic.textMuted}
-            />
-            <Text variant="caption" color={semantic.textMuted}>
-              {gpsStatus === 'loading' && 'Mengambil lokasi...'}
-              {gpsStatus === 'ok' && 'Lokasi berhasil diambil'}
-              {gpsStatus === 'unavailable' && 'Lokasi tidak tersedia — pengiriman tetap bisa dilanjutkan'}
-            </Text>
-          </View>
-        </Card>
+        <View style={styles.gpsRow}>
+          <MaterialCommunityIcons
+            name={gpsStatus === 'ok' ? 'map-marker-check-outline' : 'map-marker-off-outline'}
+            size={16}
+            color={gpsStatus === 'unavailable' ? feedback.warningFg : brand[600]}
+          />
+          <Text variant="caption" color={semantic.textMuted}>
+            {gpsStatus === 'loading' && 'Mengambil lokasi...'}
+            {gpsStatus === 'ok' && 'Lokasi berhasil diambil'}
+            {gpsStatus === 'unavailable' && 'Lokasi tidak tersedia — pengiriman tetap bisa dilanjutkan'}
+          </Text>
+        </View>
 
         <Card style={styles.card}>
           {method === 'staff_signature' ? (
-            <>
-              <Text variant="bodyStrong">Paraf Staff</Text>
-              <SignaturePad
-                onSigned={setSignature}
-                onClear={() => setSignature(null)}
-              />
-              <Pressable onPress={() => { setMethod('pin_fallback'); setSignature(null); setError(null); }}>
-                <Text variant="caption" color={brand[700]} style={styles.link}>
-                  Staff tidak bisa paraf?
-                </Text>
-              </Pressable>
-            </>
+            <SignaturePad onSigned={setSignature} onClear={() => setSignature(null)} />
           ) : (
             <>
               <Text variant="bodyStrong">Verifikasi PIN Staff</Text>
@@ -218,24 +206,32 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
                 maxLength={6}
                 placeholder="123456"
               />
-              <Pressable onPress={() => { setMethod('staff_signature'); setStaffPin(''); setError(null); }}>
-                <Text variant="caption" color={brand[700]} style={styles.link}>
-                  Kembali ke paraf staff
-                </Text>
-              </Pressable>
             </>
           )}
+
+          <Button
+            label={method === 'staff_signature' ? 'Staff tidak bisa paraf?' : 'Kembali ke paraf staff'}
+            icon={method === 'staff_signature' ? 'dialpad' : 'draw'}
+            variant="ghost"
+            size="sm"
+            onPress={() => {
+              if (method === 'staff_signature') {
+                setMethod('pin_fallback');
+                setSignature(null);
+              } else {
+                setMethod('staff_signature');
+                setStaffPin('');
+              }
+              setError(null);
+            }}
+          />
         </Card>
 
-        {error ? (
-          <View style={styles.errorBanner}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={feedback.dangerFg} />
-            <Text variant="caption" color={feedback.dangerFg} style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
+        {error ? <Banner message={error} tone="danger" /> : null}
 
         <Button
           label="Konfirmasi Pengiriman"
+          icon="check-circle-outline"
           onPress={() => void onSubmit()}
           disabled={!canSubmit}
           loading={deliver.isPending}
@@ -252,79 +248,58 @@ export default function RiderActiveScreen() {
   const active = refillsQuery.data ?? [];
   const openRefill = active.find((r) => r.id === openId) ?? null;
 
-  if (refillsQuery.isLoading) {
-    return (
-      <Screen scroll={false} contentStyle={styles.center}>
-        <ActivityIndicator color={brand[700]} />
-      </Screen>
-    );
-  }
-
-  if (refillsQuery.isError) {
-    return (
-      <Screen scroll={false} contentStyle={styles.center}>
-        <Card style={styles.stateCard}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={28} color={feedback.dangerFg} />
-          <Text variant="bodyStrong" center>Gagal memuat pengiriman</Text>
-          <Text variant="caption" color={semantic.textMuted} center>
-            {(refillsQuery.error as Error).message}
-          </Text>
-          <Button label="Coba Lagi" onPress={() => void refillsQuery.refetch()} />
-        </Card>
-      </Screen>
-    );
-  }
-
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
-      <Text variant="h2" style={styles.header}>Pengiriman Saya</Text>
+      <Text variant="h2" style={styles.header}>
+        Pengiriman Saya
+      </Text>
 
-      <FlatList
-        data={active}
-        keyExtractor={(item) => String(item.id)}
-        contentContainerStyle={styles.listContent}
-        refreshing={refillsQuery.isRefetching}
-        onRefresh={() => void refillsQuery.refetch()}
-        renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <View style={styles.top}>
-              <View style={styles.topText}>
-                <Text variant="bodyStrong">{item.code}</Text>
-                <Text variant="caption" color={semantic.textMuted}>
-                  {item.location_name ?? 'Lokasi tidak diketahui'} · {item.staff_name}
-                </Text>
+      {refillsQuery.isLoading ? (
+        <View style={styles.listPad}>
+          <SkeletonList count={2} lines={2} />
+        </View>
+      ) : refillsQuery.isError ? (
+        <View style={styles.center}>
+          <EmptyState icon="wifi-off" title="Gagal memuat pengiriman" subtitle={(refillsQuery.error as Error).message} tone="danger">
+            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+          </EmptyState>
+        </View>
+      ) : (
+        <FlatList
+          data={active}
+          keyExtractor={(item) => String(item.id)}
+          contentContainerStyle={styles.listContent}
+          refreshing={refillsQuery.isRefetching}
+          onRefresh={() => void refillsQuery.refetch()}
+          renderItem={({ item }) => (
+            <Card style={styles.card}>
+              <View style={styles.top}>
+                <View style={styles.topText}>
+                  <Text variant="h3" numberOfLines={1}>
+                    {item.code}
+                  </Text>
+                  <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
+                    {item.location_name ?? 'Lokasi tidak diketahui'} · {item.staff_name}
+                  </Text>
+                </View>
+                <StatusBadge status={item.status} />
               </View>
-              <StatusBadge status={item.status} />
-            </View>
 
-            <View style={styles.metaRow}>
-              <MaterialCommunityIcons name="moped-outline" size={15} color={semantic.textMuted} />
-              <Text variant="caption" color={semantic.text}>Gerobak {item.cart_code}</Text>
-              <MaterialCommunityIcons name="cup-outline" size={15} color={semantic.textMuted} />
-              <Text variant="caption" color={semantic.text}>{item.total_requested} cups</Text>
-            </View>
+              <View style={styles.metaChips}>
+                <Chip label={`Gerobak ${item.cart_code}`} icon={<MaterialCommunityIcons name="moped-outline" size={14} color={semantic.textMuted} />} />
+                <Chip label={`${item.total_requested} cups`} icon={<MaterialCommunityIcons name="cup-outline" size={14} color={semantic.textMuted} />} />
+              </View>
 
-            <Button
-              label="Selesaikan Pengiriman"
-              onPress={() => setOpenId(item.id)}
-              disabled={!item.can.deliver}
-            />
-          </Card>
-        )}
-        ListEmptyComponent={
-          <Card style={styles.stateCard}>
-            <Text variant="caption" color={semantic.textMuted} center>
-              Tidak ada pengiriman yang sedang berjalan.
-            </Text>
-          </Card>
-        }
-      />
+              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setOpenId(item.id)} disabled={!item.can.deliver} />
+            </Card>
+          )}
+          ListEmptyComponent={
+            <EmptyState icon="moped-outline" title="Tidak ada pengiriman berjalan" subtitle="Ambil pesanan dari layar Siap Diambil untuk memulai." />
+          }
+        />
+      )}
 
-      <Modal
-        visible={openRefill !== null}
-        animationType="slide"
-        onRequestClose={() => setOpenId(null)}
-      >
+      <Modal visible={openRefill !== null} animationType="slide" onRequestClose={() => setOpenId(null)}>
         {openRefill ? <DeliverySheet refill={openRefill} onClose={() => setOpenId(null)} /> : null}
       </Modal>
     </Screen>
@@ -333,20 +308,17 @@ export default function RiderActiveScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  center: { alignItems: 'center', justifyContent: 'center' },
   header: { padding: space.lg, paddingBottom: space.sm },
+  listPad: { paddingHorizontal: space.lg },
+  center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
   card: { gap: space.md },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
   topText: { flex: 1, gap: space.xxs },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  metaChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   lineText: { flex: 1 },
-  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  link: { textDecorationLine: 'underline' },
-  errorBanner: { flexDirection: 'row', gap: space.sm, backgroundColor: feedback.dangerBg, borderColor: feedback.dangerBorder, borderWidth: 1, borderRadius: radius.md, padding: space.md },
-  errorText: { flex: 1 },
-  stateCard: { gap: space.md, alignItems: 'center' },
+  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xs },
   sheetRoot: { flex: 1, backgroundColor: semantic.bg },
   sheetHeader: {
     flexDirection: 'row',
@@ -355,7 +327,7 @@ const styles = StyleSheet.create({
     padding: space.lg,
     borderBottomWidth: 1,
     borderBottomColor: semantic.border,
-    backgroundColor: neutral[0],
+    backgroundColor: '#FFFFFF',
   },
   sheetContent: { padding: space.lg, gap: space.md },
 });

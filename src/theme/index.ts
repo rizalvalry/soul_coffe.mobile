@@ -1,6 +1,7 @@
 import { StyleSheet, type TextStyle } from 'react-native';
 
 export * from './tokens';
+export * from './motion';
 import { type } from './tokens';
 
 /**

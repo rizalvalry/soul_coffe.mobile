@@ -4,17 +4,24 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
+import { Chip } from '@/components/ui/Badge';
+import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonGrid } from '@/components/ui/Skeleton';
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { SectionTitle } from '@/components/ui/Section';
+import { enter } from '@/components/ui/Motion';
+import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
-import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
+import { brand, neutral, radius, semantic, shadow, space } from '@/theme';
 
 /** Hard ceiling per line — R7/§9: "Jumlah harus antara 1 dan 100 cups". */
 const MAX_PER_LINE = 100;
@@ -76,6 +83,7 @@ export default function NewRefillScreen() {
   }, []);
 
   const totalCups = useMemo(() => Object.values(qty).reduce((sum, n) => sum + n, 0), [qty]);
+  const selectedCount = useMemo(() => Object.values(qty).filter((n) => n > 0).length, [qty]);
   const isSubmitting = uploadEvidence.isPending || submitRefill.isPending;
 
   const capturePhoto = useCallback(async () => {
@@ -83,9 +91,7 @@ export default function NewRefillScreen() {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) {
-        setCameraError(
-          'Izin kamera ditolak. Aktifkan izin kamera di pengaturan HP untuk melanjutkan.',
-        );
+        setCameraError('Izin kamera ditolak. Aktifkan izin kamera di pengaturan HP untuk melanjutkan.');
         return;
       }
 
@@ -154,19 +160,14 @@ export default function NewRefillScreen() {
     return (
       <Screen>
         <View style={styles.top}>
-          <Button
-            label="Kembali"
-            icon="chevron-left"
-            variant="ghost"
-            fullWidth={false}
-            onPress={() => router.back()}
-          />
+          <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
         </View>
         <Card>
           <EmptyState
             icon="moped-off"
             title="Anda tidak bertugas di gerobak ini hari ini"
             subtitle="Hubungi Barista atau Administrator untuk penugasan gerobak hari ini."
+            tone="neutral"
           />
         </Card>
       </Screen>
@@ -181,14 +182,7 @@ export default function NewRefillScreen() {
       {...(isSubmitting ? {} : { onRefresh: () => void productsQuery.refetch() })}
     >
       <View style={styles.top}>
-        <Button
-          label="Kembali"
-          icon="chevron-left"
-          variant="ghost"
-          fullWidth={false}
-          onPress={() => router.back()}
-          disabled={isSubmitting}
-        />
+        <IconButton icon="chevron-left" label="Kembali" disabled={isSubmitting} onPress={() => router.back()} />
       </View>
 
       <View>
@@ -198,41 +192,35 @@ export default function NewRefillScreen() {
         </Text>
       </View>
 
+      <SectionTitle
+        title="Pilih produk"
+        caption={selectedCount > 0 ? `${selectedCount} produk dipilih` : 'Ketuk foto untuk menambah'}
+      />
+
       {productsQuery.isLoading ? (
-        <Card>
-          <Text color={semantic.textMuted} center>
-            Memuat daftar produk...
-          </Text>
-        </Card>
+        <SkeletonGrid count={6} />
       ) : productsQuery.isError ? (
         <Card style={styles.stateCard}>
-          <EmptyState
-            icon="alert-circle-outline"
-            title="Gagal memuat produk"
-            subtitle="Periksa koneksi internet Anda."
-          />
-          <Button label="Coba Lagi" variant="secondary" onPress={() => void productsQuery.refetch()} />
+          <EmptyState icon="wifi-off" title="Gagal memuat produk" subtitle="Periksa koneksi internet Anda." tone="danger" />
+          <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void productsQuery.refetch()} />
         </Card>
       ) : !productsQuery.data || productsQuery.data.length === 0 ? (
         <Card>
-          <EmptyState
-            icon="coffee-off-outline"
-            title="Belum ada produk"
-            subtitle="Hubungi Administrator untuk menambahkan produk."
-          />
+          <EmptyState icon="coffee-off-outline" title="Belum ada produk" subtitle="Hubungi Administrator untuk menambahkan produk." tone="neutral" />
         </Card>
       ) : (
         /* A grid of photographs, not a list of names. Staff recognise the drink they are out of
            by sight long before they read its name, and two columns keeps every tile inside a
            thumb's reach. */
         <View style={styles.grid}>
-          {productsQuery.data.map((product) => (
+          {productsQuery.data.map((product, index) => (
             <View key={product.id} style={styles.gridCell}>
               <ProductPickerCard
                 product={product}
                 value={qty[product.id] ?? 0}
                 max={MAX_PER_LINE}
                 disabled={isSubmitting}
+                index={index}
                 onChange={(next) => setQty((prev) => ({ ...prev, [product.id]: next }))}
               />
             </View>
@@ -240,91 +228,65 @@ export default function NewRefillScreen() {
         </View>
       )}
 
-      <Card accent style={styles.totalCard}>
-        <Text variant="caption" color={semantic.textMuted}>
-          Total Cups (otomatis)
-        </Text>
-        <Text variant="display" color={brand[700]}>
-          {totalCups}
-        </Text>
-      </Card>
+      <Animated.View entering={enter('below')}>
+        <Card style={styles.totalCard} accent>
+          <Text variant="caption" color={semantic.textMuted}>
+            Total Cups (otomatis)
+          </Text>
+          <AnimatedNumber value={totalCups} variant="display" color={brand[700]} />
+        </Card>
+      </Animated.View>
 
-      <Card style={styles.evidenceCard}>
-        <Text variant="bodyStrong">Foto Bukti Frozen Gerobak</Text>
-        <Text variant="caption" color={semantic.textMuted}>
-          Wajib diambil langsung dari kamera saat ini juga.
-        </Text>
+      <Animated.View entering={enter('below')}>
+        <Card style={styles.evidenceCard}>
+          <Text variant="bodyStrong">Foto Bukti Frozen Gerobak</Text>
+          <Text variant="caption" color={semantic.textMuted}>
+            Wajib diambil langsung dari kamera saat ini juga.
+          </Text>
 
-        {photo ? (
-          <View style={styles.photoBlock}>
-            <Image source={{ uri: photo.uri }} style={styles.photo} />
-            <Button
-              label="Ambil Ulang"
-              icon="camera-retake-outline"
-              variant="secondary"
-              onPress={capturePhoto}
-              disabled={isSubmitting}
-            />
-          </View>
-        ) : (
-          <Button
-            label="Ambil Foto"
-            icon="camera-outline"
-            onPress={capturePhoto}
-            disabled={isSubmitting}
-          />
-        )}
+          {photo ? (
+            <View style={styles.photoBlock}>
+              <View style={styles.photoFrame}>
+                <Image source={{ uri: photo.uri }} style={styles.photo} />
+                <View style={styles.photoBadge}>
+                  <Chip
+                    tone="translucent"
+                    label="Foto siap"
+                    icon={<MaterialCommunityIcons name="check-circle" size={14} color={neutral[0]} />}
+                  />
+                </View>
+              </View>
+              <Button label="Ambil Ulang" icon="camera-retake-outline" variant="secondary" onPress={capturePhoto} disabled={isSubmitting} />
+            </View>
+          ) : (
+            <Button label="Ambil Foto" icon="camera-outline" onPress={capturePhoto} disabled={isSubmitting} />
+          )}
 
-        {cameraError ? (
-          <View style={styles.errorBanner}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={feedback.dangerFg} />
-            <Text variant="caption" color={feedback.dangerFg} style={styles.errorText}>
-              {cameraError}
-            </Text>
-          </View>
-        ) : null}
-      </Card>
+          {cameraError ? <Banner message={cameraError} tone="danger" /> : null}
+        </Card>
+      </Animated.View>
 
       <View style={styles.gpsRow}>
         <MaterialCommunityIcons
           name={gpsStatus === 'granted' ? 'map-marker-check-outline' : 'map-marker-off-outline'}
           size={16}
-          color={semantic.textSubtle}
+          color={gpsStatus === 'granted' ? brand[600] : semantic.textSubtle}
         />
         <Text variant="caption" color={semantic.textSubtle}>
-          {gpsStatus === 'checking'
-            ? 'Mendeteksi lokasi...'
-            : gpsStatus === 'granted'
-              ? 'Lokasi terdeteksi'
-              : 'Tanpa GPS — tetap bisa dikirim'}
+          {gpsStatus === 'checking' ? 'Mendeteksi lokasi...' : gpsStatus === 'granted' ? 'Lokasi terdeteksi' : 'Tanpa GPS — tetap bisa dikirim'}
         </Text>
       </View>
 
-      {formError ? (
-        <View style={styles.errorBanner}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={18} color={feedback.dangerFg} />
-          <Text variant="caption" color={feedback.dangerFg} style={styles.errorText}>
-            {formError}
-          </Text>
-        </View>
-      ) : null}
+      {formError ? <Banner message={formError} tone="danger" /> : null}
 
-      <Button
-        label="Kirim Request"
-        icon="send-outline"
-        onPress={() => void onSubmit()}
-        loading={isSubmitting}
-        disabled={isSubmitting}
-      />
+      <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={isSubmitting} />
 
       {/* The photo is re-encoded on the device before it is sent (lib/image.ts), so submit is a
           multi-second operation with two distinct stages. Naming the stage is what stops a staff
           member from deciding the app has frozen and killing it mid-upload. */}
       {isSubmitting ? (
         <Text variant="caption" color={semantic.textSubtle} center>
-          {uploadEvidence.isPending
-            ? 'Mengompres dan mengunggah foto bukti...'
-            : 'Mengirim request...'}
+          {uploadEvidence.isPending ? 'Mengompres dan mengunggah foto bukti...' : 'Mengirim request...'}
         </Text>
       ) : null}
     </Screen>
@@ -342,24 +304,9 @@ const styles = StyleSheet.create({
 
   evidenceCard: { gap: space.md },
   photoBlock: { gap: space.md },
-  photo: {
-    width: '100%',
-    height: 200,
-    borderRadius: radius.md,
-    backgroundColor: neutral[100],
-  },
+  photoFrame: { borderRadius: radius.md, overflow: 'hidden', backgroundColor: neutral[100], ...shadow.card },
+  photo: { width: '100%', height: 200 },
+  photoBadge: { position: 'absolute', left: space.md, bottom: space.md },
 
-  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: feedback.dangerBg,
-    borderColor: feedback.dangerBorder,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: space.md,
-  },
-  errorText: { flex: 1 },
+  gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, paddingHorizontal: space.xs },
 });

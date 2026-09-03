@@ -1,21 +1,23 @@
 import { useMemo, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { QtyStepper } from '@/components/ui/QtyStepper';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
+import { Banner } from '@/components/ui/Banner';
+import { SkeletonList } from '@/components/ui/Skeleton';
+import { MetaRow } from '@/components/ui/Section';
 import { RefillCard, formatRupiah } from '@/components/refill/RefillCard';
 import { useApproveRefill, useRefills, useRejectRefill } from '@/features/refill/queries';
 import { useRealtime } from '@/features/realtime/useRealtime';
 import { ApiError } from '@/lib/api';
-import { brand, feedback, radius, semantic, space } from '@/theme';
+import { semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 const MIN_REASON_LENGTH = 10;
@@ -38,13 +40,7 @@ export default function FinanceApprovalsScreen() {
     <Screen scroll={false}>
       <View style={styles.page}>
         <View style={styles.header}>
-          <Button
-            label="Kembali"
-            icon="chevron-left"
-            variant="ghost"
-            fullWidth={false}
-            onPress={() => router.back()}
-          />
+          <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
           <Text variant="h2">Approval Refill</Text>
           <Text variant="caption" color={semantic.textMuted}>
             Permintaan menunggu keputusan Anda
@@ -53,17 +49,19 @@ export default function FinanceApprovalsScreen() {
         </View>
 
         {refillsQuery.isLoading ? (
-          <View style={styles.center}>
-            <Text color={semantic.textMuted}>Memuat permintaan...</Text>
+          <View style={styles.listPad}>
+            <SkeletonList count={3} lines={3} />
           </View>
         ) : refillsQuery.isError ? (
           <View style={styles.center}>
             <EmptyState
-              icon="alert-circle-outline"
+              icon="wifi-off"
               title="Gagal memuat permintaan"
               subtitle="Periksa koneksi internet Anda."
-            />
-            <Button label="Coba Lagi" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+              tone="danger"
+            >
+              <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+            </EmptyState>
           </View>
         ) : (
           <FlatList
@@ -71,14 +69,10 @@ export default function FinanceApprovalsScreen() {
             data={rows}
             keyExtractor={(item) => String(item.id)}
             contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refillsQuery.isRefetching}
-                onRefresh={() => void refillsQuery.refetch()}
-              />
-            }
-            renderItem={({ item }) => (
-              <ApprovalCard refill={item} onConflict={() => void refillsQuery.refetch()} />
+            refreshing={refillsQuery.isRefetching}
+            onRefresh={() => void refillsQuery.refetch()}
+            renderItem={({ item, index }) => (
+              <ApprovalCard refill={item} index={index} onConflict={() => void refillsQuery.refetch()} />
             )}
             ListEmptyComponent={
               <EmptyState
@@ -94,7 +88,15 @@ export default function FinanceApprovalsScreen() {
   );
 }
 
-function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflict: () => void }) {
+function ApprovalCard({
+  refill,
+  index,
+  onConflict,
+}: {
+  refill: RefillRequest;
+  index: number;
+  onConflict: () => void;
+}) {
   const approve = useApproveRefill();
   const reject = useRejectRefill();
 
@@ -174,7 +176,7 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
 
   return (
     <Card style={styles.card}>
-      <RefillCard refill={refill} showCost />
+      <RefillCard refill={refill} showCost index={index} />
 
       <View style={styles.lines}>
         {refill.lines.map((line) => {
@@ -182,7 +184,9 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
           return (
             <View key={line.id} style={styles.lineRow}>
               <View style={styles.lineInfo}>
-                <Text variant="bodyStrong">{line.product_name}</Text>
+                <Text variant="bodyStrong" numberOfLines={1}>
+                  {line.product_name}
+                </Text>
                 <Text variant="caption" color={semantic.textMuted}>
                   Diminta: {line.qty_requested} {line.unit}
                 </Text>
@@ -204,14 +208,7 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
         })}
       </View>
 
-      {hasCost ? (
-        <View style={styles.totalRow}>
-          <Text variant="bodyStrong">Total Disetujui</Text>
-          <Text variant="h3" color={brand[700]}>
-            {formatRupiah(grandTotal)}
-          </Text>
-        </View>
-      ) : null}
+      {hasCost ? <MetaRow label="Total Disetujui" value={formatRupiah(grandTotal)} emphasis /> : null}
 
       {anyReduced ? (
         <Input
@@ -235,14 +232,7 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
         />
       ) : null}
 
-      {error ? (
-        <View style={styles.errorBanner}>
-          <MaterialCommunityIcons name="alert-circle-outline" size={16} color={feedback.dangerFg} />
-          <Text variant="caption" color={feedback.dangerFg} style={styles.errorText}>
-            {error}
-          </Text>
-        </View>
-      ) : null}
+      {error ? <Banner message={error} tone="danger" /> : null}
 
       <View style={styles.actions}>
         {showRejectInput ? (
@@ -272,6 +262,7 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
           <>
             <Button
               label="Tolak"
+              icon="close"
               variant="secondary"
               fullWidth={false}
               style={styles.actionBtn}
@@ -280,6 +271,7 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
             />
             <Button
               label="Setujui"
+              icon="check"
               variant="primary"
               fullWidth={false}
               style={styles.actionBtn}
@@ -297,6 +289,7 @@ function ApprovalCard({ refill, onConflict }: { refill: RefillRequest; onConflic
 const styles = StyleSheet.create({
   page: { flex: 1 },
   header: { padding: space.lg, gap: space.xxs },
+  listPad: { paddingHorizontal: space.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
   listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
@@ -305,27 +298,6 @@ const styles = StyleSheet.create({
   lines: { gap: space.md },
   lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
   lineInfo: { flex: 1, gap: space.xxs },
-
-  totalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: semantic.border,
-    paddingTop: space.sm,
-  },
-
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: feedback.dangerBg,
-    borderColor: feedback.dangerBorder,
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: space.md,
-  },
-  errorText: { flex: 1 },
 
   actions: { flexDirection: 'row', gap: space.sm },
   actionBtn: { flex: 1 },

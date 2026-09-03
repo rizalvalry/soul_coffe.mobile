@@ -1,8 +1,12 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Animated from 'react-native-reanimated';
+
 import { Text } from '@/components/ui/Text';
 import { StatusBadge } from '@/components/ui/Badge';
-import { neutral, radius, shadow, semantic, space } from '@/theme';
+import { Touchable } from '@/components/ui/Touchable';
+import { enter, listTransition } from '@/components/ui/Motion';
+import { neutral, pressScale, radius, shadow, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 export function formatRupiah(amount: number): string {
@@ -20,6 +24,8 @@ export type RefillCardProps = {
   onPress?: () => void;
   /** Renders the total value row. Only pass true for FINANCE/ADMIN — see R15. */
   showCost?: boolean;
+  /** Position in its list. Drives the entrance stagger — pass the FlatList/map index. */
+  index?: number;
 };
 
 /**
@@ -28,18 +34,18 @@ export type RefillCardProps = {
  * `total_cost` is rendered only when the server actually sent it. The field is absent from
  * BARISTA/RIDER/STAFF responses by design (R15), so `showCost` alone is not enough — both the
  * flag and the value must be present.
+ *
+ * The card now carries a layout transition: when a realtime event drops a request out of a
+ * queue, the rows below glide up instead of teleporting, so the operator sees that something
+ * left rather than wondering what moved under their thumb. `index` (optional, defaults to 0)
+ * drives its entrance stagger — pass it from a `renderItem`/`.map` callback for a list that fills
+ * in one row after another instead of all at once.
  */
-export function RefillCard({ refill, onPress, showCost = false }: RefillCardProps) {
+export function RefillCard({ refill, onPress, showCost = false, index = 0 }: RefillCardProps) {
   const cost = showCost && typeof refill.total_cost === 'number' ? refill.total_cost : null;
 
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`Permintaan ${refill.code}, gerobak ${refill.cart_code}`}
-      style={({ pressed }) => [styles.card, pressed && onPress && styles.pressed]}
-    >
+  const body = (
+    <>
       <View style={styles.top}>
         <View style={styles.codeBlock}>
           <Text variant="bodyStrong">{refill.code}</Text>
@@ -90,7 +96,29 @@ export function RefillCard({ refill, onPress, showCost = false }: RefillCardProp
           {refill.out_of_hours ? <Flag icon="clock-alert-outline" label="Di luar jam" /> : null}
         </View>
       ) : null}
-    </Pressable>
+    </>
+  );
+
+  if (!onPress) {
+    return (
+      <Animated.View entering={enter('below', index)} layout={listTransition} style={styles.card}>
+        {body}
+      </Animated.View>
+    );
+  }
+
+  return (
+    <Animated.View entering={enter('below', index)} layout={listTransition}>
+      <Touchable
+        onPress={onPress}
+        scaleTo={pressScale.surface}
+        accessibilityRole="button"
+        accessibilityLabel={`Permintaan ${refill.code}, gerobak ${refill.cart_code}`}
+        style={styles.card}
+      >
+        {body}
+      </Touchable>
+    </Animated.View>
   );
 }
 
@@ -113,7 +141,6 @@ const styles = StyleSheet.create({
     padding: space.lg,
     gap: space.sm,
   },
-  pressed: { opacity: 0.8 },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
   codeBlock: { flex: 1, gap: space.xxs },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },

@@ -15,16 +15,22 @@ import { zodResolver } from '@/lib/zodResolver';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Reanimated from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { Banner } from '@/components/ui/Banner';
+import { Touchable } from '@/components/ui/Touchable';
+import { Chip } from '@/components/ui/Badge';
+import { Gradient, GradientBloom } from '@/components/ui/Gradient';
+import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
 import { useAuth } from '@/features/auth/store';
 import { useKeyboardInset, useKeyboardVisible } from '@/lib/keyboard';
 import { loginSchema, normalisePhone, type LoginForm } from '@/features/auth/schema';
 import { rolesByPriority, roleMeta, type Role } from '@/domain/roles';
-import { brand, feedback, neutral, radius, semantic, space, touch } from '@/theme';
+import { brand, feedback, gradients, neutral, pressScale, radius, semantic, space, touch } from '@/theme';
 
 /**
  * Where the sheet rests, as a fraction of screen height measured from the top.
@@ -183,20 +189,27 @@ export default function LoginScreen() {
   return (
     <View style={styles.root}>
       {/* Brand backdrop. brand[700], not the logo's brand[500]: white text on #00A3AA is only
-          3.08:1 and fails WCAG AA. See tokens.ts. */}
+          3.08:1 and fails WCAG AA. See tokens.ts. Rendered as the same brand gradient the rest
+          of the app now uses for its hero surfaces, so the login screen reads as the front door
+          of the same app rather than a flat-colour splash bolted onto it. */}
       <View style={[styles.backdrop, { paddingTop: insets.top + space.xl }]}>
+        <Gradient colors={gradients.brand} fill bands={22} />
+        <GradientBloom size={240} style={styles.backdropBloom} />
+
         {/* The mark is brand teal with the cup as white negative space, so on a teal ground it
             would all but disappear. The white disc is what makes it legible — and being a
             circle, it reads as deliberate brand furniture rather than a frame around the image. */}
-        <View style={styles.logoPlate}>
+        <Reanimated.View entering={enter('scale')} style={styles.logoPlate}>
           <SoulLogo size={52} showWordmark={false} />
-        </View>
-        <Text variant="h1" color={neutral[0]} style={styles.headline}>
-          Masuk untuk mulai{'\n'}bertugas hari ini.
-        </Text>
-        <Text variant="caption" color={brand[100]}>
-          Soul Coffeemate · Operasional Lapangan
-        </Text>
+        </Reanimated.View>
+        <Reanimated.View entering={enter('below', 1)}>
+          <Text variant="h1" color={neutral[0]} style={styles.headline}>
+            Masuk untuk mulai{'\n'}bertugas hari ini.
+          </Text>
+          <Text variant="caption" color={brand[100]}>
+            Soul Coffeemate · Operasional Lapangan
+          </Text>
+        </Reanimated.View>
       </View>
 
       <Animated.View
@@ -326,18 +339,7 @@ export default function LoginScreen() {
             />
           )}
 
-          {error ? (
-            <View style={styles.errorBanner}>
-              <MaterialCommunityIcons
-                name="alert-circle-outline"
-                size={18}
-                color={feedback.dangerFg}
-              />
-              <Text variant="caption" color={feedback.dangerFg} style={styles.errorText}>
-                {error}
-              </Text>
-            </View>
-          ) : null}
+          {error ? <Banner message={error} tone="danger" /> : null}
 
           {mode === 'password' ? (
             <Button
@@ -366,7 +368,7 @@ export default function LoginScreen() {
                 <View style={styles.dividerLine} />
               </View>
 
-              <Pressable
+              <Touchable
                 onPress={() => {
                   clearError();
                   setPinError(null);
@@ -374,11 +376,12 @@ export default function LoginScreen() {
                   setMode((m) => (m === 'pin' ? 'password' : 'pin'));
                 }}
                 disabled={submitting}
+                scaleTo={pressScale.control}
                 accessibilityRole="button"
                 accessibilityLabel={
                   mode === 'pin' ? 'Masuk dengan kata sandi' : 'Masuk dengan PIN'
                 }
-                style={({ pressed }) => [styles.altButton, pressed && styles.altButtonPressed]}
+                style={styles.altButton}
               >
                 <MaterialCommunityIcons
                   name={mode === 'pin' ? 'form-textbox-password' : 'dialpad'}
@@ -388,7 +391,7 @@ export default function LoginScreen() {
                 <Text variant="bodyStrong">
                   {mode === 'pin' ? 'Masuk dengan Kata Sandi' : 'Masuk dengan PIN'}
                 </Text>
-              </Pressable>
+              </Touchable>
             </>
           ) : null}
 
@@ -403,16 +406,12 @@ export default function LoginScreen() {
             <View style={styles.rolesBlock}>
               <View style={styles.roleChips}>
                 {rolesByPriority.map((role) => (
-                  <View key={role} style={styles.roleChip}>
-                    <MaterialCommunityIcons
-                      name={roleMeta[role].icon as never}
-                      size={13}
-                      color={brand[700]}
-                    />
-                    <Text variant="micro" color={brand[700]}>
-                      {roleMeta[role].label}
-                    </Text>
-                  </View>
+                  <Chip
+                    key={role}
+                    tone="brand"
+                    label={roleMeta[role].label}
+                    icon={<MaterialCommunityIcons name={roleMeta[role].icon as never} size={13} color={brand[700]} />}
+                  />
                 ))}
               </View>
             </View>
@@ -432,13 +431,14 @@ export default function LoginScreen() {
                 </Text>
               </View>
               {rolesByPriority.map((role) => (
-                <Pressable
+                <Touchable
                   key={role}
                   onPress={() => void onDemo(role)}
                   disabled={submitting}
+                  scaleTo={pressScale.surface}
                   accessibilityRole="button"
                   accessibilityLabel={`Masuk sebagai ${roleMeta[role].label}`}
-                  style={({ pressed }) => [styles.demoRow, pressed && styles.altButtonPressed]}
+                  style={styles.demoRow}
                 >
                   <MaterialCommunityIcons
                     name={roleMeta[role].icon as never}
@@ -446,7 +446,7 @@ export default function LoginScreen() {
                     color={brand[700]}
                   />
                   <Text variant="caption">{roleMeta[role].label}</Text>
-                </Pressable>
+                </Touchable>
               ))}
             </View>
           ) : null}
@@ -466,7 +466,9 @@ const styles = StyleSheet.create({
   backdrop: {
     paddingHorizontal: space.xl,
     gap: space.md,
+    overflow: 'hidden',
   },
+  backdropBloom: { top: -90, right: -70 },
   logoPlate: {
     width: 84,
     height: 84,

@@ -45,6 +45,23 @@ export const neutral = {
   950: '#121214',
 } as const;
 
+/**
+ * Warm amber accent — the single non-teal hue in the system.
+ *
+ * Exists to carry the ONE thing on a screen that must be found before anything else: a live
+ * counter, a "needs you now" marker. Two accents would mean neither reads as the accent, so it
+ * is deliberately rationed. `600` and darker are the only text-safe stops on white (`600` =
+ * 4.53:1); `500` and lighter are fills and glows only.
+ */
+export const accent = {
+  50: '#FFF7EB',
+  100: '#FFECCC',
+  300: '#FFBF5C',
+  400: '#FFA726',
+  500: '#F58A0B',
+  600: '#C96A00', // ← 4.53:1 on white. The lightest amber usable as text.
+} as const;
+
 /** Feedback colours. Every foreground value clears 4.5:1 on its paired background. */
 export const feedback = {
   successFg: '#15803D',
@@ -109,6 +126,19 @@ export const statusColor = {
 
 export type RefillStatus = keyof typeof statusColor;
 
+/**
+ * Gradient stop sets, rendered by `<Gradient>` (src/components/ui/Gradient.tsx) as stacked
+ * interpolated bands in pure JS — there is no `expo-linear-gradient` here on purpose: it is a
+ * native module, and adding one would mean nobody sees a pixel of the surfaces that use it until
+ * they rebuild the APK. Everything below ships in the JS bundle.
+ */
+export const gradients = {
+  /** The signature brand wash — hero headers, the primary action tile, the login backdrop. */
+  brand: ['#00A9B0', '#007277', '#004F53'],
+  /** The rationed amber, for the one element that must be found first. */
+  amber: ['#FFB03A', '#F58A0B'],
+} as const;
+
 /** 4pt spacing scale. */
 export const space = {
   xxs: 2,
@@ -150,6 +180,7 @@ export const type = {
   body: { fontSize: 15, lineHeight: 22, fontWeight: '400' },
   bodyStrong: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
   caption: { fontSize: 13, lineHeight: 18, fontWeight: '400' },
+  captionStrong: { fontSize: 13, lineHeight: 18, fontWeight: '600' },
   micro: { fontSize: 11, lineHeight: 16, fontWeight: '600' },
 } as const;
 
@@ -198,13 +229,23 @@ export const shadow = {
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 8 },
   },
+  /** Amber-tinted glow, for the rationed accent's own surfaces (the count badge, a highlight pill). */
+  amber: {
+    ...elevation.md,
+    shadowColor: '#C96A00',
+    shadowOpacity: 0.28,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+  },
 } as const;
 
 export const tokens = {
   brand,
   neutral,
+  accent,
   feedback,
   semantic,
+  gradients,
   statusColor,
   space,
   radius,

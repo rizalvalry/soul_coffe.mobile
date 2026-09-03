@@ -1,13 +1,19 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Chip } from '@/components/ui/Badge';
+import { Banner } from '@/components/ui/Banner';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SkeletonList, SkeletonCard } from '@/components/ui/Skeleton';
+import { SectionTitle } from '@/components/ui/Section';
+import { enter, listTransition } from '@/components/ui/Motion';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills, useStaffOnShift } from '@/features/refill/queries';
-import { brand, feedback, radius, semantic, space } from '@/theme';
+import { semantic, space } from '@/theme';
 
 const TERMINAL_STATUSES = ['READY_TO_PICK', 'PICKED_UP', 'DELIVERED', 'CLOSED'] as const;
 
@@ -40,82 +46,63 @@ export default function BaristaHistoryScreen() {
       <Text variant="h2">Riwayat</Text>
 
       <View style={styles.section}>
-        <Text variant="micro" color={semantic.textSubtle} style={styles.sectionTitle}>
-          RIWAYAT PENYIAPAN
-        </Text>
+        <SectionTitle title="Riwayat penyiapan" />
 
         {refillsQuery.isLoading ? (
-          <ActivityIndicator color={brand[700]} />
+          <SkeletonList count={2} lines={2} />
         ) : refillsQuery.isError ? (
-          <Card style={styles.stateCard}>
-            <MaterialCommunityIcons name="alert-circle-outline" size={24} color={feedback.dangerFg} />
-            <Text variant="caption" color={semantic.textMuted} center>
-              {(refillsQuery.error as Error).message}
-            </Text>
-            <Button label="Coba Lagi" onPress={() => void refillsQuery.refetch()} />
+          <Card>
+            <EmptyState icon="wifi-off" title="Gagal memuat data" subtitle={(refillsQuery.error as Error).message} tone="danger" />
+            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
           </Card>
         ) : prepared.length === 0 ? (
-          <Card style={styles.stateCard}>
-            <Text variant="caption" color={semantic.textMuted} center>
-              Belum ada permintaan yang selesai disiapkan.
-            </Text>
+          <Card>
+            <EmptyState icon="clipboard-text-clock-outline" title="Belum ada riwayat" subtitle="Permintaan yang selesai disiapkan akan muncul di sini." />
           </Card>
         ) : (
           <View style={styles.list}>
-            {prepared.map((r) => (
+            {prepared.map((r, index) => (
               // R15 — cost never shown to Barista.
-              <RefillCard key={r.id} refill={r} showCost={false} />
+              <RefillCard key={r.id} refill={r} showCost={false} index={index} />
             ))}
           </View>
         )}
       </View>
 
       <View style={styles.section}>
-        <Text variant="micro" color={semantic.textSubtle} style={styles.sectionTitle}>
-          ALOKASI HARI INI
-        </Text>
+        <SectionTitle title="Alokasi hari ini" />
 
         {staffQuery.isLoading ? (
-          <ActivityIndicator color={brand[700]} />
+          <SkeletonCard lines={3} />
         ) : staffQuery.isError ? (
-          <Card style={styles.stateCard}>
-            <Text variant="caption" color={semantic.textMuted} center>
-              {(staffQuery.error as Error).message}
-            </Text>
-            <Button label="Coba Lagi" onPress={() => void staffQuery.refetch()} />
+          <Card>
+            <EmptyState icon="wifi-off" title="Gagal memuat data" subtitle={(staffQuery.error as Error).message} tone="danger" />
+            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void staffQuery.refetch()} />
           </Card>
         ) : (staffQuery.data ?? []).length === 0 ? (
-          <Card style={styles.stateCard}>
-            <Text variant="caption" color={semantic.textMuted} center>
-              Tidak ada staff yang bertugas hari ini.
-            </Text>
+          <Card>
+            <EmptyState icon="account-off-outline" title="Tidak ada staff bertugas" subtitle="Belum ada penugasan hari ini." />
           </Card>
         ) : (
           <Card style={styles.card}>
-            {(staffQuery.data ?? []).map((s) => (
-              <View key={s.staff_id} style={styles.staffRow}>
-                <View>
-                  <Text variant="body">{s.staff_name}</Text>
-                  <Text variant="caption" color={semantic.textMuted}>Gerobak {s.cart_code}</Text>
+            {(staffQuery.data ?? []).map((s, index) => (
+              <Animated.View key={s.staff_id} entering={enter('below', index, 6)} layout={listTransition} style={styles.staffRow}>
+                <View style={styles.staffText}>
+                  <Text variant="bodyStrong">{s.staff_name}</Text>
+                  <Text variant="caption" color={semantic.textMuted}>
+                    Gerobak {s.cart_code}
+                  </Text>
                 </View>
-                <Text
-                  variant="micro"
-                  color={s.has_allocation ? feedback.successFg : feedback.warningFg}
-                >
-                  {s.has_allocation ? 'SUDAH' : 'BELUM'}
-                </Text>
-              </View>
+                <Chip tone={s.has_allocation ? 'brand' : 'amber'} label={s.has_allocation ? 'SUDAH' : 'BELUM'} />
+              </Animated.View>
             ))}
           </Card>
         )}
 
-        <View style={styles.noteRow}>
-          <MaterialCommunityIcons name="information-outline" size={15} color={feedback.infoFg} />
-          <Text variant="caption" color={feedback.infoFg} style={styles.noteText}>
-            Riwayat alokasi hari-hari sebelumnya belum tersedia — API saat ini hanya menyediakan
-            status alokasi hari ini.
-          </Text>
-        </View>
+        <Banner
+          tone="info"
+          message="Riwayat alokasi hari-hari sebelumnya belum tersedia — API saat ini hanya menyediakan status alokasi hari ini."
+        />
       </View>
     </Screen>
   );
@@ -123,11 +110,8 @@ export default function BaristaHistoryScreen() {
 
 const styles = StyleSheet.create({
   section: { gap: space.md },
-  sectionTitle: { letterSpacing: 1 },
   list: { gap: space.md },
-  card: { gap: space.md },
-  staffRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  stateCard: { gap: space.sm, alignItems: 'center' },
-  noteRow: { flexDirection: 'row', gap: space.sm, backgroundColor: feedback.infoBg, borderColor: feedback.infoBorder, borderWidth: 1, borderRadius: radius.md, padding: space.md },
-  noteText: { flex: 1 },
+  card: { gap: space.sm },
+  staffRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: space.xs },
+  staffText: { gap: space.xxs },
 });
