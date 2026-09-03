@@ -18,7 +18,7 @@ import { RefillTimeline } from '@/components/refill/RefillTimeline';
 import { formatRupiah } from '@/components/refill/RefillCard';
 import { useCancelRefill, useRefill } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
-import { feedback, neutral, radius, semantic, space } from '@/theme';
+import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 export default function StaffRequestDetailScreen() {
@@ -231,22 +231,26 @@ const styles = StyleSheet.create({
   photo: { width: '100%', height: 200, borderRadius: radius.md, backgroundColor: neutral[100] },
 
   linesCard: { gap: space.sm },
-  tableHead: { flexDirection: 'row', gap: space.xs },
+  tableHead: { flexDirection: 'row', gap: space.xs, paddingHorizontal: space.sm },
+  // Boxed rows, not hairline dividers — a soft tinted background per row is what makes a data
+  // grid read as a mobile app's list rather than a spreadsheet printed onto a phone screen.
   tableRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.xs,
-    borderTopWidth: 1,
-    borderTopColor: semantic.border,
-    paddingTop: space.sm,
+    backgroundColor: semantic.surfaceSunken,
+    borderRadius: radius.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.sm,
   },
   tableFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.xs,
-    borderTopWidth: 1,
-    borderTopColor: semantic.borderStrong,
-    paddingTop: space.sm,
+    backgroundColor: brand[50],
+    borderRadius: radius.sm,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.sm,
     marginTop: space.xxs,
   },
   colProduct: { flex: 2 },

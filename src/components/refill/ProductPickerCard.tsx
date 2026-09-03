@@ -13,7 +13,6 @@ import Animated, {
 
 import { Text } from '@/components/ui/Text';
 import { Touchable } from '@/components/ui/Touchable';
-import { Gradient } from '@/components/ui/Gradient';
 import { enter } from '@/components/ui/Motion';
 import { productImage } from '@/domain/productImages';
 import {
@@ -113,11 +112,9 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
           </View>
         )}
 
-        {/* Guarantees contrast for the badge below regardless of the photo's own colours —
-            painted every time, not only while a plus/count is showing, so it never pops in. */}
-        <View style={styles.scrim} pointerEvents="none">
-          <Gradient colors={['rgba(0,20,22,0)', 'rgba(0,20,22,0.45)']} fill bands={12} />
-        </View>
+        {/* Guarantees contrast for the badge below regardless of the photo's own colours — a
+            flat tint, not a gradient ramp, painted every time so it never pops in. */}
+        <View style={styles.scrim} pointerEvents="none" />
 
         {selected ? (
           <Animated.View style={[styles.countBadge, badgeStyle]}>
@@ -209,6 +206,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     height: '45%',
+    backgroundColor: 'rgba(0,20,22,0.32)',
   },
 
   countBadge: {

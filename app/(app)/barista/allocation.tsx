@@ -20,7 +20,7 @@ import { enter } from '@/components/ui/Motion';
 import { useStaffOnShift, useProducts, useCreateAllocation } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
 import type { StaffOnShift } from '@/domain/types';
-import { brand, pressScale, radius, semantic, space } from '@/theme';
+import { brand, neutral, pressScale, radius, semantic, space } from '@/theme';
 
 /** Local operating date — server time is authoritative for anything that matters (R16); this
  * is only the label the barista is composing an allocation for. */
@@ -303,7 +303,15 @@ const styles = StyleSheet.create({
   staffRowText: { flex: 1, gap: space.xxs },
 
   lines: { gap: space.md },
-  lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  lineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    backgroundColor: neutral[50],
+    borderRadius: radius.sm,
+    padding: space.sm,
+  },
   lineText: { flex: 1, gap: space.xxs },
 
   modalOverlay: { flex: 1, backgroundColor: semantic.overlay, alignItems: 'center', justifyContent: 'center', padding: space.lg },

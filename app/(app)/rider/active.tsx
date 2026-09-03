@@ -18,7 +18,7 @@ import { SignaturePad, type SignatureResult } from '@/components/ui/SignaturePad
 import { useDeliverRefill, useRefills } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest } from '@/domain/types';
-import { brand, feedback, semantic, space } from '@/theme';
+import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 
 type DeliveryMethod = 'staff_signature' | 'pin_fallback';
 type GpsCoords = { lat: number; lng: number };
@@ -316,7 +316,15 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
   topText: { flex: 1, gap: space.xxs },
   metaChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  lineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    backgroundColor: neutral[50],
+    borderRadius: radius.sm,
+    padding: space.sm,
+  },
   lineText: { flex: 1 },
   gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xs },
   sheetRoot: { flex: 1, backgroundColor: semantic.bg },

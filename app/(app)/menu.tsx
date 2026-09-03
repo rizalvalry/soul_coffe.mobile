@@ -11,14 +11,13 @@ import { Card } from '@/components/ui/Card';
 import { CountBadge, Chip } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
 import { Touchable } from '@/components/ui/Touchable';
-import { Gradient, GradientBloom } from '@/components/ui/Gradient';
 import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
 import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { IMPLEMENTED_ROUTES, menuByRole, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
-import { brand, gradients, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
+import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
 
 /**
  * Live badge counters.
@@ -168,9 +167,6 @@ export default function MenuScreen() {
             accessibilityHint={item.sublabel}
             style={styles.primaryTile}
           >
-            <Gradient colors={gradients.brand} fill bands={20} />
-            <GradientBloom size={160} color="rgba(255,255,255,0.12)" style={styles.primaryBloom} />
-
             <View style={styles.primaryIcon}>
               <MaterialCommunityIcons name={item.icon as never} size={28} color={neutral[0]} />
             </View>
@@ -271,13 +267,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
+    backgroundColor: brand[700],
     borderRadius: radius.lg,
     padding: space.lg,
     minHeight: touch.tileMinHeight,
-    overflow: 'hidden',
-    ...shadow.raised,
+    ...shadow.card,
   },
-  primaryBloom: { top: -70, right: -40 },
   primaryIcon: {
     width: 48,
     height: 48,

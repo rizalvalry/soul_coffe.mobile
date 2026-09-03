@@ -17,7 +17,7 @@ import { RefillCard, formatRupiah } from '@/components/refill/RefillCard';
 import { useApproveRefill, useRefills, useRejectRefill } from '@/features/refill/queries';
 import { useRealtime } from '@/features/realtime/useRealtime';
 import { ApiError } from '@/lib/api';
-import { semantic, space } from '@/theme';
+import { neutral, radius, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 const MIN_REASON_LENGTH = 10;
@@ -296,7 +296,15 @@ const styles = StyleSheet.create({
 
   card: { gap: space.md },
   lines: { gap: space.md },
-  lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md },
+  lineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+    backgroundColor: neutral[50],
+    borderRadius: radius.sm,
+    padding: space.sm,
+  },
   lineInfo: { flex: 1, gap: space.xxs },
 
   actions: { flexDirection: 'row', gap: space.sm },

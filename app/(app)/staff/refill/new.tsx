@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import { StatusBar } from 'expo-status-bar';
 import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
@@ -22,6 +23,17 @@ import { useAuth } from '@/features/auth/store';
 import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
 import { brand, neutral, radius, semantic, shadow, space } from '@/theme';
+
+/**
+ * A deliberately different backdrop for this one screen: dark and atmospheric, the white product
+ * cards and photo evidence sitting on it like islands rather than blending into the same pale
+ * page background every other screen uses. Requesting a refill is the single most important
+ * action in the app (requirement 2) — it earns its own mood, not a flat colour swap.
+ */
+const BACKDROP = '#0B2B2C';
+const LIGHT_TEXT = neutral[0];
+const LIGHT_MUTED = 'rgba(255,255,255,0.72)';
+const LIGHT_SUBTLE = 'rgba(255,255,255,0.56)';
 
 /** Hard ceiling per line — R7/§9: "Jumlah harus antara 1 dan 100 cups". */
 const MAX_PER_LINE = 100;
@@ -176,18 +188,25 @@ export default function NewRefillScreen() {
 
   return (
     <Screen
+      background={BACKDROP}
       refreshing={productsQuery.isRefetching}
       // Disabled mid-submit: pulling the list out from under an in-flight upload would be a
       // surprising way to lose a photo that is already on the wire.
       {...(isSubmitting ? {} : { onRefresh: () => void productsQuery.refetch() })}
     >
+      {/* Overrides the app-wide dark status bar icons — this screen's dark backdrop bleeds
+          under them, and dark-on-dark icons would be unreadable. */}
+      <StatusBar style="light" />
+
       <View style={styles.top}>
-        <IconButton icon="chevron-left" label="Kembali" disabled={isSubmitting} onPress={() => router.back()} />
+        <IconButton icon="chevron-left" label="Kembali" tone="translucent" disabled={isSubmitting} onPress={() => router.back()} />
       </View>
 
       <View>
-        <Text variant="h2">Request Refill</Text>
-        <Text variant="caption" color={semantic.textMuted}>
+        <Text variant="h2" color={LIGHT_TEXT}>
+          Request Refill
+        </Text>
+        <Text variant="caption" color={LIGHT_MUTED}>
           Gerobak {user.cartCode ?? '-'}
         </Text>
       </View>
@@ -195,6 +214,7 @@ export default function NewRefillScreen() {
       <SectionTitle
         title="Pilih produk"
         caption={selectedCount > 0 ? `${selectedCount} produk dipilih` : 'Ketuk foto untuk menambah'}
+        tone="light"
       />
 
       {productsQuery.isLoading ? (
@@ -270,9 +290,9 @@ export default function NewRefillScreen() {
         <MaterialCommunityIcons
           name={gpsStatus === 'granted' ? 'map-marker-check-outline' : 'map-marker-off-outline'}
           size={16}
-          color={gpsStatus === 'granted' ? brand[600] : semantic.textSubtle}
+          color={gpsStatus === 'granted' ? brand[300] : LIGHT_SUBTLE}
         />
-        <Text variant="caption" color={semantic.textSubtle}>
+        <Text variant="caption" color={LIGHT_SUBTLE}>
           {gpsStatus === 'checking' ? 'Mendeteksi lokasi...' : gpsStatus === 'granted' ? 'Lokasi terdeteksi' : 'Tanpa GPS — tetap bisa dikirim'}
         </Text>
       </View>
@@ -285,7 +305,7 @@ export default function NewRefillScreen() {
           multi-second operation with two distinct stages. Naming the stage is what stops a staff
           member from deciding the app has frozen and killing it mid-upload. */}
       {isSubmitting ? (
-        <Text variant="caption" color={semantic.textSubtle} center>
+        <Text variant="caption" color={LIGHT_SUBTLE} center>
           {uploadEvidence.isPending ? 'Mengompres dan mengunggah foto bukti...' : 'Mengirim request...'}
         </Text>
       ) : null}

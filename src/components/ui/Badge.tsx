@@ -11,9 +11,8 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text } from './Text';
-import { Gradient } from './Gradient';
 import { enter } from './Motion';
-import { accent, gradients, neutral, radius, semantic, shadow, space, statusColor, type RefillStatus } from '@/theme';
+import { accent, neutral, radius, semantic, space, statusColor, type RefillStatus } from '@/theme';
 
 /** Indonesian label for each state in the refill state machine (§6). */
 export const statusLabel: Record<RefillStatus, string> = {
@@ -91,7 +90,8 @@ export function StatusBadge({ status }: { status: RefillStatus }) {
  * Numeric counter for menu tiles. Caps at 99+ so the layout cannot be broken by a big number.
  *
  * Amber, not red: these counts mean "waiting for you", not "something is wrong", and a menu
- * covered in red badges every morning teaches its users to ignore red.
+ * covered in red badges every morning teaches its users to ignore red. Solid fill, no gradient —
+ * a tiny 22dp circle has no room for a ramp to read as anything but a smudge.
  */
 export function CountBadge({ count, style }: { count: number; style?: StyleProp<ViewStyle> }) {
   if (count <= 0) return null;
@@ -99,11 +99,10 @@ export function CountBadge({ count, style }: { count: number; style?: StyleProp<
   return (
     <Animated.View
       entering={enter('scale')}
-      style={[styles.count, shadow.amber, style]}
+      style={[styles.count, style]}
       accessibilityRole="text"
       accessibilityLabel={`${count} item menunggu`}
     >
-      <Gradient colors={gradients.amber} fill bands={10} />
       <Text variant="micro" color={neutral[0]}>
         {count > 99 ? '99+' : String(count)}
       </Text>
@@ -160,10 +159,10 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     borderRadius: radius.pill,
+    backgroundColor: accent[600],
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.xs,
-    overflow: 'hidden',
   },
 
   chip: {

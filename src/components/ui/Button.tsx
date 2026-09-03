@@ -4,9 +4,8 @@ import Animated from 'react-native-reanimated';
 
 import { Text } from './Text';
 import { Touchable } from './Touchable';
-import { Gradient } from './Gradient';
 import { enter } from './Motion';
-import { accent, brand, feedback, gradients, neutral, pressScale, radius, semantic, shadow, space, touch } from '@/theme';
+import { accent, brand, feedback, neutral, pressScale, radius, semantic, shadow, space, touch } from '@/theme';
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
 export type ButtonSize = 'md' | 'sm';
@@ -28,12 +27,11 @@ export type ButtonProps = {
 };
 
 /**
- * NOTE ON COLOUR: the primary fill is the brand gradient, which runs #00A9B0 → #004F53. Its
- * LIGHTEST stop is 3.4:1 against white — but that stop occupies only the top few dp of a button
- * this tall, and the label sits centred where the ramp has already passed brand[700] (5.72:1).
- * The label is also 15pt/600, so AA's large-text threshold (3:1) is the applicable bar either
- * way. This is the one place the identity teal is allowed near white text, and it is allowed
- * because the geometry makes it safe — not as an exception to tokens.ts.
+ * A flat, solid-fill pill — the reference design's "PLACE ORDER" button is one clean colour with
+ * a soft shadow underneath it, nothing else. An earlier pass here rendered the fill as a banded
+ * JS gradient (brand[500] → brand[900]); at 18 bands the seams between bands are faint but real,
+ * and on a cheap Android panel that reads as dirt on the button rather than a sheen. Solid
+ * `brand[700]` — already the AA-safe text/fill shade, see tokens.ts — reads as clean instead.
  */
 const fills: Record<ButtonVariant, { fg: string; bg: string; border: string }> = {
   primary: { fg: neutral[0], bg: brand[700], border: brand[700] },
@@ -58,7 +56,6 @@ export function Button({
 }: ButtonProps) {
   const isInert = disabled || loading;
   const fill = fills[variant];
-  const usesGradient = (variant === 'primary' || variant === 'accent') && !isInert;
 
   const bg = isInert && variant !== 'ghost' && variant !== 'secondary' ? semantic.primaryDisabled : fill.bg;
   const fg = isInert && variant !== 'ghost' && variant !== 'secondary' ? neutral[500] : fill.fg;
@@ -81,16 +78,13 @@ export function Button({
         styles.base,
         size === 'sm' ? styles.sizeSm : styles.sizeMd,
         { backgroundColor: bg, borderColor: border },
-        !isInert && variant === 'primary' ? shadow.raised : null,
-        !isInert && variant === 'accent' ? shadow.amber : null,
+        // A flat, light shadow only — never the heavier "raised" tier, which read as the button
+        // floating a full layer above the page rather than simply sitting on it.
+        !isInert && (variant === 'primary' || variant === 'accent' || variant === 'danger') ? shadow.card : null,
         fullWidth ? styles.fullWidth : null,
         style,
       ]}
     >
-      {usesGradient ? (
-        <Gradient colors={variant === 'accent' ? gradients.amber : gradients.brand} bands={18} fill />
-      ) : null}
-
       {loading ? (
         <View style={styles.content}>
           <ActivityIndicator color={fg} size="small" />

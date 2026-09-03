@@ -23,6 +23,8 @@ export function SectionTitle({
   action,
   onAction,
   icon,
+  /** For a section header sitting on a dark backdrop — see staff/refill/new.tsx. */
+  tone = 'default',
   style,
 }: {
   title: string;
@@ -31,21 +33,23 @@ export function SectionTitle({
   action?: string;
   onAction?: () => void;
   icon?: string;
+  tone?: 'default' | 'light';
   style?: StyleProp<ViewStyle>;
 }) {
+  const titleColor = tone === 'light' ? 'rgba(255,255,255,0.68)' : semantic.textSubtle;
+  const captionColor = tone === 'light' ? 'rgba(255,255,255,0.85)' : semantic.textMuted;
+
   return (
     <View style={[styles.row, style]}>
       <View style={styles.textBlock}>
         <View style={styles.titleRow}>
-          {icon ? (
-            <MaterialCommunityIcons name={icon as never} size={15} color={semantic.textSubtle} />
-          ) : null}
-          <Text variant="micro" color={semantic.textSubtle} style={styles.title}>
+          {icon ? <MaterialCommunityIcons name={icon as never} size={15} color={titleColor} /> : null}
+          <Text variant="micro" color={titleColor} style={styles.title}>
             {title.toUpperCase()}
           </Text>
         </View>
         {caption ? (
-          <Text variant="caption" color={semantic.textMuted}>
+          <Text variant="caption" color={captionColor}>
             {caption}
           </Text>
         ) : null}

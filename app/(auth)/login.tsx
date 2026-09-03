@@ -14,6 +14,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@/lib/zodResolver';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Constants from 'expo-constants';
+import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Reanimated from 'react-native-reanimated';
 
@@ -23,14 +24,13 @@ import { Button } from '@/components/ui/Button';
 import { Banner } from '@/components/ui/Banner';
 import { Touchable } from '@/components/ui/Touchable';
 import { Chip } from '@/components/ui/Badge';
-import { Gradient, GradientBloom } from '@/components/ui/Gradient';
 import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
 import { useAuth } from '@/features/auth/store';
 import { useKeyboardInset, useKeyboardVisible } from '@/lib/keyboard';
 import { loginSchema, normalisePhone, type LoginForm } from '@/features/auth/schema';
 import { rolesByPriority, roleMeta, type Role } from '@/domain/roles';
-import { brand, feedback, gradients, neutral, pressScale, radius, semantic, space, touch } from '@/theme';
+import { brand, feedback, neutral, pressScale, radius, semantic, space, touch } from '@/theme';
 
 /**
  * Where the sheet rests, as a fraction of screen height measured from the top.
@@ -188,14 +188,14 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Brand backdrop. brand[700], not the logo's brand[500]: white text on #00A3AA is only
-          3.08:1 and fails WCAG AA. See tokens.ts. Rendered as the same brand gradient the rest
-          of the app now uses for its hero surfaces, so the login screen reads as the front door
-          of the same app rather than a flat-colour splash bolted onto it. */}
-      <View style={[styles.backdrop, { paddingTop: insets.top + space.xl }]}>
-        <Gradient colors={gradients.brand} fill bands={22} />
-        <GradientBloom size={240} style={styles.backdropBloom} />
+      {/* The header behind this bleeds under the status bar, so its icons must switch to light —
+          overriding the app-wide `dark` set in app/_layout.tsx for this screen only. */}
+      <StatusBar style="light" />
 
+      {/* Brand backdrop. brand[700], not the logo's brand[500]: white text on #00A3AA is only
+          3.08:1 and fails WCAG AA. See tokens.ts. Flat fill, deliberately — the reference
+          design's header is one solid colour with a shadow underneath it, not a gradient wash. */}
+      <View style={[styles.backdrop, { paddingTop: insets.top + space.xl }]}>
         {/* The mark is brand teal with the cup as white negative space, so on a teal ground it
             would all but disappear. The white disc is what makes it legible — and being a
             circle, it reads as deliberate brand furniture rather than a frame around the image. */}
@@ -466,9 +466,7 @@ const styles = StyleSheet.create({
   backdrop: {
     paddingHorizontal: space.xl,
     gap: space.md,
-    overflow: 'hidden',
   },
-  backdropBloom: { top: -90, right: -70 },
   logoPlate: {
     width: 84,
     height: 84,

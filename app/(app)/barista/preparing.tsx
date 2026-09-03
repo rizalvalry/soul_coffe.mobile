@@ -14,7 +14,7 @@ import { SkeletonList } from '@/components/ui/Skeleton';
 import { useMarkReady, useRefills } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest } from '@/domain/types';
-import { semantic, space } from '@/theme';
+import { neutral, radius, semantic, space } from '@/theme';
 
 /** One request's own prepare-quantities form. Kept local so each card manages independent state
  * without a shared map keyed by request id. */
@@ -143,6 +143,14 @@ const styles = StyleSheet.create({
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
   topText: { flex: 1, gap: space.xxs },
   lines: { gap: space.md },
-  lineRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  lineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    backgroundColor: neutral[50],
+    borderRadius: radius.sm,
+    padding: space.sm,
+  },
   lineText: { flex: 1 },
 });
