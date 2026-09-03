@@ -43,10 +43,13 @@ export const IMPLEMENTED_ROUTES: ReadonlySet<string> = new Set([
   '/finance/approvals',
   '/finance/history',
   '/barista/allocation',
+  '/barista/add-stock',
+  '/barista/close-out',
   '/barista/requests',
   '/barista/preparing',
   '/barista/stock',
   '/barista/history',
+  '/absen',
   '/rider/available',
   '/rider/active',
   '/rider/history',
@@ -169,6 +172,32 @@ const roleMenus: Record<Role, MenuItem[]> = {
   ],
 
   BARISTA: [
+    // First and primary, per the brief: the "+" the barista reaches for every morning.
+    {
+      id: 'barista-add-stock',
+      label: 'Add Stock',
+      sublabel: 'Pindahkan cups showcase → gerobak + uang harian',
+      icon: 'plus-circle-outline',
+      route: '/barista/add-stock',
+      requirement: 'Showcase — centralize stock',
+      primary: true,
+    },
+    {
+      id: 'barista-absen',
+      label: 'Absen',
+      sublabel: 'Absen sendiri, lalu buka absen untuk staff',
+      icon: 'fingerprint',
+      route: '/absen',
+      requirement: 'Absen — barista membuka akses staff',
+    },
+    {
+      id: 'barista-close-out',
+      label: 'Tutup Gerobak',
+      sublabel: 'Sisa cups: masuk showcase atau reject',
+      icon: 'clipboard-check-outline',
+      route: '/barista/close-out',
+      requirement: 'Showcase — rekonsiliasi sisa',
+    },
     {
       id: 'barista-allocation',
       label: 'Alokasi Harian',
@@ -176,7 +205,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       icon: 'clipboard-list-outline',
       route: '/barista/allocation',
       requirement: 'req 1, Flow A',
-      primary: true,
     },
     {
       id: 'barista-requests',
@@ -251,6 +279,16 @@ const roleMenus: Record<Role, MenuItem[]> = {
       route: '/staff/refill/new',
       requirement: 'req 2, R3',
       primary: true,
+    },
+    // The button here stays disabled until a barista has clocked in and opened absen — the
+    // screen reads that from the server rather than deciding it locally.
+    {
+      id: 'staff-absen',
+      label: 'Absen',
+      sublabel: 'Aktif setelah barista membuka absen',
+      icon: 'fingerprint',
+      route: '/absen',
+      requirement: 'Absen — dibuka oleh barista',
     },
     {
       id: 'staff-requests',

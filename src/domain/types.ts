@@ -168,3 +168,72 @@ export type NewsPost = {
 
 export const NEWS_REACTIONS = ['api', 'mantap', 'semangat', 'bingung'] as const;
 export type NewsReaction = (typeof NEWS_REACTIONS)[number];
+
+// ── Showcase stock (barista) ─────────────────────────────────────────────────
+
+/** A staff member the barista can hand a cart to — see `GET /showcase/staff`. */
+export type StaffPickerRow = {
+  id: number;
+  name: string;
+  phone: string;
+  /**
+   * The cart this person is already on today, if any. R11 allows exactly one cart per staff per
+   * day, so a non-null value here means picking them is a conflict — the picker says so up
+   * front rather than letting it surface as a 422 after the cups are typed.
+   */
+  assigned_cart_id: number | null;
+  assigned_cart_code: string | null;
+};
+
+/** The day's operational allowance for one cart (uang makan/minum). Whole rupiah, scale 0 (R9). */
+export type DailyAllowance = {
+  id: number;
+  operating_date: string;
+  cart_id: number;
+  amount_minor: number;
+  /** True once a barista has deliberately changed the amount away from the 00:00 default. */
+  is_edited: boolean;
+  set_by: number | null;
+};
+
+/** What `POST /showcase/hand-to-cart` returns — enough to refresh the screen with no second call. */
+export type HandoverResult = {
+  assignment_id: number;
+  cart_id: number;
+  cart_code: string;
+  staff_id: number;
+  staff_name: string;
+  operating_date: string;
+  allowance: DailyAllowance;
+  cart_stock: CartStockRow[];
+  showcase_stock: CartStockRow[];
+};
+
+// ── Absen ────────────────────────────────────────────────────────────────────
+
+/**
+ * Everything needed to render both absen buttons, decided server-side.
+ *
+ * The client deliberately does not re-derive these from role + timestamps: the gating rule
+ * (barista clocks in, then opens, then staff may clock in) lives in one place on the server, and
+ * a second copy here is a second place for it to be wrong.
+ */
+export type AttendanceStatus = {
+  operating_date: string;
+  has_clocked_in: boolean;
+  clocked_in_at: string | null;
+  staff_window_open: boolean;
+  can_clock_in: boolean;
+  can_open_staff_window: boolean;
+  /** Ready-to-display copy for a disabled button; null when nothing is blocking. */
+  blocked_reason: string | null;
+};
+
+export type AttendanceRow = {
+  id: number;
+  operating_date: string;
+  user_id: number;
+  user_name: string | null;
+  role: Role;
+  clocked_in_at: string;
+};
