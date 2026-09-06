@@ -15,6 +15,7 @@ import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
 import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
+import { useBadges } from '@/features/refill/queries';
 import { IMPLEMENTED_ROUTES, menuByRole, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
 import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
@@ -22,12 +23,31 @@ import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } fr
 /**
  * Live badge counters.
  *
- * Deliberately returns nothing until the realtime layer exists (Phase 4). Rendering a plausible
- * fake number here would be worse than rendering none — an operations app that shows an invented
- * count of pending approvals teaches its users to distrust it.
+ * This used to return `{}` on purpose, while the realtime layer did not exist yet — showing an
+ * invented count of pending approvals would have taught people to distrust the number. The
+ * realtime layer exists now, so the honest thing is the real count: `GET /badges` is scoped
+ * server-side to the caller's own role, and `invalidateRefillData()` already invalidates
+ * `qk.badges` on every inbound Pusher event and on the 10s poll fallback, so these numbers move
+ * on their own without this screen subscribing to anything itself.
+ *
+ * `pendingSync` stays absent rather than being faked as 0: it would count writes queued on the
+ * device, which nothing tracks yet, and no menu item asks for it. A tile that always reads "0
+ * waiting to sync" is exactly the invented number the original comment warned about.
  */
 function useMenuBadges(): Partial<Record<NonNullable<MenuItem['badge']>, number>> {
-  return {};
+  const { data } = useBadges();
+
+  // While the first fetch is in flight there is no count to show. Returning nothing renders no
+  // badge at all, which is right — a "0" that later becomes "3" reads as though something just
+  // arrived, when in fact it was always there and simply had not loaded.
+  if (!data) return {};
+
+  return {
+    pendingApprovals: data.pendingApprovals,
+    incomingRequests: data.incomingRequests,
+    readyToPick: data.readyToPick,
+    myRequests: data.myRequests,
+  };
 }
 
 /** Time-of-day greeting. These shifts start before dawn and run past dark, so all three matter. */
