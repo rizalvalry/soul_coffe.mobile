@@ -175,7 +175,22 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
     };
   }, [session, client]);
 
-  // Fallback refetch while the socket is not up.
+  // One catch-up refetch the moment the socket comes up.
+  //
+  // Events that fired while it was down were broadcast to nobody — Pusher has no replay on
+  // subscribe, and the outbox is a delivery log, not a mailbox the client can read back. Without
+  // this, a reconnect would leave the screen showing whatever it held before the drop until the
+  // next event happened to arrive. This is the poll's actual job, done once instead of forever.
+  useEffect(() => {
+    if (state !== 'connected') return;
+    invalidateRefillData(client);
+  }, [state, client]);
+
+  // Fallback refetch while the socket is NOT up. Never runs alongside the socket: the guard below
+  // means the timer is torn down the instant `connected` arrives, so a working Pusher connection
+  // costs zero polling requests. It exists for the case where the socket genuinely cannot be
+  // established — no key configured, a captive-portal network — where the alternative is a screen
+  // that silently stops updating.
   useEffect(() => {
     if (state === 'connected' || !session) return;
     const timer = setInterval(() => invalidateRefillData(client), 10_000);
