@@ -51,10 +51,25 @@ export type Credentials = {
   password: string;
 };
 
+/**
+ * `pin-required` and `pin-not-set` are the two 409s the server answers when the caller used the
+ * WRONG credential for this account — not a failure, a redirection. The login screen switches
+ * form on them instead of showing an error, which is why they are a distinct kind rather than
+ * another 'credentials' message.
+ */
+export type AuthErrorKind =
+  | 'credentials'
+  | 'network'
+  | 'server'
+  | 'config'
+  | 'pin-required'
+  | 'pin-not-set'
+  | 'locked';
+
 export class AuthError extends Error {
   constructor(
     message: string,
-    readonly kind: 'credentials' | 'network' | 'server' | 'config' = 'server',
+    readonly kind: AuthErrorKind = 'server',
   ) {
     super(message);
     this.name = 'AuthError';
@@ -121,6 +136,18 @@ export async function login(credentials: Credentials): Promise<Session> {
   if (response.status === 401 || response.status === 422) {
     throw new AuthError('Nomor HP atau kata sandi salah.', 'credentials');
   }
+
+  // The account has a PIN, so the password no longer signs in (AuthController::login). The server
+  // only answers this AFTER the password checked out, so reaching it means the credentials were
+  // right and the user simply needs the other form.
+  if (response.status === 409) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new AuthError(
+      body?.message ?? 'Akun ini sudah memiliki PIN. Masuk dengan PIN Anda.',
+      'pin-required',
+    );
+  }
+
   if (!response.ok) {
     throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
   }
@@ -228,10 +255,21 @@ export async function loginWithPin(phone: string, pin: string): Promise<Session>
 
   if (response.status === 429) {
     throw new AuthError(
-      'Terlalu banyak percobaan PIN. Tunggu beberapa menit atau masuk dengan kata sandi.',
-      'credentials',
+      'Terlalu banyak percobaan PIN. Tunggu 15 menit, atau kirim permintaan reset PIN ke Administrator.',
+      'locked',
     );
   }
+
+  // No PIN on this account — usually because an Administrator has just reset it. The login screen
+  // reads this and switches back to the password form rather than repeating "PIN salah" forever.
+  if (response.status === 409) {
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new AuthError(
+      body?.message ?? 'Akun ini belum memiliki PIN. Masuk dengan kata sandi.',
+      'pin-not-set',
+    );
+  }
+
   if (response.status === 401 || response.status === 422) {
     throw new AuthError('Nomor HP atau PIN salah.', 'credentials');
   }
@@ -291,21 +329,87 @@ export async function setLoginPin(token: string, pin: string, password: string):
   throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
 }
 
-/** Removes the caller's PIN, returning the account to password-only sign-in. */
-export async function removeLoginPin(token: string): Promise<void> {
+/**
+ * Removes the caller's PIN, returning the account to password sign-in.
+ *
+ * The account password is required, as it is for creating one: this is the action that decides
+ * WHICH credential opens the account, and a token lifted from an unlocked phone must not be
+ * enough to change that.
+ */
+export async function removeLoginPin(token: string, password: string): Promise<void> {
   if (isDemoMode()) return;
 
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl()}/me/login-pin`, {
       method: 'DELETE',
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ password }),
     });
   } catch {
     throw new AuthError('Tidak dapat menghubungi server. Periksa koneksi internet Anda.', 'network');
   }
 
-  if (!response.ok) {
-    throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
+  if (response.ok) return;
+
+  if (response.status === 422) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      errors?: Record<string, string[]>;
+    } | null;
+    const first = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+    throw new AuthError(first ?? body?.message ?? 'PIN tidak dapat dihapus.', 'credentials');
   }
+
+  throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
+}
+
+/**
+ * "Lupa PIN" — asks an Administrator to issue a new password (docs/04 §Auth).
+ *
+ * Unauthenticated, and the server answers an identical 202 for every input, so there is nothing to
+ * branch on here: a wrong phone, a wrong password and a perfect submission all look the same from
+ * this side. That is the design — an unauthenticated caller must not learn who exists.
+ */
+export async function requestPinReset(
+  phone: string,
+  email: string,
+  password: string,
+): Promise<void> {
+  if (isDemoMode()) return;
+
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl()}/auth/pin-reset-requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ phone, email, password }),
+    });
+  } catch {
+    throw new AuthError('Tidak dapat menghubungi server. Periksa koneksi internet Anda.', 'network');
+  }
+
+  if (response.ok) return;
+
+  if (response.status === 422) {
+    const body = (await response.json().catch(() => null)) as {
+      message?: string;
+      errors?: Record<string, string[]>;
+    } | null;
+    const first = body?.errors ? Object.values(body.errors)[0]?.[0] : undefined;
+    throw new AuthError(first ?? body?.message ?? 'Data belum lengkap.', 'credentials');
+  }
+
+  if (response.status === 429) {
+    throw new AuthError(
+      'Terlalu banyak permintaan. Coba lagi beberapa menit lagi atau hubungi Administrator langsung.',
+      'locked',
+    );
+  }
+
+  throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
 }

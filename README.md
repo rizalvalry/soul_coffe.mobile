@@ -83,6 +83,57 @@ every screen:
 None of the above was guesswork — every gap was confirmed by reading the actual PHP resource
 source in soul_coffe.backend before writing the corresponding mapper or fallback.
 
+## Sign-in: password first, then PIN only
+
+The login screen has two forms and the SERVER decides which one this account may use:
+
+- **No PIN yet** → phone + password. `POST /auth/login-pin` answers `409 PIN_NOT_SET`, and the app
+  switches back to the password form when it sees that.
+- **PIN created** → phone + 6-digit PIN. `POST /auth/login` answers `409 PIN_REQUIRED` *after*
+  checking the password, so a correct password moves the user to the PIN pad with a plain
+  explanation rather than a red error.
+
+The device remembers, in AsyncStorage, which of the two the last account used (`lastPhone` +
+`pinAvailable`), so a returning user lands on the right form without a round trip. That hint is a
+convenience only — it holds a phone number, never a credential, and the server re-decides
+everything.
+
+**Creating a PIN signs you out, on purpose.** `POST /me/login-pin` revokes every token for the
+account, so `app/(app)/settings.tsx` confirms the three consequences first (all sessions end, the
+password stops signing in, only an Administrator can recover a forgotten PIN), then shows a
+non-dismissable dialog whose only button takes the user to the PIN pad. They prove the PIN works
+while they still remember typing it. `endRevokedSession()` is used instead of `signOut()` — the
+server already revoked the token, so the usual revoke call would just 401.
+
+**Forgot the PIN.** There is no password fallback once a PIN exists, so `ForgotPinSheet` submits
+phone + email + password to `POST /auth/pin-reset-requests`. It always reports success, because
+the server answers an identical 202 for every input — an unauthenticated form must not reveal who
+has an account here. An Administrator then issues a new password from the panel, which clears the
+PIN and revokes every session.
+
+## Push notifications
+
+Registration is automatic and tied to the session: on sign-in (and on every return to foreground,
+and whenever Android rotates the token) the app asks for `POST_NOTIFICATIONS`, fetches the native
+FCM token with `getDevicePushTokenAsync()`, and upserts it via `POST /me/devices`. Sign-out
+deletes that registration **before** revoking the session — after the revoke the call could no
+longer authenticate, and the next person on this handset would inherit the previous user's alerts.
+
+The token is the native FCM one, not an Expo push token: the Laravel side talks to Firebase
+directly, so there is no Expo relay and no Expo account in the path of an operational alert.
+
+Push and the Pusher socket carry the same `event_id`, and `src/features/realtime/seen.ts` is the
+single dedupe set both go through. Whichever arrives first refreshes the screen; the second is
+dropped, and a foreground banner is suppressed for an event the socket already applied. That set
+lives outside the hook deliberately — the push handler is not a hook and fires with nothing
+mounted.
+
+**`google-services.json` is required for delivery and is not in git.** Download it from the
+Firebase console for an Android app registered as `id.soulcoffeemate.ops.demo`, and drop it in
+this directory before `prebuild`. `app.config.js` adds `android.googleServicesFile` only when the
+file is present, so a build without it still succeeds: the app logs that push is unavailable once
+and keeps using the socket and its 10-second poll. Nothing else degrades.
+
 ## Build an APK locally
 
 This is the primary release path, and per task 0.12 it must be proven **before** feature work.

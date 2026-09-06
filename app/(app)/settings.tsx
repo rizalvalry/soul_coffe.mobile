@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/features/auth/store';
 import { AuthError, removeLoginPin, setLoginPin } from '@/features/auth/api';
+import { Banner } from '@/components/ui/Banner';
 import { roleMeta } from '@/domain/roles';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 
@@ -20,19 +21,26 @@ import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
  * Its only function today is the sign-in PIN, which is a genuine field-ergonomics fix rather than
  * a preference: staff sign in on a phone in one hand, outdoors, and a six-digit numeric keypad is
  * far quicker than a password on a phone keyboard. Everything about the PIN's weakness is handled
- * server-side — see LoginPinController and AuthController::loginWithPin — but two rules are
- * visible here because the user has to understand them:
+ * server-side — see LoginPinController and AuthController::loginWithPin — but three rules are
+ * visible here because the user has to understand them before they commit:
  *
- *  - the account password is required to create or change a PIN, because a token alone can be
- *    lifted from an unlocked phone;
- *  - the PIN is an ADDITION, never a replacement. The password always still works, which is what
- *    makes the per-account PIN lockout safe to apply.
+ *  - the account password is required to create, change or remove a PIN, because a token alone can
+ *    be lifted from an unlocked phone;
+ *  - the PIN REPLACES the password. Once it exists the password stops signing in, and the only way
+ *    back from a forgotten PIN is an Administrator issuing a new password;
+ *  - creating one ends every session on every device, so the user is signed out here and lands on
+ *    the PIN pad immediately — they prove they can type it while they still remember it.
+ *
+ * The confirmation dialog states all three before anything is written. Saving a PIN a user did not
+ * realise was replacing their password would lock them out of their own account, and no amount of
+ * server-side correctness would make that acceptable.
  */
 export default function SettingsScreen() {
   const router = useRouter();
   const session = useAuth((s) => s.session);
   const pinAvailable = useAuth((s) => s.pinAvailable);
   const setPinAvailable = useAuth((s) => s.setPinAvailable);
+  const endRevokedSession = useAuth((s) => s.endRevokedSession);
 
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -50,7 +58,55 @@ export default function SettingsScreen() {
     setPassword('');
   }, []);
 
-  const save = useCallback(async () => {
+  /**
+   * Writes the PIN, then ends the session the server has already revoked.
+   *
+   * `endRevokedSession` rather than `signOut`: `POST /me/login-pin` deletes every token for this
+   * account as part of the same request, so the revoke call `signOut` makes would only 401 against
+   * a token that no longer exists. The push registration is left in place on purpose — the same
+   * person is about to sign back in on this same phone.
+   */
+  const applyPin = useCallback(async () => {
+    if (!session?.token) return;
+
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+
+    try {
+      await setLoginPin(session.token, pin, password);
+      await setPinAvailable(true);
+      reset();
+
+      Alert.alert(
+        'PIN aktif — silakan masuk kembali',
+        'Semua sesi telah dikeluarkan. Masuk lagi sekarang menggunakan PIN yang baru Anda buat, ' +
+          'supaya Anda yakin PIN-nya benar. Mulai sekarang kata sandi tidak lagi dipakai untuk masuk.',
+        [
+          {
+            text: 'MASUK DENGAN PIN',
+            onPress: () => {
+              void (async () => {
+                await endRevokedSession();
+                // replace, not push: the settings screen belongs to a session that no longer
+                // exists, and it must not be reachable with the back gesture.
+                router.replace('/login');
+              })();
+            },
+          },
+        ],
+        // No dismiss: the session is gone either way, so an app left sitting on this screen would
+        // be showing a signed-in UI that every request would 401 against.
+        { cancelable: false },
+      );
+    } catch (e) {
+      setError(e instanceof AuthError ? e.message : 'Gagal menyimpan PIN. Coba lagi.');
+    } finally {
+      setBusy(false);
+    }
+  }, [pin, password, session, setPinAvailable, reset, endRevokedSession, router]);
+
+  const save = useCallback(() => {
     setError(null);
     setNotice(null);
 
@@ -68,23 +124,35 @@ export default function SettingsScreen() {
     }
     if (!session?.token) return;
 
-    setBusy(true);
-    try {
-      await setLoginPin(session.token, pin, password);
-      await setPinAvailable(true);
-      reset();
-      setNotice('PIN berhasil disimpan. Anda bisa masuk dengan PIN di halaman login.');
-    } catch (e) {
-      setError(e instanceof AuthError ? e.message : 'Gagal menyimpan PIN. Coba lagi.');
-    } finally {
-      setBusy(false);
-    }
-  }, [pin, confirmPin, password, session, setPinAvailable, reset]);
+    // Everything the PIN changes, said before it changes. The wording is deliberately blunt about
+    // the password no longer working: that is the part a user cannot undo on their own.
+    Alert.alert(
+      hasPin ? 'Ganti PIN masuk?' : 'Buat PIN masuk?',
+      'Setelah disimpan:\n\n' +
+        '• Anda akan dikeluarkan dari aplikasi di semua perangkat.\n' +
+        '• Masuk berikutnya memakai PIN ini, bukan kata sandi.\n' +
+        '• Jika PIN lupa, hanya Administrator yang bisa memulihkan akses lewat menu "Lupa PIN".',
+      [
+        { text: 'Batal', style: 'cancel' },
+        { text: hasPin ? 'Ganti PIN' : 'Buat PIN', onPress: () => void applyPin() },
+      ],
+    );
+  }, [pin, confirmPin, password, session, hasPin, applyPin]);
 
   const confirmRemove = useCallback(() => {
+    setError(null);
+    setNotice(null);
+
+    // The password field is shared with the create form, so the same box that authorises adding a
+    // PIN authorises removing one. Asked for explicitly rather than silently reused.
+    if (!password) {
+      setError('Masukkan kata sandi akun Anda untuk menghapus PIN.');
+      return;
+    }
+
     Alert.alert(
       'Hapus PIN?',
-      'Anda tetap bisa masuk menggunakan nomor HP dan kata sandi.',
+      'Setelah dihapus, Anda masuk kembali menggunakan nomor HP dan kata sandi. Sesi yang sedang berjalan tidak terputus.',
       [
         { text: 'Batal', style: 'cancel' },
         {
@@ -97,10 +165,10 @@ export default function SettingsScreen() {
               setError(null);
               setNotice(null);
               try {
-                await removeLoginPin(session.token);
+                await removeLoginPin(session.token, password);
                 await setPinAvailable(false);
                 reset();
-                setNotice('PIN dihapus.');
+                setNotice('PIN dihapus. Masuk berikutnya memakai kata sandi.');
               } catch (e) {
                 setError(e instanceof AuthError ? e.message : 'Gagal menghapus PIN. Coba lagi.');
               } finally {
@@ -111,7 +179,7 @@ export default function SettingsScreen() {
         },
       ],
     );
-  }, [session, setPinAvailable, reset]);
+  }, [session, password, setPinAvailable, reset]);
 
   if (!user) return null;
 
@@ -153,8 +221,8 @@ export default function SettingsScreen() {
             <Text variant="bodyStrong">PIN Masuk</Text>
             <Text variant="caption" color={semantic.textMuted}>
               {hasPin
-                ? 'PIN aktif. Anda bisa masuk dengan nomor HP dan PIN.'
-                : 'Buat PIN 6 angka agar bisa masuk tanpa mengetik kata sandi.'}
+                ? 'PIN aktif. Masuk memakai nomor HP dan PIN — kata sandi tidak lagi dipakai untuk masuk.'
+                : 'Buat PIN 6 angka untuk masuk tanpa mengetik kata sandi.'}
             </Text>
           </View>
         </View>
@@ -162,10 +230,18 @@ export default function SettingsScreen() {
         <View style={styles.infoBanner}>
           <MaterialCommunityIcons name="shield-key-outline" size={16} color={brand[700]} />
           <Text variant="caption" color={semantic.textMuted} style={styles.infoText}>
-            PIN adalah tambahan, bukan pengganti. Kata sandi Anda tetap berfungsi, dan PIN ini
-            berbeda dari PIN serah-terima pengiriman.
+            PIN ini menggantikan kata sandi saat masuk, dan berbeda dari PIN serah-terima
+            pengiriman. Kata sandi tetap diperlukan untuk mengubah atau menghapus PIN.
           </Text>
         </View>
+
+        {/* Stated before the fields, not after the mistake: this is the consequence a user cannot
+            reverse without an Administrator. */}
+        <Banner
+          tone="warning"
+          icon="logout-variant"
+          message="Menyimpan PIN akan mengeluarkan Anda dari semua perangkat. Anda langsung diminta masuk kembali dengan PIN baru."
+        />
 
         <Input
           label={hasPin ? 'PIN Baru (6 angka)' : 'PIN (6 angka)'}
@@ -227,7 +303,7 @@ export default function SettingsScreen() {
         <Button
           label={hasPin ? 'SIMPAN PIN BARU' : 'BUAT PIN'}
           icon="content-save-outline"
-          onPress={() => void save()}
+          onPress={save}
           loading={busy}
           disabled={busy}
         />

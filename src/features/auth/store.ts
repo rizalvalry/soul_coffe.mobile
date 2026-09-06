@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
 import { isRole, type Role } from '@/domain/roles';
+import { releaseRegistration, syncRegistration } from '@/features/push/registration';
+import { resetSeenEvents } from '@/features/realtime/seen';
 import {
   AuthError,
   login,
@@ -15,6 +17,19 @@ import {
 const SESSION_KEY = 'soul.session.v1';
 
 export type AuthStatus = 'restoring' | 'authenticated' | 'unauthenticated';
+
+/**
+ * What a sign-in attempt actually decided.
+ *
+ * `ok` is not enough any more: the server can refuse a correct password because this account now
+ * signs in with a PIN, and refuse a PIN because it no longer has one. Both are instructions to the
+ * login screen, not errors to display, so they are returned rather than left in `error`.
+ */
+export type SignInOutcome =
+  | { result: 'ok' }
+  | { result: 'pin-required'; message: string }
+  | { result: 'pin-not-set'; message: string }
+  | { result: 'failed'; message: string };
 
 type AuthState = {
   status: AuthStatus;
@@ -33,12 +48,18 @@ type AuthState = {
   pinAvailable: boolean;
 
   restore: () => Promise<void>;
-  signIn: (credentials: Credentials) => Promise<boolean>;
-  signInWithPin: (phone: string, pin: string) => Promise<boolean>;
+  signIn: (credentials: Credentials) => Promise<SignInOutcome>;
+  signInWithPin: (phone: string, pin: string) => Promise<SignInOutcome>;
   signInAsDemo: (role: Role) => Promise<boolean>;
   signOut: () => Promise<void>;
   /** Records that the signed-in user now does (or no longer does) have a PIN. */
   setPinAvailable: (available: boolean) => Promise<void>;
+  /**
+   * Ends the session locally after the SERVER has already revoked it — creating a PIN does that
+   * as part of the same call. Skips the revoke request that `signOut` makes, which would only 401
+   * against a token that is already gone.
+   */
+  endRevokedSession: () => Promise<void>;
   clearError: () => void;
 };
 
@@ -147,12 +168,29 @@ export const useAuth = create<AuthState>((set) => ({
         lastPhone: credentials.phone,
         pinAvailable: hasPin,
       });
-      return true;
+
+      // Fire and forget: a phone that cannot register for push must still be able to sign in.
+      void syncRegistration();
+
+      return { result: 'ok' };
     } catch (e) {
+      if (e instanceof AuthError && e.kind === 'pin-required') {
+        // The password was CORRECT — this account just uses its PIN now. Remember that, so the
+        // screen opens on the PIN pad next time rather than sending them down this path again.
+        await persistHint({ phone: credentials.phone, hasPin: true });
+        set({
+          submitting: false,
+          error: null,
+          lastPhone: credentials.phone,
+          pinAvailable: true,
+        });
+        return { result: 'pin-required', message: e.message };
+      }
+
       const message =
         e instanceof AuthError ? e.message : 'Terjadi kesalahan tidak terduga. Coba lagi.';
       set({ error: message, submitting: false });
-      return false;
+      return { result: 'failed', message };
     }
   },
 
@@ -169,12 +207,23 @@ export const useAuth = create<AuthState>((set) => ({
         lastPhone: phone,
         pinAvailable: true,
       });
-      return true;
+
+      void syncRegistration();
+
+      return { result: 'ok' };
     } catch (e) {
+      if (e instanceof AuthError && e.kind === 'pin-not-set') {
+        // An administrator has reset this account. Clear the stale hint so the device stops
+        // offering a PIN that no longer exists.
+        await persistHint({ phone, hasPin: false });
+        set({ submitting: false, error: null, lastPhone: phone, pinAvailable: false });
+        return { result: 'pin-not-set', message: e.message };
+      }
+
       const message =
         e instanceof AuthError ? e.message : 'Terjadi kesalahan tidak terduga. Coba lagi.';
       set({ error: message, submitting: false });
-      return false;
+      return { result: 'failed', message };
     }
   },
 
@@ -206,13 +255,29 @@ export const useAuth = create<AuthState>((set) => ({
   },
 
   signOut: async () => {
-    // Revoke server-side first, best-effort. Tokens never expire on their own, so a session
+    // Order matters: the push registration is deleted through an authenticated call, so it has to
+    // happen while the token is still valid. Doing it after the revoke would leave this device
+    // subscribed to the departing user's events — and the next person to sign in on this phone
+    // would receive them.
+    await releaseRegistration();
+
+    // Revoke server-side next, best-effort. Tokens never expire on their own, so a session
     // dropped only on the device would leave a valid credential alive on the server forever.
     // Failure here must not trap the user in a signed-in state, so the local clear happens
     // either way.
     const token = useAuth.getState().session?.token;
     if (token) await revokeToken(token);
 
+    resetSeenEvents();
+    await persist(null);
+    set({ session: null, status: 'unauthenticated', error: null });
+  },
+
+  endRevokedSession: async () => {
+    // No revoke call and no device-release call: the server has already dropped every token for
+    // this account, so both would 401. The push registration is deliberately LEFT in place — the
+    // same person is about to sign back in on this same phone with their new PIN.
+    resetSeenEvents();
     await persist(null);
     set({ session: null, status: 'unauthenticated', error: null });
   },

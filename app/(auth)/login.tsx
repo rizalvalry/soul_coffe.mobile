@@ -27,6 +27,7 @@ import { Chip } from '@/components/ui/Badge';
 import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
 import { useAuth } from '@/features/auth/store';
+import { ForgotPinSheet } from '@/features/auth/ForgotPinSheet';
 import { useKeyboardInset, useKeyboardVisible } from '@/lib/keyboard';
 import { loginSchema, normalisePhone, type LoginForm } from '@/features/auth/schema';
 import { rolesByPriority, roleMeta, type Role } from '@/domain/roles';
@@ -57,9 +58,30 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
 
-  const [mode, setMode] = useState<Mode>('password');
+  // Opens on the PIN pad whenever this device last signed in with an account that has one. That
+  // is the normal case for a returning user: the password would only be refused with 409.
+  const [mode, setMode] = useState<Mode>(pinAvailable && lastPhone ? 'pin' : 'password');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [forgotOpen, setForgotOpen] = useState(false);
+
+  /**
+   * The hint is read from disk during `restore()`, which can land AFTER this screen first paints.
+   * Without this the returning user would see the password form for a frame and then have it
+   * swapped underneath them — or, if they were quick, would type a password that cannot work.
+   *
+   * It only ever moves the screen TO the PIN pad on arrival; it must not yank someone back who
+   * deliberately tapped "Masuk dengan Kata Sandi".
+   */
+  const switchedRef = useRef(false);
+  useEffect(() => {
+    if (switchedRef.current) return;
+    if (pinAvailable && lastPhone) {
+      switchedRef.current = true;
+      setMode('pin');
+    }
+  }, [pinAvailable, lastPhone]);
 
   const expandedTop = Math.round(height * SHEET_EXPANDED);
   const collapsedTop = Math.round(height * SHEET_COLLAPSED);
@@ -151,17 +173,33 @@ export default function LoginScreen() {
 
   const onSubmit = useCallback(
     async (values: LoginForm) => {
-      const ok = await signIn({
+      setNotice(null);
+      const outcome = await signIn({
         phone: normalisePhone(values.phone),
         password: values.password,
       });
-      if (ok) router.replace('/menu');
+
+      if (outcome.result === 'ok') {
+        router.replace('/menu');
+        return;
+      }
+
+      // The password was right, but this account signs in with its PIN now. Move them to the pad
+      // rather than showing a red error for something they did nothing wrong in.
+      if (outcome.result === 'pin-required') {
+        setPin('');
+        setPinError(null);
+        setMode('pin');
+        setNotice(outcome.message);
+      }
     },
     [signIn, router],
   );
 
   const onPinSubmit = useCallback(async () => {
     setPinError(null);
+    setNotice(null);
+
     if (!lastPhone) {
       setPinError('Masuk sekali dengan kata sandi terlebih dahulu di perangkat ini.');
       return;
@@ -170,8 +208,21 @@ export default function LoginScreen() {
       setPinError('PIN harus terdiri dari 6 angka.');
       return;
     }
-    const ok = await signInWithPin(lastPhone, pin);
-    if (ok) router.replace('/menu');
+
+    const outcome = await signInWithPin(lastPhone, pin);
+
+    if (outcome.result === 'ok') {
+      router.replace('/menu');
+      return;
+    }
+
+    // The PIN is gone — an Administrator reset this account. Send them to the password form with
+    // the reason, instead of letting them keep trying a PIN that no longer exists.
+    if (outcome.result === 'pin-not-set') {
+      setPin('');
+      setMode('password');
+      setNotice(outcome.message);
+    }
   }, [lastPhone, pin, signInWithPin, router]);
 
   const onDemo = useCallback(
@@ -339,6 +390,7 @@ export default function LoginScreen() {
             />
           )}
 
+          {notice ? <Banner message={notice} tone="info" /> : null}
           {error ? <Banner message={error} tone="danger" /> : null}
 
           {mode === 'password' ? (
@@ -368,11 +420,16 @@ export default function LoginScreen() {
                 <View style={styles.dividerLine} />
               </View>
 
+              {/* Kept even though the password is refused while a PIN exists: an account whose PIN
+                  an Administrator has just cleared still needs this door, and the server's 409 is
+                  what tells the user which one they are behind. */}
               <Touchable
                 onPress={() => {
                   clearError();
                   setPinError(null);
+                  setNotice(null);
                   setPin('');
+                  switchedRef.current = true;
                   setMode((m) => (m === 'pin' ? 'password' : 'pin'));
                 }}
                 disabled={submitting}
@@ -395,9 +452,27 @@ export default function LoginScreen() {
             </>
           ) : null}
 
-          <Text variant="caption" color={semantic.textSubtle} center>
-            Lupa kata sandi atau PIN? Hubungi Administrator.
-          </Text>
+          {/* The recovery path. It is a real control rather than the old "hubungi Administrator"
+              sentence because a forgotten PIN now locks the account outright — the password stops
+              working the moment a PIN exists. */}
+          <Touchable
+            onPress={() => {
+              clearError();
+              setPinError(null);
+              setNotice(null);
+              setForgotOpen(true);
+            }}
+            disabled={submitting}
+            scaleTo={pressScale.control}
+            accessibilityRole="button"
+            accessibilityLabel="Lupa PIN, kirim permintaan ke Administrator"
+            style={styles.forgotLink}
+          >
+            <MaterialCommunityIcons name="lock-question" size={16} color={brand[700]} />
+            <Text variant="caption" color={brand[700]}>
+              Lupa PIN? Kirim permintaan ke Administrator
+            </Text>
+          </Touchable>
 
           {/* The five roles are informational: the SERVER decides the role from the credentials.
               A client-side role picker would be forgeable. Hidden while typing so it is not
@@ -456,6 +531,12 @@ export default function LoginScreen() {
           </Text>
         </ScrollView>
       </Animated.View>
+
+      <ForgotPinSheet
+        visible={forgotOpen}
+        initialPhone={lastPhone ?? ''}
+        onClose={() => setForgotOpen(false)}
+      />
     </View>
   );
 }
@@ -533,6 +614,14 @@ const styles = StyleSheet.create({
     backgroundColor: neutral[50],
   },
   altButtonPressed: { opacity: 0.7 },
+
+  forgotLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xs,
+    minHeight: touch.minTarget,
+  },
 
   rolesBlock: { gap: space.sm },
   roleChips: {

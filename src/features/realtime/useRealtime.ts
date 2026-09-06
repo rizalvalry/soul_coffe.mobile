@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/store';
 import { apiBaseUrl } from '@/lib/api';
 import { invalidateRefillData } from '@/features/refill/queries';
+import { claimEvent } from './seen';
 import type { RefillStatus, Role } from '@/domain/types';
 
 // laravel-echo looks for a global Pusher when using the pusher/reverb broadcaster.
@@ -57,7 +58,9 @@ function channelsFor(
  * Two things worth knowing before changing this:
  *
  * 1. **Dedupe by `event_id`.** The same event can arrive over the WebSocket and again as a push
- *    notification (E15). The seen-set makes the second arrival a no-op.
+ *    notification (E15). The seen-set lives in `./seen` rather than in this hook, because the push
+ *    handler is not a hook and can fire with nothing mounted — a set owned here would be rebuilt on
+ *    every remount and would miss exactly the overlap it exists to catch.
  *
  * 2. **The polling fallback is a safety net, not the mechanism.** When the socket is down the
  *    app refetches every 10 s so a demo on a hostile network still works, but requirement 3 is
@@ -69,7 +72,6 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
   const session = useAuth((s) => s.session);
   const [state, setState] = useState<ConnectionState>('connecting');
 
-  const seen = useRef<Set<string>>(new Set());
   const echoRef = useRef<Echo<'pusher'> | null>(null);
   const handlerRef = useRef(onEvent);
   handlerRef.current = onEvent;
@@ -145,13 +147,11 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
 
     const dispatch = (raw: unknown) => {
       const event = raw as RealtimeEvent;
-      if (!event?.event_id || seen.current.has(event.event_id)) return;
-      seen.current.add(event.event_id);
+      if (!event?.event_id) return;
 
-      // Bounded memory: a long shift must not grow this set without limit.
-      if (seen.current.size > 500) {
-        seen.current = new Set([...seen.current].slice(-250));
-      }
+      // First arrival wins. If the push got here first, the screen is already being refreshed and
+      // this copy is dropped; if this got here first, the push's foreground banner is suppressed.
+      if (!claimEvent(event.event_id)) return;
 
       invalidateRefillData(client, event.refill_request_id ?? undefined);
       handlerRef.current?.(event);

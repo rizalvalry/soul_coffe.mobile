@@ -3,7 +3,7 @@
     "name": "Soul Coffeemate",
     "slug": "soul-coffeemate",
     "scheme": "soulcoffeemate",
-    "version": "1.3.3",
+    "version": "1.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "id.soulcoffeemate.ops.demo",
-      "versionCode": 13,
+      "versionCode": 14,
       "minSdkVersion": 26,
       "adaptiveIcon": {
         "backgroundColor": "#00A3AA",
@@ -23,10 +23,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
         "android.permission.CAMERA",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.VIBRATE",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
@@ -37,6 +40,15 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#00A3AA",
+          "defaultChannel": "default",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -87,7 +99,8 @@
       "demoMode": false,
       "_comment_api": "Production Laravel API on its own subdomain (Cloudflare-proxied). Confirmed live and reachable — POST /auth/login, GET /products, GET /refills and GET /badges were all verified against this host to return exactly the shapes src/lib/mappers.ts expects, and all 5 UserSeeder.php accounts (one per role) were confirmed to authenticate. For local development against Laragon use http://10.0.2.2:8000/api/v1 (Android emulator) or http://<LAN-IP>:8000/api/v1 (physical device), then rebuild.",
       "_comment_pusher": "Pusher Channels app 2191062, cluster ap1. Replaced self-hosted Reverb because this shared hosting cannot expose a persistent WebSocket process behind a reverse proxy (confirmed: a raw WS upgrade to the API domain returned Laravel's own 404 page, meaning nothing proxies it to Reverb at all, and the raw Reverb port timed out — the host firewall drops it). Only the public app KEY + CLUSTER go here; the App Secret stays backend-only, in the Laravel .env (PUSHER_APP_SECRET), and must never appear in this file or in the mobile bundle. useRealtime() falls back to a 10s poll and shows an honest 'Mode luring' banner whenever these are blank or the socket can't connect — see that file's docblock. Switching broadcaster does not by itself fix delivery: PublishOutboxEvent is a QUEUED job (QUEUE_CONNECTION=database in the backend), and nothing currently processes that queue — see soul_coffe.backend's queue-worker cron note. Until that cron exists, events never reach Pusher OR Reverb; the gap isn't which broadcaster is configured.",
-      "_comment_demoMode": "false: every screen now calls the real Laravel API at apiBaseUrl instead of src/features/demo/router.ts's in-memory fixtures. DemoBanner and the role-switcher (loginAsDemoRole) are gone from the UI — real accounts must exist in the backend's users table with is_active=1. Flip back to true only for an offline standalone demo build; see README's \"Real backend\" section for the wire-format gaps that src/lib/mappers.ts papers over."
+      "_comment_demoMode": "false: every screen now calls the real Laravel API at apiBaseUrl instead of src/features/demo/router.ts's in-memory fixtures. DemoBanner and the role-switcher (loginAsDemoRole) are gone from the UI — real accounts must exist in the backend's users table with is_active=1. Flip back to true only for an offline standalone demo build; see README's \"Real backend\" section for the wire-format gaps that src/lib/mappers.ts papers over.",
+      "_comment_push": "Push notifications go through Firebase Cloud Messaging. The app asks for POST_NOTIFICATIONS on first launch after sign-in, then registers its FCM device token with POST /me/devices; the Laravel side sends to it from EventPublisher (App\\Services\\Push\\PushNotifier). Two files must exist for delivery to work and NEITHER is in git: google-services.json in this directory (Firebase console -> Project settings -> Your apps -> Android app with package id.soulcoffeemate.ops.demo), and the matching service-account JSON on the server (FCM_CREDENTIALS_PATH). app.config.js wires google-services.json in only when the file is present, so a build without it still succeeds — the app simply reports that push is unavailable and keeps using the Pusher socket and the 10s poll."
     }
   }
 }
