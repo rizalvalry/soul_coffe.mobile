@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills } from '@/features/refill/queries';
-import { useRealtime } from '@/features/realtime/useRealtime';
+import { useRealtimeState } from '@/features/realtime/RealtimeProvider';
 import { semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
@@ -16,7 +16,7 @@ import type { RefillRequest } from '@/domain/types';
 export default function StaffRequestsScreen() {
   const router = useRouter();
   const refillsQuery = useRefills();
-  const { isRealtime } = useRealtime();
+  const { isRealtime } = useRealtimeState();
 
   return (
     <Screen scroll={false}>

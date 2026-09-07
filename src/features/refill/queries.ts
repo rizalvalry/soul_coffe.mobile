@@ -81,13 +81,30 @@ export function useBadges() {
   });
 }
 
-export function useNotifications() {
+/**
+ * `unreadOnly` is a separate cache entry from the full inbox, not a client-side filter of one
+ * shared list: the bell's badge count needs to be cheap and correct even when the inbox itself
+ * has never been opened this session, and a single shared query would force the badge to fetch
+ * every read notification just to count the unread ones.
+ */
+export function useNotifications(options?: { unreadOnly?: boolean }) {
+  const unreadOnly = options?.unreadOnly ?? false;
   return useQuery({
-    queryKey: qk.notifications,
+    queryKey: [...qk.notifications, { unreadOnly }] as const,
     queryFn: async () => {
-      const rows = await request<RawAppNotification[]>('/notifications?unread=1');
+      const rows = await request<RawAppNotification[]>(`/notifications${unreadOnly ? '?unread=1' : ''}`);
       return rows.map(toAppNotification);
     },
+  });
+}
+
+export function useMarkNotificationRead() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (notificationId: number) => request<void>(`/notifications/${notificationId}/read`, { method: 'POST' }),
+    // Both cache entries above key off `qk.notifications`, so one invalidation call — using the
+    // short, unparameterised key — reaches the inbox screen AND the bell's unread count together.
+    onSuccess: () => void client.invalidateQueries({ queryKey: qk.notifications }),
   });
 }
 

@@ -32,8 +32,14 @@ Notifications.setNotificationHandler({
   },
 });
 
-/** Where a tapped notification should land, by event type. */
-function routeFor(data: Record<string, unknown>): string | null {
+/**
+ * Where a tapped notification should land, by event type.
+ *
+ * Exported so the in-app notification inbox (`NotificationBell`/`/notifications`) can send a
+ * tapped row to the same place a tapped push notification would — one routing decision instead
+ * of two that could quietly drift apart.
+ */
+export function routeFor(data: Record<string, unknown>): string | null {
   const refillId = data['refill_request_id'];
   if (refillId !== null && refillId !== undefined && `${refillId}` !== '') {
     return `/staff/requests/${refillId}`;
@@ -60,7 +66,7 @@ function routeFor(data: Record<string, unknown>): string | null {
 /**
  * Wires push into the app: registration, cache invalidation on arrival, navigation on tap.
  *
- * Mounted once, from the authenticated layout. Everything it does is additive to `useRealtime` —
+ * Mounted once, from the authenticated layout. Everything it does is additive to `RealtimeProvider` —
  * if push never arrives (permission denied, no Firebase config, no Play Services) the socket and
  * its polling fallback still keep every screen current.
  */

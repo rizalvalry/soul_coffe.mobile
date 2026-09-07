@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills, useStartPreparing } from '@/features/refill/queries';
-import { useRealtime } from '@/features/realtime/useRealtime';
+import { useRealtimeState } from '@/features/realtime/RealtimeProvider';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest, RefillStatus } from '@/domain/types';
 import { semantic, space } from '@/theme';
@@ -33,7 +33,7 @@ const SECTION_ORDER: { key: RefillStatus; title: string }[] = [
 export default function BaristaRequestsScreen() {
   const refillsQuery = useRefills(['SUBMITTED', 'APPROVED', 'PREPARING']);
   const startPreparing = useStartPreparing();
-  const realtime = useRealtime();
+  const realtime = useRealtimeState();
 
   const sections: Section[] = useMemo(() => {
     const data = refillsQuery.data ?? [];

@@ -15,7 +15,7 @@ import { SkeletonList } from '@/components/ui/Skeleton';
 import { MetaRow } from '@/components/ui/Section';
 import { RefillCard, formatRupiah } from '@/components/refill/RefillCard';
 import { useApproveRefill, useRefills, useRejectRefill } from '@/features/refill/queries';
-import { useRealtime } from '@/features/realtime/useRealtime';
+import { useRealtimeState } from '@/features/realtime/RealtimeProvider';
 import { ApiError } from '@/lib/api';
 import { neutral, radius, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
@@ -34,7 +34,7 @@ export default function FinanceApprovalsScreen() {
   const router = useRouter();
   const refillsQuery = useRefills('SUBMITTED');
   const rows = refillsQuery.data ?? [];
-  const realtime = useRealtime();
+  const realtime = useRealtimeState();
 
   return (
     <Screen scroll={false}>

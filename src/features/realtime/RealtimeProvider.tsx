@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import Constants from 'expo-constants';
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
@@ -52,29 +52,33 @@ function channelsFor(
   return channels;
 }
 
+type RealtimeContextValue = {
+  state: ConnectionState;
+  isRealtime: boolean;
+};
+
+const RealtimeContext = createContext<RealtimeContextValue>({ state: 'disconnected', isRealtime: false });
+
 /**
- * Realtime layer for requirement 3 — updates without a reload.
+ * Owns the ONE Pusher/Echo connection for the whole authenticated app.
  *
- * Two things worth knowing before changing this:
+ * This used to live inside `useRealtime()` itself, so every screen that called the hook opened
+ * its own socket — harmless while only one such screen was ever mounted at a time, but it also
+ * meant the connection existed ONLY while one of those four screens was on screen. A refill
+ * approved while the user sat on the menu, on Settings, or anywhere else produced no live signal
+ * at all: nothing was subscribed to hear it. Mounted once here, from `(app)/_layout.tsx`, the
+ * socket is alive for the whole authenticated session, which is what makes a notification bell
+ * (see `NotificationBell`) mean anything outside those four screens.
  *
- * 1. **Dedupe by `event_id`.** The same event can arrive over the WebSocket and again as a push
- *    notification (E15). The seen-set lives in `./seen` rather than in this hook, because the push
- *    handler is not a hook and can fire with nothing mounted — a set owned here would be rebuilt on
- *    every remount and would miss exactly the overlap it exists to catch.
- *
- * 2. **The polling fallback is a safety net, not the mechanism.** When the socket is down the
- *    app refetches every 10 s so a demo on a hostile network still works, but requirement 3 is
- *    only satisfied when `state === 'connected'`. The UI shows which mode it is in — silently
- *    degrading to polling while claiming to be realtime would be a lie to the operator.
+ * `useRealtimeState()` below is what the four screens now call instead of running their own
+ * connection — same `state`/`isRealtime` shape as before, so nothing downstream had to change.
  */
-export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
+export function RealtimeProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const session = useAuth((s) => s.session);
   const [state, setState] = useState<ConnectionState>('connecting');
 
   const echoRef = useRef<Echo<'pusher'> | null>(null);
-  const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
 
   useEffect(() => {
     if (!session) {
@@ -154,7 +158,6 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
       if (!claimEvent(event.event_id)) return;
 
       invalidateRefillData(client, event.refill_request_id ?? undefined);
-      handlerRef.current?.(event);
     };
 
     const names = channelsFor(
@@ -197,5 +200,15 @@ export function useRealtime(onEvent?: (event: RealtimeEvent) => void) {
     return () => clearInterval(timer);
   }, [state, session, client]);
 
-  return { state, isRealtime: state === 'connected' };
+  return <RealtimeContext.Provider value={{ state, isRealtime: state === 'connected' }}>{children}</RealtimeContext.Provider>;
+}
+
+/**
+ * What the four business screens read instead of opening their own connection.
+ *
+ * Same shape `useRealtime()` used to return (`state`, `isRealtime`) so ConnectionBanner and the
+ * staff requests header needed no changes beyond the import.
+ */
+export function useRealtimeState(): RealtimeContextValue {
+  return useContext(RealtimeContext);
 }

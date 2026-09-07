@@ -5,7 +5,7 @@
  * push. `event_id` is the server's key for that pair (EventPublisher mints one per event and puts
  * it in both), so whichever arrives first claims it and the second is a no-op.
  *
- * This lives outside `useRealtime` because the push handler is not a React hook and can fire while
+ * This lives outside `RealtimeProvider` because the push handler is not a React hook and can fire while
  * no component is mounted. A set owned by a hook would be recreated on every remount and would
  * miss exactly the overlap it exists to catch.
  */

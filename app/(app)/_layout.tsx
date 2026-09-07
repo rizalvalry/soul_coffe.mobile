@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import { useAuth } from '@/features/auth/store';
 import { usePushNotifications } from '@/features/push/usePushNotifications';
+import { RealtimeProvider } from '@/features/realtime/RealtimeProvider';
 import { DemoBanner } from '@/components/ui/DemoBanner';
 import { semantic } from '@/theme';
 
@@ -25,14 +26,19 @@ export default function AppLayout() {
   if (status === 'unauthenticated') return <Redirect href="/login" />;
 
   return (
-    <View style={{ flex: 1, backgroundColor: semantic.bg }}>
-      <DemoBanner />
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          contentStyle: { backgroundColor: semantic.bg },
-        }}
-      />
-    </View>
+    // The socket connects here, above the Stack, so it stays alive across every authenticated
+    // screen instead of only the handful that used to open it themselves — see
+    // RealtimeProvider's docblock for what broke while it didn't.
+    <RealtimeProvider>
+      <View style={{ flex: 1, backgroundColor: semantic.bg }}>
+        <DemoBanner />
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            contentStyle: { backgroundColor: semantic.bg },
+          }}
+        />
+      </View>
+    </RealtimeProvider>
   );
 }

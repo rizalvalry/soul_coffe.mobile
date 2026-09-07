@@ -14,7 +14,7 @@ import Animated, {
 import { Text } from './Text';
 import { enter, exit } from './Motion';
 import { feedback, radius, space } from '@/theme';
-import type { ConnectionState } from '@/features/realtime/useRealtime';
+import type { ConnectionState } from '@/features/realtime/RealtimeProvider';
 
 export type ConnectionBannerProps = {
   state: ConnectionState;

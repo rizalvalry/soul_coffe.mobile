@@ -10,6 +10,7 @@ import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { CountBadge, Chip } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
+import { NotificationBell } from '@/components/ui/NotificationBell';
 import { Touchable } from '@/components/ui/Touchable';
 import { enter } from '@/components/ui/Motion';
 import { SoulLogo } from '@/components/brand/SoulLogo';
@@ -123,7 +124,10 @@ export default function MenuScreen() {
           </View>
         </View>
 
-        <IconButton icon="logout-variant" label="Keluar dari aplikasi" onPress={confirmSignOut} />
+        <View style={styles.headerActions}>
+          <NotificationBell />
+          <IconButton icon="logout-variant" label="Keluar dari aplikasi" onPress={confirmSignOut} />
+        </View>
       </Animated.View>
 
       <Animated.View entering={enter('below', 1)}>
@@ -260,6 +264,7 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   headerText: { flex: 1 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
 
   roleCard: { gap: space.lg },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },

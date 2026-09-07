@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useClaimRefill, useRefills } from '@/features/refill/queries';
-import { useRealtime } from '@/features/realtime/useRealtime';
+import { useRealtimeState } from '@/features/realtime/RealtimeProvider';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest } from '@/domain/types';
 import { space } from '@/theme';
@@ -20,7 +20,7 @@ import { space } from '@/theme';
 export default function RiderAvailableScreen() {
   const refillsQuery = useRefills('READY_TO_PICK');
   const claim = useClaimRefill();
-  const realtime = useRealtime();
+  const realtime = useRealtimeState();
 
   const onClaim = async (refill: RefillRequest) => {
     try {

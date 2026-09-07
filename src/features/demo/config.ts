@@ -9,7 +9,7 @@ import Constants from 'expo-constants';
  * make it impossible to ship a demo build at all. See `app.json`'s `_comment_demoMode` for how to
  * turn this off for a build that must talk to the real backend.
  *
- * HONESTY REQUIREMENT — read before touching this file, `router.ts`, or `useRealtime.ts`.
+ * HONESTY REQUIREMENT — read before touching this file, `router.ts`, or `RealtimeProvider.tsx`.
  *
  * Demo mode "feels realtime" only because every screen reads and writes the SAME in-process
  * JavaScript object (`src/features/demo/store.ts`) held in memory on this one device. Two screens
@@ -18,9 +18,9 @@ import Constants from 'expo-constants';
  * (cross-device realtime over Laravel Reverb) works — proving that needs an actually running
  * Reverb server and two separate devices/sessions talking to it over a socket.
  *
- * `useRealtime()` is deliberately left untouched by demo mode: it still attempts a real
+ * `RealtimeProvider` is deliberately left untouched by demo mode: it still attempts a real
  * WebSocket connection, and — having no Reverb server to reach — never transitions to
- * `connected`. Do not special-case demo mode inside `useRealtime()` to make it report
+ * `connected`. Do not special-case demo mode inside `RealtimeProvider` to make it report
  * `connected`, and do not add any demo-mode banner or copy that implies cross-device realtime
  * has been demonstrated. What the demo actually proves is the state machine and the guards; what
  * it cannot prove is the transport, and the UI must never blur that line.
