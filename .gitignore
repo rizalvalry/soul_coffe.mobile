@@ -8,3 +8,6 @@ ios/
 *.aab
 .env
 .env.local
+
+# Firebase credential — see app.config.js's docblock for why the build tolerates its absence.
+google-services.json
