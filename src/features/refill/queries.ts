@@ -11,7 +11,7 @@ import {
   type RawRefillRequest,
   type RawStockRow,
 } from '@/lib/mappers';
-import type { BadgeCounts, Product, RefillRequest, RefillStatus, StaffOnShift } from '@/domain/types';
+import type { AppNotification, BadgeCounts, Product, RefillRequest, RefillStatus, StaffOnShift } from '@/domain/types';
 
 /**
  * Neither `RefillLineResource` nor `StockRowResource` (soul_coffe.backend) return a product's
@@ -105,6 +105,45 @@ export function useMarkNotificationRead() {
     // Both cache entries above key off `qk.notifications`, so one invalidation call — using the
     // short, unparameterised key — reaches the inbox screen AND the bell's unread count together.
     onSuccess: () => void client.invalidateQueries({ queryKey: qk.notifications }),
+  });
+}
+
+/**
+ * Clears the badge the instant it's tapped, not after the request round-trips.
+ *
+ * A bell that has piled up unread items is exactly the case where a spinner or a laggy count is
+ * most visible and most annoying — the whole point of "tandai semua dibaca" is that the number
+ * disappears NOW. `onMutate` writes both cache entries directly (the unread list to empty, the
+ * full inbox's rows stamped read) before the request is even sent; `onError` restores the
+ * snapshot if the server disagrees, and `onSettled` refetches so the cache still converges on
+ * whatever the server actually recorded.
+ */
+export function useMarkAllNotificationsRead() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: () => request<void>('/notifications/read-all', { method: 'POST' }),
+    onMutate: async () => {
+      await client.cancelQueries({ queryKey: qk.notifications });
+
+      const previous = client.getQueriesData<AppNotification[]>({ queryKey: qk.notifications });
+      const now = new Date().toISOString();
+
+      for (const [key] of previous) {
+        client.setQueryData<AppNotification[]>(key, (rows) => {
+          if (!rows) return rows;
+          const isUnreadOnlyKey = (key[1] as { unreadOnly?: boolean } | undefined)?.unreadOnly === true;
+          return isUnreadOnlyKey ? [] : rows.map((n) => (n.read_at ? n : { ...n, read_at: now }));
+        });
+      }
+
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      for (const [key, data] of context?.previous ?? []) {
+        client.setQueryData(key, data);
+      }
+    },
+    onSettled: () => void client.invalidateQueries({ queryKey: qk.notifications }),
   });
 }
 

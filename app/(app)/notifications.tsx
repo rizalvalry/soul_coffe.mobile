@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useMarkNotificationRead, useNotifications } from '@/features/refill/queries';
+import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/refill/queries';
 import { routeFor } from '@/features/push/usePushNotifications';
 import { brand, neutral, radius, shadow, semantic, space } from '@/theme';
 import type { AppNotification } from '@/domain/types';
@@ -29,6 +29,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const inbox = useNotifications();
   const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
 
   const rows = inbox.data ?? [];
   const unread = rows.filter((n) => !n.read_at).length;
@@ -46,11 +47,22 @@ export default function NotificationsScreen() {
         <Button label="Kembali" icon="chevron-left" variant="ghost" fullWidth={false} onPress={() => router.back()} />
       </View>
 
-      <View>
-        <Text variant="h2">Notifikasi</Text>
-        <Text variant="caption" color={semantic.textMuted}>
-          {unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca'}
-        </Text>
+      <View style={styles.headerRow}>
+        <View style={styles.headerText}>
+          <Text variant="h2">Notifikasi</Text>
+          <Text variant="caption" color={semantic.textMuted}>
+            {unread > 0 ? `${unread} belum dibaca` : 'Semua sudah dibaca'}
+          </Text>
+        </View>
+
+        {unread > 0 ? (
+          <Button
+            label="Tandai Semua Dibaca"
+            variant="ghost"
+            fullWidth={false}
+            onPress={() => markAllRead.mutate()}
+          />
+        ) : null}
       </View>
 
       {inbox.isLoading ? (
@@ -112,6 +124,9 @@ function NotificationRow({ notification, onPress }: { notification: AppNotificat
 const styles = StyleSheet.create({
   top: { alignItems: 'flex-start' },
   stateCard: { gap: space.md },
+
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
+  headerText: { flex: 1, gap: space.xxs },
 
   row: {
     flexDirection: 'row',
