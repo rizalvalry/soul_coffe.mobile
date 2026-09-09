@@ -235,6 +235,27 @@ export type AttendanceStatus = {
   can_open_staff_window: boolean;
   /** Ready-to-display copy for a disabled button; null when nothing is blocking. */
   blocked_reason: string | null;
+  /**
+   * Where this person must be standing to clock in today.
+   *
+   * Absen is the one action in this app that a GPS reading can stop (everywhere else a missing
+   * fix is only evidence, E10), so the rule is sent to the client BEFORE the button is pressed —
+   * being refused is a bad way to learn where you were supposed to stand.
+   *
+   * `enforced: false` covers three ordinary cases and the app should say nothing special about
+   * any of them: the kitchen has no map pin, this cart has an exemption, or the rule is switched
+   * off entirely.
+   */
+  geofence: {
+    enforced: boolean;
+    /** kitchen | selling_location | exempt | untagged | disabled */
+    basis: string;
+    lat: number | null;
+    lng: number | null;
+    radius_m: number;
+    label: string | null;
+    exemption_reason: string | null;
+  };
 };
 
 export type AttendanceRow = {

@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import * as Location from 'expo-location';
 import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
@@ -21,7 +22,7 @@ import {
 } from '@/features/showcase/queries';
 import { useAuth } from '@/features/auth/store';
 import { ApiError } from '@/lib/api';
-import { brand, radius, semantic, space } from '@/theme';
+import { brand, feedback, radius, semantic, space } from '@/theme';
 
 /**
  * Absen — one screen for both Barista and Staff.
@@ -40,6 +41,20 @@ function clockTime(iso: string | null): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+type Fix = { lat: number; lng: number; accuracy: number | null };
+
+const METRES_PER_DEGREE = 111_320;
+
+/**
+ * Same equirectangular approximation the server uses, so the number on screen and the number in
+ * the refusal message agree. Over tens of metres its error is far below a phone's own accuracy.
+ */
+function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const dLat = (b.lat - a.lat) * METRES_PER_DEGREE;
+  const dLng = (b.lng - a.lng) * METRES_PER_DEGREE * Math.cos(((a.lat + b.lat) / 2) * (Math.PI / 180));
+  return Math.round(Math.sqrt(dLat * dLat + dLng * dLng));
+}
+
 export default function AbsenScreen() {
   const role = useAuth((s) => s.session?.user.role);
   const statusQuery = useAttendanceStatus();
@@ -48,9 +63,63 @@ export default function AbsenScreen() {
   const openStaffAbsen = useOpenStaffAbsen();
 
   const [banner, setBanner] = useState<string | null>(null);
+  const [fix, setFix] = useState<Fix | null>(null);
+  const [locating, setLocating] = useState(false);
 
   const status = statusQuery.data;
   const roll = rollQuery.data ?? [];
+  const geofence = status?.geofence;
+
+  /**
+   * Reads the phone's position.
+   *
+   * Absen is the one screen where this matters enough to ask for on arrival: the server may
+   * refuse without it, and finding that out only after pressing the button would waste the walk.
+   * A denial or a failure is not treated as an error here — plenty of kitchens have no geofence
+   * at all, and for them the absen works exactly as it always did.
+   */
+  const locate = useCallback(async (): Promise<Fix | null> => {
+    setLocating(true);
+    try {
+      const permission = await Location.getForegroundPermissionsAsync();
+      const granted = permission.granted
+        ? true
+        : (await Location.requestForegroundPermissionsAsync()).granted;
+
+      if (!granted) return null;
+
+      const position = await Location.getCurrentPositionAsync({
+        // Absen is judged in metres, so this is the one place the highest accuracy is worth its
+        // battery: being wrongly refused by a lazy fix is worse than a few seconds of GPS.
+        accuracy: Location.LocationAccuracy.High,
+      });
+
+      const next: Fix = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: typeof position.coords.accuracy === 'number' ? Math.round(position.coords.accuracy) : null,
+      };
+
+      setFix(next);
+      return next;
+    } catch {
+      return null;
+    } finally {
+      setLocating(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void locate();
+  }, [locate]);
+
+  /** How far the phone is from where it needs to be, or null when nothing is enforced. */
+  const distance = useMemo(() => {
+    if (!geofence?.enforced || geofence.lat === null || geofence.lng === null || !fix) return null;
+    return metresBetween({ lat: geofence.lat, lng: geofence.lng }, fix);
+  }, [geofence, fix]);
+
+  const withinRange = distance !== null && geofence ? distance <= geofence.radius_m : null;
 
   const act = async (run: () => Promise<unknown>) => {
     setBanner(null);
@@ -132,13 +201,70 @@ export default function AbsenScreen() {
 
         {banner ? <Banner tone="danger" message={banner} /> : null}
 
+        {/*
+          The location rule, stated before the button rather than discovered by being refused.
+          Rendered only when something is actually enforced: a kitchen with no pin, an exempt
+          cart, or the rule switched off all mean there is nothing here worth saying.
+        */}
+        {!status.has_clocked_in && geofence?.enforced ? (
+          <View style={styles.geoBlock}>
+            <View style={styles.geoRow}>
+              <MaterialCommunityIcons
+                name={
+                  withinRange === null
+                    ? 'crosshairs-question'
+                    : withinRange
+                      ? 'map-marker-check-outline'
+                      : 'map-marker-alert-outline'
+                }
+                size={18}
+                color={withinRange === false ? feedback.dangerFg : brand[600]}
+              />
+              <Text variant="caption" color={semantic.textMuted} style={styles.geoText}>
+                {locating
+                  ? 'Mengambil lokasi Anda…'
+                  : distance === null
+                    ? `Absen harus dilakukan dalam ${geofence.radius_m} m dari ${geofence.label ?? 'lokasi yang ditentukan'}. Nyalakan lokasi (GPS) di HP Anda.`
+                    : withinRange
+                      ? `Anda ${distance} m dari ${geofence.label ?? 'lokasi absen'} — masih di dalam batas ${geofence.radius_m} m.`
+                      : `Anda ${distance} m dari ${geofence.label ?? 'lokasi absen'}, batasnya ${geofence.radius_m} m. Mendekatlah dulu.`}
+              </Text>
+            </View>
+
+            <Button
+              label="Perbarui Lokasi"
+              icon="crosshairs-gps"
+              variant="ghost"
+              size="sm"
+              loading={locating}
+              onPress={() => void locate()}
+            />
+          </View>
+        ) : null}
+
+        {/* An exemption is worth showing: it explains why this phone's rule differs from a
+            colleague's, and it is the answer to "kenapa saya bisa absen dari sini?". */}
+        {!status.has_clocked_in && geofence?.basis === 'exempt' && geofence.exemption_reason ? (
+          <Banner tone="info" message={`Izin absen luar lokasi berlaku: ${geofence.exemption_reason}`} />
+        ) : null}
+
         {!status.has_clocked_in ? (
           <Button
             label="Absen Sekarang"
             icon="fingerprint"
-            onPress={() => void act(() => clockIn.mutateAsync())}
-            loading={clockIn.isPending}
-            // Disabled state and its copy both come from the server — see the docblock.
+            // The fix is refreshed at the moment of pressing, not reused from arrival: somebody
+            // who walked closer after being told they were too far must not be judged on where
+            // they were standing a minute ago.
+            onPress={() =>
+              void act(async () => {
+                const current = (await locate()) ?? fix;
+                return clockIn.mutateAsync(current ? { lat: current.lat, lng: current.lng } : null);
+              })
+            }
+            loading={clockIn.isPending || locating}
+            // Disabled state and its copy both come from the server — see the docblock. The
+            // geofence deliberately does NOT disable the button: the server decides, and a phone
+            // whose fix is stale or inaccurate should still be allowed to try.
             disabled={!status.can_clock_in}
             hint={status.can_clock_in ? undefined : (status.blocked_reason ?? undefined)}
           />
@@ -219,6 +345,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: space.xs,
   },
+  geoBlock: { gap: space.xs },
+  geoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space.sm },
+  geoText: { flex: 1 },
+
   rollList: { gap: space.sm },
   rollRow: {
     flexDirection: 'row',

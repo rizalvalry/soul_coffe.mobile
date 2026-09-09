@@ -226,10 +226,18 @@ export function useCloseOutCart() {
  * Clock in. Idempotent server-side, so a double tap is a replay rather than an error — the
  * screen does not need to guard the button against it.
  */
+export type ClockInInput = { lat: number; lng: number } | null;
+
 export function useClockIn() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: () => request<AttendanceRow>('/absen', { method: 'POST' }),
+    mutationFn: (gps: ClockInInput = null) =>
+      request<AttendanceRow>('/absen', {
+        method: 'POST',
+        // Sent when the phone has a fix. Whether one is REQUIRED is the server's decision, not
+        // this app's — a kitchen with no map pin still accepts an absen without coordinates.
+        body: gps ? { gps_lat: gps.lat, gps_lng: gps.lng } : {},
+      }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
       void client.invalidateQueries({ queryKey: ['absen', 'roll'] });
