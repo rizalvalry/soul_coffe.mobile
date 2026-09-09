@@ -7,6 +7,14 @@ export type Product = {
   id: number;
   code: string;
   name: string;
+  /**
+   * The photo an administrator uploaded in the CMS, absolute and ready to fetch, or null.
+   *
+   * Null means "no photo", not "broken": the tiles fall back to the bundled artwork in
+   * `domain/productImages.ts` and then to an icon, so a product added in the CMS this morning is
+   * usable this morning whether or not anyone has photographed it yet.
+   */
+  image_url?: string | null;
   unit: string;
   is_sellable: boolean;
   sort_order: number;
@@ -236,4 +244,75 @@ export type AttendanceRow = {
   user_name: string | null;
   role: Role;
   clocked_in_at: string;
+};
+
+// ── Penjualan gerobak ────────────────────────────────────────────────────────
+
+export type SaleLine = {
+  product_id: number;
+  product_name: string | null;
+  qty: number;
+  /** The price pinned at the moment of the transaction (R10), in whole rupiah. */
+  unit_price: number;
+  subtotal: number;
+};
+
+/**
+ * One recorded transaction.
+ *
+ * `is_suspect` is deliberately NOT part of this type even though the API returns it. The flag is
+ * addressed to Administrator and Finance; showing a staff member "you look suspicious" would be
+ * both an accusation and a hint about how to stay under the threshold next time.
+ */
+export type Sale = {
+  id: number;
+  uuid: string;
+  operating_date: string;
+  occurred_at: string;
+  cart_code: string | null;
+  location_name: string | null;
+  total_qty: number;
+  total_amount: number;
+  payment_method: PaymentMethod;
+  note: string | null;
+  lines: SaleLine[];
+};
+
+export const PAYMENT_METHODS = ['cash', 'qris', 'transfer'] as const;
+
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+// ── Insiden pengiriman ───────────────────────────────────────────────────────
+
+export type IncidentStatus = 'REPORTED' | 'RESOLVED_CANCELLED' | 'RESOLVED_PARTIAL';
+
+/**
+ * Cups damaged on the way to a cart.
+ *
+ * The rider files it; Finance or an Administrator decides. Everything from `decided_by` onwards
+ * is null until then, which is exactly what the rider is waiting to see.
+ */
+export type DeliveryIncident = {
+  id: number;
+  uuid: string;
+  refill_request_id: number;
+  refill_code: string | null;
+  cart_code: string | null;
+  rider_name: string | null;
+  reported_at: string;
+  note: string | null;
+  status: IncidentStatus;
+  status_label: string;
+  photo_url: string | null;
+  damaged_qty: number;
+  written_off_qty: number;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string | null;
+  lines: {
+    line_id: number;
+    product_id: number;
+    product_name: string | null;
+    qty_damaged: number;
+  }[];
 };

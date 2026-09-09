@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
-import { File, Paths } from 'expo-file-system';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -14,30 +14,26 @@ import { StatusBadge, Chip } from '@/components/ui/Badge';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { Touchable } from '@/components/ui/Touchable';
 import { SignaturePad, type SignatureResult } from '@/components/ui/SignaturePad';
-import { useDeliverRefill, useRefills } from '@/features/refill/queries';
+import { useDeliverRefill, useRefills, useUploadHandoverPhoto } from '@/features/refill/queries';
+import { useReportIncident } from '@/features/incidents/queries';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest } from '@/domain/types';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 
-type DeliveryMethod = 'staff_signature' | 'pin_fallback';
-type GpsCoords = { lat: number; lng: number };
-
 /**
- * Minimal 1x1 transparent PNG used only for `pin_fallback` deliveries (E7). The flow explicitly
- * switches away from signature capture to a PIN — but `useDeliverRefill()` still uploads a
- * `signature` file for every delivery, so this placeholder satisfies that field honestly
- * (`stroke_count: 0` travels alongside it, so the server never mistakes it for a real signature).
+ * How a delivery is proved, as of 2026-09-10.
+ *
+ * `none` is the default and the normal case: a photograph of the cups changing hands. The other
+ * two are additions a rider may make when the staff member is present and willing — a signature,
+ * or their PIN. The old arrangement had this backwards: a signature was required and no photo was
+ * collected at all, which meant a rider holding a crate in the street could be unable to close a
+ * delivery that had plainly happened, and a dispute had nothing but a squiggle to look at.
  */
-const PIN_FALLBACK_PLACEHOLDER_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-
-function writePlaceholderSignature(): string {
-  const file = new File(Paths.cache, `pin-fallback-${Date.now()}.png`);
-  file.create({ overwrite: true });
-  file.write(PIN_FALLBACK_PLACEHOLDER_PNG_BASE64, { encoding: 'base64' });
-  return file.uri;
-}
+type ProofMode = 'none' | 'staff_signature' | 'pin_fallback';
+type GpsCoords = { lat: number; lng: number };
+type Photo = { uri: string; takenAt: string };
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
   return Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
@@ -55,13 +51,73 @@ async function captureGps(): Promise<GpsCoords | null> {
   }
 }
 
+/**
+ * Camera only, never the gallery.
+ *
+ * The same rule the refill evidence photo lives under (R3): there is no `launchImageLibraryAsync`
+ * anywhere in this flow, because a photo that can come from the gallery proves nothing about
+ * where anyone was.
+ */
+async function capturePhoto(): Promise<Photo | null> {
+  const permission = await ImagePicker.requestCameraPermissionsAsync();
+  if (!permission.granted) {
+    throw new Error('Izin kamera ditolak. Aktifkan izin kamera di pengaturan HP.');
+  }
+
+  const result = await ImagePicker.launchCameraAsync({
+    mediaTypes: ['images'],
+    quality: 0.6,
+    allowsEditing: false,
+  });
+
+  if (result.canceled || !result.assets?.[0]) return null;
+
+  return { uri: result.assets[0].uri, takenAt: new Date().toISOString() };
+}
+
+function PhotoField({
+  photo,
+  title,
+  hint,
+  disabled,
+  onCapture,
+}: {
+  photo: Photo | null;
+  title: string;
+  hint: string;
+  disabled: boolean;
+  onCapture: () => void;
+}) {
+  return (
+    <Card style={styles.card}>
+      <Text variant="bodyStrong">{title}</Text>
+      <Text variant="caption" color={semantic.textMuted}>
+        {hint}
+      </Text>
+
+      {photo ? (
+        <>
+          <View style={styles.photoFrame}>
+            <Image source={{ uri: photo.uri }} style={styles.photo} />
+          </View>
+          <Button label="Ambil Ulang" icon="camera-retake-outline" variant="secondary" disabled={disabled} onPress={onCapture} />
+        </>
+      ) : (
+        <Button label="Ambil Foto" icon="camera-outline" disabled={disabled} onPress={onCapture} />
+      )}
+    </Card>
+  );
+}
+
 function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: () => void }) {
+  const uploadPhoto = useUploadHandoverPhoto();
   const deliver = useDeliverRefill();
 
   const [qty, setQty] = useState<Record<number, number>>(() =>
     Object.fromEntries(refill.lines.map((l) => [l.id, l.qty_prepared ?? 0])),
   );
-  const [method, setMethod] = useState<DeliveryMethod>('staff_signature');
+  const [photo, setPhoto] = useState<Photo | null>(null);
+  const [proof, setProof] = useState<ProofMode>('none');
   const [signature, setSignature] = useState<SignatureResult | null>(null);
   const [staffPin, setStaffPin] = useState('');
   const [gps, setGps] = useState<GpsCoords | null>(null);
@@ -80,36 +136,48 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
     };
   }, []);
 
-  const canSubmit = method === 'staff_signature' ? signature !== null : staffPin.length === 6;
+  const isSubmitting = uploadPhoto.isPending || deliver.isPending;
+
+  // The photo is the only requirement. A chosen proof mode has to be complete, but choosing one
+  // at all is optional.
+  const canSubmit =
+    photo !== null &&
+    (proof === 'none' ||
+      (proof === 'staff_signature' && signature !== null) ||
+      (proof === 'pin_fallback' && staffPin.length === 6));
+
+  const takePhoto = async () => {
+    setError(null);
+    try {
+      const taken = await capturePhoto();
+      if (taken) setPhoto(taken);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Tidak dapat membuka kamera.');
+    }
+  };
 
   const onSubmit = async () => {
     setError(null);
 
-    let signatureUri: string;
-    let strokeCount: number;
-    if (method === 'staff_signature') {
-      if (!signature) return;
-      signatureUri = signature.uri;
-      strokeCount = signature.strokeCount;
-    } else {
-      try {
-        signatureUri = writePlaceholderSignature();
-      } catch {
-        setError('Gagal menyiapkan data verifikasi PIN.');
-        return;
-      }
-      strokeCount = 0;
+    if (!photo) {
+      setError('Foto serah terima wajib diambil dulu.');
+      return;
     }
 
     try {
+      // Uploaded first, then referenced by id: this request may also carry a signature file, and
+      // the client streams one file per request on purpose (see lib/api.ts).
+      const media = await uploadPhoto.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
+
       const result = await deliver.mutateAsync({
         id: refill.id,
-        signatureUri,
-        strokeCount,
-        method,
-        staffPin: method === 'pin_fallback' ? staffPin : undefined,
+        handoverMediaId: media.id,
         lines: refill.lines.map((l) => ({ line_id: l.id, qty_received: qty[l.id] ?? 0 })),
         gps,
+        ...(proof === 'staff_signature' && signature
+          ? { signature: { method: 'staff_signature' as const, uri: signature.uri, strokeCount: signature.strokeCount } }
+          : {}),
+        ...(proof === 'pin_fallback' ? { signature: { method: 'pin_fallback' as const, staffPin } } : {}),
       });
 
       // 202 means the delivery is recorded but the stock ledger post is still being retried
@@ -176,6 +244,14 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           ))}
         </Card>
 
+        <PhotoField
+          photo={photo}
+          title="Foto Serah Terima (wajib)"
+          hint="Ambil foto cups yang diserahkan beserta gerobaknya. Ini bukti utama pengiriman."
+          disabled={isSubmitting}
+          onCapture={() => void takePhoto()}
+        />
+
         <View style={styles.gpsRow}>
           <MaterialCommunityIcons
             name={gpsStatus === 'ok' ? 'map-marker-check-outline' : 'map-marker-off-outline'}
@@ -190,41 +266,63 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
         </View>
 
         <Card style={styles.card}>
-          {method === 'staff_signature' ? (
-            <SignaturePad onSigned={setSignature} onClear={() => setSignature(null)} />
-          ) : (
-            <>
-              <Text variant="bodyStrong">Verifikasi PIN Staff</Text>
-              <Text variant="caption" color={semantic.textMuted}>
-                Digunakan saat staff tidak dapat memberikan paraf (E7). Diminta untuk peninjauan Finance.
-              </Text>
-              <Input
-                label="PIN Staff (6 digit)"
-                value={staffPin}
-                onChangeText={(t) => setStaffPin(t.replace(/\D/g, '').slice(0, 6))}
-                keyboardType="number-pad"
-                maxLength={6}
-                placeholder="123456"
-              />
-            </>
-          )}
+          <Text variant="bodyStrong">Tanda tangan staff (opsional)</Text>
+          <Text variant="caption" color={semantic.textMuted}>
+            Foto di atas sudah cukup. Tambahkan ini hanya jika staff ada di tempat dan bersedia.
+          </Text>
 
-          <Button
-            label={method === 'staff_signature' ? 'Staff tidak bisa paraf?' : 'Kembali ke paraf staff'}
-            icon={method === 'staff_signature' ? 'dialpad' : 'draw'}
-            variant="ghost"
-            size="sm"
-            onPress={() => {
-              if (method === 'staff_signature') {
-                setMethod('pin_fallback');
-                setSignature(null);
-              } else {
-                setMethod('staff_signature');
-                setStaffPin('');
-              }
-              setError(null);
-            }}
-          />
+          <View style={styles.proofRow}>
+            {(
+              [
+                { mode: 'none' as ProofMode, label: 'Tanpa paraf', icon: 'camera-outline' },
+                { mode: 'staff_signature' as ProofMode, label: 'Paraf staff', icon: 'draw' },
+                { mode: 'pin_fallback' as ProofMode, label: 'PIN staff', icon: 'dialpad' },
+              ]
+            ).map((option) => {
+              const active = proof === option.mode;
+
+              return (
+                <Touchable
+                  key={option.mode}
+                  onPress={() => {
+                    setProof(option.mode);
+                    setSignature(null);
+                    setStaffPin('');
+                    setError(null);
+                  }}
+                  disabled={isSubmitting}
+                  accessibilityRole="button"
+                  accessibilityLabel={option.label}
+                  accessibilityState={{ selected: active }}
+                  style={[styles.proofOption, active && styles.proofOptionOn]}
+                >
+                  <MaterialCommunityIcons
+                    name={option.icon as never}
+                    size={18}
+                    color={active ? neutral[0] : brand[700]}
+                  />
+                  <Text variant="captionStrong" color={active ? neutral[0] : semantic.textMuted}>
+                    {option.label}
+                  </Text>
+                </Touchable>
+              );
+            })}
+          </View>
+
+          {proof === 'staff_signature' ? (
+            <SignaturePad onSigned={setSignature} onClear={() => setSignature(null)} />
+          ) : null}
+
+          {proof === 'pin_fallback' ? (
+            <Input
+              label="PIN Staff (6 digit)"
+              value={staffPin}
+              onChangeText={(t) => setStaffPin(t.replace(/\D/g, '').slice(0, 6))}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="123456"
+            />
+          ) : null}
         </Card>
 
         {error ? <Banner message={error} tone="danger" /> : null}
@@ -233,8 +331,162 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           label="Konfirmasi Pengiriman"
           icon="check-circle-outline"
           onPress={() => void onSubmit()}
-          disabled={!canSubmit}
-          loading={deliver.isPending}
+          disabled={!canSubmit || isSubmitting}
+          loading={isSubmitting}
+        />
+
+        {isSubmitting ? (
+          <Text variant="caption" color={semantic.textSubtle} center>
+            {uploadPhoto.isPending ? 'Mengunggah foto serah terima...' : 'Menyelesaikan pengiriman...'}
+          </Text>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+/**
+ * The accident report.
+ *
+ * Deliberately does NOT ask the rider what should happen next. Finance or an Administrator
+ * decides whether the run is cancelled or the survivors still go out — the rider is the one
+ * person who should not rule on their own accident, and either answer has money in it. So this
+ * screen collects the facts and says plainly that somebody else will answer.
+ */
+function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: () => void }) {
+  const report = useReportIncident();
+
+  const [photo, setPhoto] = useState<Photo | null>(null);
+  const [damaged, setDamaged] = useState<Record<number, number>>({});
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const totalDamaged = useMemo(() => Object.values(damaged).reduce((sum, n) => sum + n, 0), [damaged]);
+  const allDamaged = useMemo(
+    () => refill.lines.every((line) => (damaged[line.id] ?? 0) >= (line.qty_prepared ?? 0)),
+    [refill.lines, damaged],
+  );
+
+  const takePhoto = async () => {
+    setError(null);
+    try {
+      const taken = await capturePhoto();
+      if (taken) setPhoto(taken);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Tidak dapat membuka kamera.');
+    }
+  };
+
+  const onSubmit = async () => {
+    setError(null);
+
+    if (!photo) {
+      setError('Foto kerusakan wajib diambil dulu.');
+      return;
+    }
+    if (totalDamaged <= 0) {
+      setError('Isi dulu jumlah cups yang rusak.');
+      return;
+    }
+
+    try {
+      await report.mutateAsync({
+        refillId: refill.id,
+        photoUri: photo.uri,
+        takenAt: photo.takenAt,
+        lines: Object.entries(damaged)
+          .map(([lineId, qty]) => ({ line_id: Number(lineId), qty_damaged: qty }))
+          .filter((line) => line.qty_damaged > 0),
+        note: note.trim() || undefined,
+      });
+
+      Alert.alert(
+        'Laporan Terkirim',
+        'Finance dan Administrator sudah diberi tahu. Tunggu keputusan mereka: pengantaran dibatalkan, atau lanjut dengan cups yang masih layak.',
+      );
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
+    }
+  };
+
+  return (
+    <View style={styles.sheetRoot}>
+      <View style={styles.sheetHeader}>
+        <View>
+          <Text variant="h3">Laporkan Insiden</Text>
+          <Text variant="caption" color={semantic.textMuted}>
+            {refill.code}
+          </Text>
+        </View>
+        <IconButton icon="close" label="Tutup" onPress={onClose} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
+        <Banner
+          tone="info"
+          message="Isi apa yang rusak dan kirim fotonya. Keputusan lanjut atau batal diambil oleh Finance/Administrator, bukan oleh Anda."
+        />
+
+        <PhotoField
+          photo={photo}
+          title="Foto Kerusakan (wajib)"
+          hint="Foto cups yang rusak / tumpah, sedekat mungkin. Ini yang dilihat Finance saat memutuskan."
+          disabled={report.isPending}
+          onCapture={() => void takePhoto()}
+        />
+
+        <Card style={styles.card}>
+          <Text variant="bodyStrong">Jumlah yang rusak</Text>
+          <Text variant="caption" color={semantic.textMuted}>
+            Hanya yang benar-benar tidak layak. Sisanya tetap dihitung sebagai cups yang bisa diantar.
+          </Text>
+
+          {refill.lines.map((line) => (
+            <View key={line.id} style={styles.lineRow}>
+              <Text variant="body" style={styles.lineText} numberOfLines={1}>
+                {line.product_name}
+              </Text>
+              <QtyStepper
+                value={damaged[line.id] ?? 0}
+                onChange={(next) => setDamaged((prev) => ({ ...prev, [line.id]: next }))}
+                max={line.qty_prepared ?? 0}
+                capHint={`maks. ${line.qty_prepared ?? 0} (dikirim)`}
+              />
+            </View>
+          ))}
+
+          {totalDamaged > 0 ? (
+            <Banner
+              tone={allDamaged ? 'danger' : 'warning'}
+              message={
+                allDamaged
+                  ? `Semua ${totalDamaged} cups dilaporkan rusak. Finance kemungkinan membatalkan pengantaran dan Anda kembali ke dapur.`
+                  : `${totalDamaged} cups dilaporkan rusak. Pisahkan yang rusak dari yang masih layak sambil menunggu keputusan.`
+              }
+            />
+          ) : null}
+        </Card>
+
+        <Card style={styles.card}>
+          <Input
+            label="Keterangan (opsional)"
+            value={note}
+            onChangeText={setNote}
+            placeholder="Mis. jatuh di Jalan Pemuda, tutup cup pecah"
+            multiline
+            maxLength={500}
+          />
+        </Card>
+
+        {error ? <Banner message={error} tone="danger" /> : null}
+
+        <Button
+          label="Kirim Laporan"
+          icon="alert-outline"
+          onPress={() => void onSubmit()}
+          disabled={report.isPending || !photo || totalDamaged <= 0}
+          loading={report.isPending}
         />
       </ScrollView>
     </View>
@@ -243,10 +495,12 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
 export default function RiderActiveScreen() {
   const refillsQuery = useRefills('PICKED_UP');
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [deliverId, setDeliverId] = useState<number | null>(null);
+  const [incidentId, setIncidentId] = useState<number | null>(null);
 
   const active = refillsQuery.data ?? [];
-  const openRefill = active.find((r) => r.id === openId) ?? null;
+  const deliverRefill = active.find((r) => r.id === deliverId) ?? null;
+  const incidentRefill = active.find((r) => r.id === incidentId) ?? null;
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
@@ -290,7 +544,18 @@ export default function RiderActiveScreen() {
                 <Chip label={`${item.total_requested} cups`} icon={<MaterialCommunityIcons name="cup-outline" size={14} color={semantic.textMuted} />} />
               </View>
 
-              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setOpenId(item.id)} disabled={!item.can.deliver} />
+              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setDeliverId(item.id)} disabled={!item.can.deliver} />
+
+              {/* Second, quieter action: something went wrong on the road. Deliberately on the
+                  same card as the delivery, because a rider standing over a spilled crate should
+                  not have to go looking for it. */}
+              <Button
+                label="Laporkan Insiden"
+                icon="alert-outline"
+                variant="ghost"
+                size="sm"
+                onPress={() => setIncidentId(item.id)}
+              />
             </Card>
           )}
           ListEmptyComponent={
@@ -299,8 +564,12 @@ export default function RiderActiveScreen() {
         />
       )}
 
-      <Modal visible={openRefill !== null} animationType="slide" onRequestClose={() => setOpenId(null)}>
-        {openRefill ? <DeliverySheet refill={openRefill} onClose={() => setOpenId(null)} /> : null}
+      <Modal visible={deliverRefill !== null} animationType="slide" onRequestClose={() => setDeliverId(null)}>
+        {deliverRefill ? <DeliverySheet refill={deliverRefill} onClose={() => setDeliverId(null)} /> : null}
+      </Modal>
+
+      <Modal visible={incidentRefill !== null} animationType="slide" onRequestClose={() => setIncidentId(null)}>
+        {incidentRefill ? <IncidentSheet refill={incidentRefill} onClose={() => setIncidentId(null)} /> : null}
       </Modal>
     </Screen>
   );
@@ -327,6 +596,24 @@ const styles = StyleSheet.create({
   },
   lineText: { flex: 1 },
   gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xs },
+
+  photoFrame: { borderRadius: radius.md, overflow: 'hidden', backgroundColor: neutral[100] },
+  photo: { width: '100%', height: 190 },
+
+  proofRow: { flexDirection: 'row', gap: space.sm },
+  proofOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.xxs,
+    paddingVertical: space.sm,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: brand[200],
+    backgroundColor: brand[50],
+  },
+  proofOptionOn: { backgroundColor: brand[700], borderColor: brand[700] },
+
   sheetRoot: { flex: 1, backgroundColor: semantic.bg },
   sheetHeader: {
     flexDirection: 'row',

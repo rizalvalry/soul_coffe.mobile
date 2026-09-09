@@ -28,3 +28,23 @@ const BY_CODE: Record<string, ImageSourcePropType> = {
 export function productImage(code: string): ImageSourcePropType | null {
   return BY_CODE[code.toUpperCase()] ?? null;
 }
+
+/**
+ * What a product tile should actually show, in order of preference.
+ *
+ * The CMS photo wins when there is one: it is the picture an administrator chose for THIS
+ * installation's menu, and it changes without shipping an APK. The bundled slice from the printed
+ * menu is the fallback, so the products that existed when this build was cut still look right
+ * offline and on a slow connection. `null` means the tile draws its icon placeholder — an
+ * outcome, not a failure.
+ */
+export function productImageSource(product: {
+  code: string;
+  image_url?: string | null;
+}): ImageSourcePropType | null {
+  if (product.image_url) {
+    return { uri: product.image_url };
+  }
+
+  return productImage(product.code);
+}

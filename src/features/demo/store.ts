@@ -714,9 +714,15 @@ export function claimRefill(actor: Actor, id: number): DemoRefillRequest {
 }
 
 export type DeliverInput = {
-  signatureUri: string;
-  strokeCount: number;
-  method: 'staff_signature' | 'pin_fallback';
+  /**
+   * The photo is what a delivery now needs (2026-09-10). The demo has no storage, so it records
+   * the uri and nothing more — what it is here for is the state machine, not the file.
+   */
+  handoverPhotoUri: string | null;
+  /** Optional since 2026-09-10: photo only, a real signature, or a PIN. */
+  method: 'staff_signature' | 'pin_fallback' | null;
+  signatureUri?: string | null;
+  strokeCount?: number;
   staffPin?: string;
   lines: { lineId: number; qtyReceived: number }[];
   gpsLat: number | null;
@@ -732,14 +738,15 @@ export function deliverRefill(actor: Actor, id: number, input: DeliverInput): De
 
   if (input.method === 'staff_signature') {
     // E24 — an accidental single dot is rejected.
-    if (input.strokeCount < 3) throw new DemoError('Tanda tangan belum lengkap', 422);
-  } else {
+    if ((input.strokeCount ?? 0) < 3) throw new DemoError('Tanda tangan belum lengkap', 422);
+  } else if (input.method === 'pin_fallback') {
     // E7 — PIN fallback verifies the requesting staff's own PIN. `stroke_count: 0` is accepted.
     const staffUser = state.users.find((u) => u.id === refill.staffId);
     if (!staffUser?.pin || staffUser.pin !== input.staffPin) {
       throw new DemoError('PIN staff salah.', 422);
     }
   }
+  // No method at all is the normal case now: the photo is the evidence.
 
   for (const line of input.lines) {
     const target = refill.lines.find((l) => l.id === line.lineId);
@@ -759,9 +766,11 @@ export function deliverRefill(actor: Actor, id: number, input: DeliverInput): De
   const previousStatus = refill.status;
   refill.status = 'DELIVERED';
   refill.deliveredAt = at;
-  refill.signatureId = nextId('media');
-  refill.signatureUrl = input.signatureUri;
-  refill.signatureMethod = input.method;
+  if (input.signatureUri) {
+    refill.signatureId = nextId('media');
+    refill.signatureUrl = input.signatureUri;
+  }
+  refill.signatureMethod = input.method ?? null;
   refill.gpsLat = input.gpsLat ?? refill.gpsLat;
   refill.gpsLng = input.gpsLng ?? refill.gpsLng;
   appendHistory(refill, actor, previousStatus, 'DELIVERED', input.method === 'pin_fallback' ? 'Verifikasi via PIN staff (E7)' : null);

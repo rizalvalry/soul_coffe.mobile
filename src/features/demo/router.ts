@@ -335,6 +335,29 @@ function handlePost(base: string, body: unknown, actor: Actor): { data: unknown;
     return { data: serializeAllocation(allocation), status: 201 };
   }
 
+  // A delivery with no signature file: the normal shape since 2026-09-10, so it arrives as JSON
+  // rather than multipart. The multipart branch in demoUpload still handles the signed case.
+  const deliverJson = /^\/refills\/(\d+)\/deliver$/.exec(base);
+  if (deliverJson) {
+    const b = (body ?? {}) as JsonRecord;
+    const lines = (Array.isArray(b['lines']) ? b['lines'] : []) as JsonRecord[];
+    const method = b['signature_method'] === 'pin_fallback' ? 'pin_fallback' : null;
+
+    const refill = deliverRefill(actor, Number(deliverJson[1]), {
+      handoverPhotoUri: null,
+      signatureUri: null,
+      method,
+      strokeCount: 0,
+      staffPin: typeof b['staff_pin'] === 'string' ? b['staff_pin'] : undefined,
+      lines: lines.map((l) => ({ lineId: asNumber(l['line_id']), qtyReceived: asNumber(l['qty_received']) })),
+      gpsLat: typeof b['gps_lat'] === 'number' ? b['gps_lat'] : null,
+      gpsLng: typeof b['gps_lng'] === 'number' ? b['gps_lng'] : null,
+      gpsUnavailable: b['gps_unavailable'] === true,
+    });
+
+    return { data: serializeRefillRequest(actor, refill), status: 200 };
+  }
+
   const notifRead = /^\/notifications\/(\d+)\/read$/.exec(base);
   if (notifRead) {
     markNotificationRead(actor, Number(notifRead[1]));
@@ -427,9 +450,49 @@ export async function demoUpload<T>(
   const actor = currentActor();
   const { base } = splitPath(path);
 
-  if (base === '/media/evidence') {
+  if (base === '/media/evidence' || base === '/media/handover') {
     const media = storeMedia(file.uri);
     return { data: { id: media.id, url: media.url, sha256: media.sha256 } as T, status: 201 };
+  }
+
+  // The rider's accident report. The demo takes the report and stops there, which is honest:
+  // the decision is made in the CMS, and this fixture has no CMS.
+  const incidentMatch = /^\/refills\/(\d+)\/incident$/.exec(base);
+  if (incidentMatch) {
+    const id = Number(incidentMatch[1]);
+    let lines: { line_id: number; qty_damaged: number }[] = [];
+    try {
+      const parsed = JSON.parse(fields['lines'] ?? '[]') as JsonRecord[];
+      lines = parsed.map((l) => ({ line_id: asNumber(l['line_id']), qty_damaged: asNumber(l['qty_damaged']) }));
+    } catch {
+      throw new DemoError('Data insiden tidak valid.', 422);
+    }
+
+    const damaged = lines.reduce((sum, l) => sum + l.qty_damaged, 0);
+    if (damaged <= 0) throw new DemoError('Isi dulu jumlah cups yang rusak.', 422);
+
+    return {
+      data: {
+        id: Date.now(),
+        uuid: fields['uuid'] ?? '',
+        refill_request_id: id,
+        refill_code: null,
+        cart_code: null,
+        rider_name: actor.name,
+        reported_at: new Date().toISOString(),
+        note: fields['note'] ?? null,
+        status: 'REPORTED',
+        status_label: 'Menunggu keputusan',
+        photo_url: file.uri,
+        damaged_qty: damaged,
+        written_off_qty: 0,
+        decided_by: null,
+        decided_at: null,
+        decision_note: null,
+        lines: lines.map((l) => ({ ...l, product_id: 0, product_name: null })),
+      } as T,
+      status: 201,
+    };
   }
 
   const deliverMatch = /^\/refills\/(\d+)\/deliver$/.exec(base);
@@ -445,6 +508,8 @@ export async function demoUpload<T>(
     }
 
     const refill = deliverRefill(actor, id, {
+      // A file reaching this path is the signature; the handover photo went up separately.
+      handoverPhotoUri: null,
       signatureUri: file.uri,
       strokeCount: Number(fields['stroke_count'] ?? '0'),
       method,

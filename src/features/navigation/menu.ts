@@ -34,15 +34,24 @@ export type MenuItem = {
  * names the route and its requirement instead of rendering a misleading blank screen.
  *
  * Remove an entry from this list only by deleting its screen.
+ *
+ * WHY THERE IS NO "ALOKASI" ENTRY ANY MORE
+ * ---------------------------------------
+ * There were two: a barista typed the morning allocation, and a staff member then read it back.
+ * Both were removed on 2026-09-10 because "Add Stock" already does the same job as a side effect
+ * of the thing the barista has to do anyway — handing cups over records the movement, writes the
+ * day's allowance, and puts the cart on today's roster. Asking for the same numbers a second time
+ * in a separate screen was two people's work for one fact, and the fact was already recorded.
+ * Finance's "Approval Alokasi" went with them: it existed only to approve an over-target
+ * allocation that nothing creates now.
  */
 export const IMPLEMENTED_ROUTES: ReadonlySet<string> = new Set([
   '/staff/refill/new',
+  '/staff/sell',
   '/staff/requests',
-  '/staff/allocation',
   '/staff/stock',
   '/finance/approvals',
   '/finance/history',
-  '/barista/allocation',
   '/barista/add-stock',
   '/barista/close-out',
   '/barista/requests',
@@ -138,14 +147,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       primary: true,
     },
     {
-      id: 'finance-allocation-approvals',
-      label: 'Approval Alokasi',
-      sublabel: 'Alokasi pagi yang melebihi target +20%',
-      icon: 'alert-decagram-outline',
-      route: '/finance/allocation-approvals',
-      requirement: 'Q2, Flow A',
-    },
-    {
       id: 'finance-history',
       label: 'Riwayat Approval',
       sublabel: 'Semua keputusan beserta alasannya',
@@ -197,14 +198,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       icon: 'clipboard-check-outline',
       route: '/barista/close-out',
       requirement: 'Showcase — rekonsiliasi sisa',
-    },
-    {
-      id: 'barista-allocation',
-      label: 'Alokasi Harian',
-      sublabel: 'Input stock cups pagi & tetapkan lokasi',
-      icon: 'clipboard-list-outline',
-      route: '/barista/allocation',
-      requirement: 'req 1, Flow A',
     },
     {
       id: 'barista-requests',
@@ -271,6 +264,18 @@ const roleMenus: Record<Role, MenuItem[]> = {
   ],
 
   STAFF: [
+    // First and primary: this is the thing a staff member does dozens of times a day, and
+    // everything else on this menu happens once or twice. Requesting a refill was primary until
+    // selling existed, which is exactly backwards for a screen you open between customers.
+    {
+      id: 'staff-sell',
+      label: 'Catat Penjualan',
+      sublabel: 'Cups terjual — stok gerobak berkurang otomatis',
+      icon: 'cash-register',
+      route: '/staff/sell',
+      requirement: 'Penjualan gerobak — input transaksi staff',
+      primary: true,
+    },
     {
       id: 'staff-refill-new',
       label: 'Request Refill',
@@ -278,7 +283,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       icon: 'plus-box-outline',
       route: '/staff/refill/new',
       requirement: 'req 2, R3',
-      primary: true,
     },
     // The button here stays disabled until a barista has clocked in and opened absen — the
     // screen reads that from the server rather than deciding it locally.
@@ -298,14 +302,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       route: '/staff/requests',
       requirement: 'req 3',
       badge: 'myRequests',
-    },
-    {
-      id: 'staff-allocation',
-      label: 'Alokasi Hari Ini',
-      sublabel: 'Surat pengambilan barang & lokasi tugas',
-      icon: 'clipboard-list-outline',
-      route: '/staff/allocation',
-      requirement: 'req 1, §4',
     },
     {
       id: 'staff-stock',

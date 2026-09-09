@@ -1,12 +1,10 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { request, uploadFile, uploadFileWithStatus, uuidv4 } from '@/lib/api';
+import { request, requestWithStatus, uploadFile, uploadFileWithStatus, uuidv4 } from '@/lib/api';
 import { compressForUpload } from '@/lib/image';
 import {
-  toAllocation,
   toAppNotification,
   toRefillRequest,
   toStockRow,
-  type RawAllocation,
   type RawAppNotification,
   type RawRefillRequest,
   type RawStockRow,
@@ -45,8 +43,11 @@ export const qk = {
   notifications: ['notifications'] as const,
   refills: (params?: { status?: RefillStatus | RefillStatus[] }) => ['refills', params ?? {}] as const,
   refill: (id: number) => ['refill', id] as const,
+  // Still here because `useStaffOnShift()` reads it for the barista's history screen. The
+  // allocation WRITE hook and the staff's read-only allocation hook were removed on 2026-09-10
+  // along with their screens — see features/navigation/menu.ts for why that step no longer
+  // exists in the flow.
   allocationsToday: ['allocations', 'today'] as const,
-  myAllocation: ['me', 'allocation'] as const,
   myStock: ['me', 'stock'] as const,
   kitchenStock: ['kitchen', 'stock'] as const,
 };
@@ -183,16 +184,6 @@ export function useStaffOnShift() {
   });
 }
 
-export function useMyAllocation() {
-  return useQuery({
-    queryKey: qk.myAllocation,
-    queryFn: async () => {
-      const raw = await request<RawAllocation | null>('/me/allocation/today');
-      return raw ? toAllocation(raw) : null;
-    },
-  });
-}
-
 export function useMyStock() {
   const client = useQueryClient();
   return useQuery({
@@ -248,6 +239,27 @@ export function useUploadEvidence() {
       return uploadFile<{ id: number; url: string }>(
         '/media/evidence',
         { uri: compressed.uri, name: 'evidence.jpg', type: 'image/jpeg' },
+        { taken_at: input.takenAt },
+      );
+    },
+  });
+}
+
+/**
+ * The rider's handover photo, uploaded just before the delivery it belongs to.
+ *
+ * Separate request, same reason the evidence photo is separate: a delivery may also carry a
+ * signature, and `uploadFileWithStatus` streams exactly one file per request on purpose (see its
+ * docblock for the cellular failure that forced that). So the required photo goes first and the
+ * delivery references it by id.
+ */
+export function useUploadHandoverPhoto() {
+  return useMutation({
+    mutationFn: async (input: UploadEvidenceInput) => {
+      const compressed = await compressForUpload(input.uri);
+      return uploadFile<{ id: number; url: string }>(
+        '/media/handover',
+        { uri: compressed.uri, name: 'handover.jpg', type: 'image/jpeg' },
         { taken_at: input.takenAt },
       );
     },
@@ -354,12 +366,19 @@ export const useClaimRefill = () =>
 
 export type DeliverInput = {
   id: number;
-  signatureUri: string;
-  strokeCount: number;
-  method: 'staff_signature' | 'pin_fallback';
-  staffPin?: string;
+  /** Required (2026-09-10): the photo of the cups changing hands, already uploaded. */
+  handoverMediaId: number;
   lines: { line_id: number; qty_received: number }[];
   gps: { lat: number; lng: number } | null;
+  /**
+   * Optional now. Three shapes reach the server, all legitimate:
+   *   nothing here            — photo only, which is the normal case;
+   *   method staff_signature  — with a signature file and its stroke count (E24);
+   *   method pin_fallback     — with the staff member's PIN and no file at all (E7).
+   */
+  signature?:
+    | { method: 'staff_signature'; uri: string; strokeCount: number }
+    | { method: 'pin_fallback'; staffPin: string };
 };
 
 export type DeliverResult = {
@@ -372,25 +391,53 @@ export function useDeliverRefill() {
   const client = useQueryClient();
   return useMutation<DeliverResult, Error, DeliverInput>({
     mutationFn: async (input: DeliverInput) => {
+      const signature = input.signature;
+
+      // Shared by both paths below. Everything except the signature file is ordinary data, so
+      // the two branches differ only in HOW they travel, never in what is sent.
+      const body = {
+        handover_media_id: input.handoverMediaId,
+        lines: input.lines,
+        gps_lat: input.gps ? input.gps.lat : null,
+        gps_lng: input.gps ? input.gps.lng : null,
+        // E10: a lost fix is reported as missing, never a reason to refuse the delivery.
+        gps_unavailable: input.gps === null,
+        ...(signature?.method === 'staff_signature' ? { signature_method: 'staff_signature', stroke_count: signature.strokeCount } : {}),
+        ...(signature?.method === 'pin_fallback' ? { signature_method: 'pin_fallback', staff_pin: signature.staffPin } : {}),
+      };
+
+      // `/deliver` carries `idempotent:require`; without this header the server answers 422
+      // "Header Idempotency-Key wajib dikirim untuk aksi ini." before the handler ever runs.
+      const idempotencyKey = uuidv4();
+
       const [result, unitOf] = await Promise.all([
-        uploadFileWithStatus<RawRefillRequest | null>(
-          `/refills/${input.id}/deliver`,
-          { uri: input.signatureUri, name: 'signature.png', type: 'image/png' },
-          {
-            signature_method: input.method,
-            ...(input.staffPin ? { staff_pin: input.staffPin } : {}),
-            lines: JSON.stringify(input.lines),
-            stroke_count: String(input.strokeCount),
-            gps_lat: input.gps ? String(input.gps.lat) : '',
-            gps_lng: input.gps ? String(input.gps.lng) : '',
-            gps_unavailable: input.gps === null ? '1' : '0',
-          },
-          // The deliver endpoint names this part `signature`, not `file` (docs/04).
-          'signature',
-          // `/deliver` carries `idempotent:require`; without this header the server answers 422
-          // "Header Idempotency-Key wajib dikirim untuk aksi ini." before the handler ever runs.
-          uuidv4(),
-        ),
+        signature?.method === 'staff_signature'
+          ? uploadFileWithStatus<RawRefillRequest | null>(
+              `/refills/${input.id}/deliver`,
+              { uri: signature.uri, name: 'signature.png', type: 'image/png' },
+              {
+                // Multipart carries strings; the server casts. `lines` is JSON for the same
+                // reason it is on the incident endpoint — multipart has no array-of-objects
+                // encoding this client can rely on.
+                handover_media_id: String(input.handoverMediaId),
+                signature_method: 'staff_signature',
+                stroke_count: String(signature.strokeCount),
+                lines: JSON.stringify(input.lines),
+                gps_lat: input.gps ? String(input.gps.lat) : '',
+                gps_lng: input.gps ? String(input.gps.lng) : '',
+                gps_unavailable: input.gps === null ? '1' : '0',
+              },
+              // The deliver endpoint names this part `signature`, not `file` (docs/04).
+              'signature',
+              idempotencyKey,
+            )
+          : // No file to send: a photo-only delivery, or a PIN fallback that no longer needs the
+            // 1x1 placeholder image an older build had to invent.
+            requestWithStatus<RawRefillRequest | null>(`/refills/${input.id}/deliver`, {
+              method: 'POST',
+              idempotencyKey,
+              body,
+            }),
         unitLookup(client),
       ]);
 
@@ -403,37 +450,3 @@ export function useDeliverRefill() {
   });
 }
 
-export type CreateAllocationInput = {
-  operatingDate: string;
-  cartId: number;
-  staffId: number;
-  locationId: number | null;
-  lines: { product_id: number; qty_issued: number }[];
-  correctionReason?: string;
-};
-
-export function useCreateAllocation() {
-  const client = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: CreateAllocationInput) => {
-      const raw = await request<RawAllocation>('/allocations', {
-        method: 'POST',
-        idempotencyKey: uuidv4(),
-        body: {
-          operating_date: input.operatingDate,
-          cart_id: input.cartId,
-          staff_id: input.staffId,
-          location_id: input.locationId,
-          lines: input.lines,
-          ...(input.correctionReason ? { correction_reason: input.correctionReason } : {}),
-        },
-      });
-      return toAllocation(raw);
-    },
-    onSuccess: () => {
-      void client.invalidateQueries({ queryKey: qk.allocationsToday });
-      void client.invalidateQueries({ queryKey: qk.kitchenStock });
-      void client.invalidateQueries({ queryKey: qk.badges });
-    },
-  });
-}

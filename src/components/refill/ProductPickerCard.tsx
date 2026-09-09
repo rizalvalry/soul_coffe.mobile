@@ -14,7 +14,7 @@ import Animated, {
 import { Text } from '@/components/ui/Text';
 import { Touchable } from '@/components/ui/Touchable';
 import { enter } from '@/components/ui/Motion';
-import { productImage } from '@/domain/productImages';
+import { productImageSource } from '@/domain/productImages';
 import {
   brand,
   feedback,
@@ -57,7 +57,8 @@ export type ProductPickerCardProps = {
  * of merely registered.
  */
 export function ProductPickerCard({ product, value, max, disabled = false, onChange, index = 0 }: ProductPickerCardProps) {
-  const image = productImage(product.code);
+  // Prefers the photo uploaded in the CMS, falling back to the bundled menu artwork.
+  const image = productImageSource(product);
   const selected = value > 0;
   const atMax = value >= max;
 

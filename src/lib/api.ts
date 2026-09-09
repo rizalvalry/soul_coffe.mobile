@@ -139,14 +139,28 @@ async function handleUnauthorized(token: string | undefined): Promise<void> {
   void useAuth.getState().signOut();
 }
 
+/** The common case: the payload, with the HTTP status discarded. */
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return (await requestWithStatus<T>(path, options)).data;
+}
+
+/**
+ * The same request, with the status kept.
+ *
+ * One transition needs it: `deliver` answers 202 when the stock ledger post is being retried
+ * rather than 200 with a closed request (E19), and the rider is told which of those happened.
+ * Pairs with `uploadFile` / `uploadFileWithStatus` below, so the two transports expose the same
+ * choice rather than one of them hiding it.
+ */
+export async function requestWithStatus<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
   const { method = 'GET', body, idempotencyKey, signal } = options;
 
   // Demo mode (see features/demo/config.ts) never touches the network — every hook in
   // features/refill/queries.ts calls this same function unmodified either way.
   if (isDemoMode()) {
     try {
-      return await demoRequest<T>(method, path, body, idempotencyKey);
+      // The demo router has no notion of HTTP, so its answers are reported as plain 200s.
+      return { data: await demoRequest<T>(method, path, body, idempotencyKey), status: 200 };
     } catch (e) {
       if (e instanceof DemoError && e.status === 401) void useAuth.getState().signOut();
       rethrowAsApiError(e);
@@ -184,10 +198,12 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   }
 
   // The API wraps payloads as { data: ... }; unwrap so callers deal in domain objects.
-  if (parsed && typeof parsed === 'object' && 'data' in (parsed as Record<string, unknown>)) {
-    return (parsed as { data: T }).data;
-  }
-  return parsed as T;
+  const data =
+    parsed && typeof parsed === 'object' && 'data' in (parsed as Record<string, unknown>)
+      ? (parsed as { data: T }).data
+      : (parsed as T);
+
+  return { data, status: response.status };
 }
 
 /** The HTTP status matters for at least one transition: `deliver` answers 202 when the stock

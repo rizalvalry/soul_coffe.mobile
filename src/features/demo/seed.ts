@@ -151,9 +151,10 @@ export const USERS: DemoUser[] = [
 export type DemoStaffAssignment = { userId: number; cartId: number; locationId: number; operatingDate: string };
 export type DemoDailyTarget = { cartId: number; productId: number; targetQty: number };
 
-/** Local calendar date, `YYYY-MM-DD` — mirrors the same formatting every screen that builds an
- * `operating_date` locally already uses (see `app/(app)/barista/allocation.tsx`), so the demo's
- * "today" always lines up with what the client sends. */
+/** Local calendar date, `YYYY-MM-DD` — the same formatting every screen that builds an
+ * `operating_date` locally uses, so the demo's "today" always lines up with what the client
+ * sends. (The barista allocation screen this used to point at was removed on 2026-09-10; see
+ * features/navigation/menu.ts for why.) */
 export function todayOperatingDate(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { Redirect, Stack } from 'expo-router';
 import { useAuth } from '@/features/auth/store';
+import { useLocationReporter } from '@/features/location/reporter';
 import { usePushNotifications } from '@/features/push/usePushNotifications';
 import { RealtimeProvider } from '@/features/realtime/RealtimeProvider';
 import { DemoBanner } from '@/components/ui/DemoBanner';
@@ -21,6 +22,11 @@ export default function AppLayout() {
   // early returns below, because a hook that runs conditionally is the one ordering violation
   // React cannot recover from.
   usePushNotifications();
+
+  // Same reasoning, and the same ordering constraint: reporting needs a session, and it decides
+  // for itself that it only applies to staff accounts. See features/location/reporter.ts for
+  // what it does report and what it deliberately does not.
+  useLocationReporter();
 
   if (status === 'restoring') return null;
   if (status === 'unauthenticated') return <Redirect href="/login" />;
