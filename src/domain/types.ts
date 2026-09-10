@@ -337,3 +337,78 @@ export type DeliveryIncident = {
     qty_damaged: number;
   }[];
 };
+
+// ── Setoran (finance) ────────────────────────────────────────────────────────
+
+/** One cart in today's deposit queue. `settlement_id` null means Finance is still waiting. */
+export type SettlementQueueRow = {
+  cart_id: number;
+  cart_code: string | null;
+  staff_id: number | null;
+  staff_name: string | null;
+  area: string | null;
+  transactions: number;
+  cups_sold: number;
+  /** Whole rupiah, from the transactions themselves. */
+  expected_total: number;
+  cups_remaining: number;
+  settlement_id: number | null;
+  settlement_status: string | null;
+};
+
+export type SettlementDraftLine = {
+  product_id: number;
+  product_name: string;
+  unit: string;
+  qty_issued: number;
+  qty_sold: number;
+  /** Live cart stock, not a snapshot — this is what the disposition is measured against. */
+  qty_remaining: number;
+};
+
+/**
+ * What the deposit form already knows before Finance types anything.
+ *
+ * The only field a human supplies is the money. Everything here is computed from the ledger and
+ * the day's transactions, because asking a queue of staff to recite numbers the database holds is
+ * how a reconciliation turns into an argument about arithmetic.
+ */
+export type SettlementDraft = {
+  cart_id: number;
+  cart_code: string;
+  operating_date: string;
+  staff_id: number | null;
+  staff_name: string | null;
+  area: string | null;
+  expected_total: number;
+  lines: SettlementDraftLine[];
+};
+
+export type Settlement = {
+  id: number;
+  operating_date: string;
+  cart_id: number;
+  cart_code: string | null;
+  staff_id: number | null;
+  staff_name: string | null;
+  status: 'SUBMITTED' | 'RECONCILED' | 'VARIANCE_FLAGGED';
+  cash: number;
+  qris: number;
+  transfer: number;
+  declared_total: number;
+  expected_total: number;
+  /** Signed: positive is a surplus, negative a shortfall. Both need explaining. */
+  variance: number;
+  variance_reason: string | null;
+  reconciled_by: string | null;
+  reconciled_at: string | null;
+  lines: {
+    product_id: number;
+    product_name: string | null;
+    qty_issued: number;
+    qty_sold: number;
+    qty_remaining: number;
+    qty_wasted: number;
+    variance_qty: number;
+  }[];
+};

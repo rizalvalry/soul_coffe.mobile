@@ -51,6 +51,7 @@ export const IMPLEMENTED_ROUTES: ReadonlySet<string> = new Set([
   '/staff/requests',
   '/staff/stock',
   '/finance/approvals',
+  '/finance/settlements',
   '/finance/history',
   '/barista/add-stock',
   '/barista/close-out',
@@ -156,11 +157,11 @@ const roleMenus: Record<Role, MenuItem[]> = {
     },
     {
       id: 'finance-settlements',
-      label: 'Rekonsiliasi Setoran',
-      sublabel: 'Cash, QRIS, transfer & selisih stok',
+      label: 'Setoran',
+      sublabel: 'Terima uang harian & pisahkan cups sisa',
       icon: 'cash-register',
       route: '/finance/settlements',
-      requirement: 'Flow C, Q1',
+      requirement: 'Flow C — setoran harian per gerobak',
     },
     {
       id: 'finance-reports',
