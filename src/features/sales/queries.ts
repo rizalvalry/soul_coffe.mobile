@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { request, uuidv4 } from '@/lib/api';
 import { qk as refillKeys } from '@/features/refill/queries';
 import { showcaseKeys } from '@/features/showcase/queries';
+import { buildSaleBody } from './offlineQueue';
 import type { PaymentMethod, Sale } from '@/domain/types';
 
 /**
@@ -53,20 +54,12 @@ export function useRecordSale() {
     mutationFn: (input: RecordSaleInput) => {
       const uuid = uuidv4();
 
+      // Same body shape the offline queue replays later under this same uuid — see
+      // offlineQueue.ts's `buildSaleBody` for why that sharing matters.
       return request<Sale>('/sales', {
         method: 'POST',
         idempotencyKey: uuid,
-        body: {
-          uuid,
-          lines: input.lines.filter((line) => line.qty > 0),
-          payment_method: input.paymentMethod,
-          ...(input.gps
-            ? { gps_lat: input.gps.lat, gps_lng: input.gps.lng }
-            : // E10: a lost fix is reported as missing, never a reason to refuse the sale.
-              { gps_unavailable: true }),
-          ...(input.note ? { note: input.note } : {}),
-          ...(input.deviceId ? { device_id: input.deviceId } : {}),
-        },
+        body: buildSaleBody(uuid, input),
       });
     },
     onSuccess: () => {
@@ -74,6 +67,29 @@ export function useRecordSale() {
       // The cups came out of the cart's stock.
       void client.invalidateQueries({ queryKey: refillKeys.myStock });
       // And out of the central total the barista and the panel read.
+      void client.invalidateQueries({ queryKey: showcaseKeys.stock });
+    },
+  });
+}
+
+/**
+ * Undoes a sale within the window the server allows — a mis-tap or the wrong quantity, corrected
+ * while the customer is still at the cart. The server is the only place that actually enforces
+ * who may void and until when (see SaleService::void()); this screen just offers the button and
+ * shows whatever message comes back when it is too late.
+ */
+export function useVoidSale() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ saleId, reason }: { saleId: number; reason: string }) =>
+      request<Sale>(`/sales/${saleId}/void`, {
+        method: 'POST',
+        body: { reason },
+      }),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: salesKeys.today });
+      void client.invalidateQueries({ queryKey: refillKeys.myStock });
       void client.invalidateQueries({ queryKey: showcaseKeys.stock });
     },
   });

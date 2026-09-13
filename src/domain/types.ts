@@ -296,6 +296,10 @@ export type Sale = {
   total_amount: number;
   payment_method: PaymentMethod;
   note: string | null;
+  /** Undone, not deleted — the row stays in the list with these three fields set. */
+  is_voided: boolean;
+  void_reason: string | null;
+  voided_at: string | null;
   lines: SaleLine[];
 };
 

@@ -12,6 +12,7 @@ import { Card } from '@/components/ui/Card';
 import { Chip } from '@/components/ui/Badge';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Input } from '@/components/ui/Input';
 import { SkeletonGrid } from '@/components/ui/Skeleton';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { SectionTitle } from '@/components/ui/Section';
@@ -21,10 +22,15 @@ import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useMyStock } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
-import { useRecordSale, useTodaySales } from '@/features/sales/queries';
+import { useRecordSale, useTodaySales, useVoidSale } from '@/features/sales/queries';
+import type { QueuedSale } from '@/features/sales/offlineQueue';
+import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
 import { ApiError } from '@/lib/api';
-import { PAYMENT_METHODS, type PaymentMethod } from '@/domain/types';
-import { brand, neutral, radius, semantic, shadow, space } from '@/theme';
+import { PAYMENT_METHODS, type PaymentMethod, type Product, type Sale } from '@/domain/types';
+import { brand, feedback, neutral, radius, semantic, shadow, space } from '@/theme';
+
+/** Alasan pembatalan minimal ini panjangnya, sekadar penjaga ketikan asal-asalan. */
+const MIN_VOID_REASON_LENGTH = 5;
 
 /**
  * "Catat Penjualan" — the till, as simple as a street vendor's notebook.
@@ -74,6 +80,189 @@ function clockOf(iso: string): string {
   return `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
 }
 
+/**
+ * One row in "Transaksi hari ini", with the undo built in.
+ *
+ * The reason field expands inline rather than popping a dialog — the same pattern Finance's
+ * approval screen uses for a rejection reason, so a staff member never meets a native
+ * `Alert.prompt`, which does not exist on Android anyway.
+ *
+ * The server is the only place that actually decides whether this void is still allowed (the
+ * window, whose sale it is, whether the day is already settled); this row just offers the button
+ * and shows whatever sentence comes back once it is too late.
+ */
+function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
+  const voidSale = useVoidSale();
+
+  const [expanded, setExpanded] = useState(false);
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const onConfirmVoid = async () => {
+    setError(null);
+
+    if (reason.trim().length < MIN_VOID_REASON_LENGTH) {
+      setError(`Alasan pembatalan wajib diisi (min. ${MIN_VOID_REASON_LENGTH} karakter).`);
+      return;
+    }
+
+    try {
+      await voidSale.mutateAsync({ saleId: sale.id, reason: reason.trim() });
+      setExpanded(false);
+      setReason('');
+    } catch (e) {
+      // A 422 here carries the server's own sentence — "Pembatalan hanya bisa dilakukan dalam
+      // 10 menit…", "sudah direkonsiliasi…" — more useful than anything invented here.
+      setError(e instanceof ApiError ? e.message : 'Gagal membatalkan transaksi. Coba lagi.');
+    }
+  };
+
+  if (sale.is_voided) {
+    return (
+      <View style={[styles.historyRow, !isFirst && styles.historyRowDivided, styles.historyRowVoided]}>
+        <View style={styles.historyRowMain}>
+          <View style={styles.historyTime}>
+            <Text variant="captionStrong" color={semantic.textSubtle}>
+              {clockOf(sale.occurred_at)}
+            </Text>
+            <Chip tone="neutral" label="Dibatalkan" />
+          </View>
+
+          <View style={styles.historyBody}>
+            <Text variant="body" numberOfLines={1} color={semantic.textSubtle} style={styles.strikethrough}>
+              {sale.lines.map((line) => `${line.qty}× ${line.product_name ?? 'produk'}`).join(', ')}
+            </Text>
+            <Text variant="micro" color={semantic.textSubtle} numberOfLines={1}>
+              {sale.void_reason}
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.historyRow, !isFirst && styles.historyRowDivided]}>
+      <View style={styles.historyRowMain}>
+        <View style={styles.historyTime}>
+          <Text variant="captionStrong">{clockOf(sale.occurred_at)}</Text>
+          <Text variant="micro" color={semantic.textSubtle}>
+            {PAYMENT_LABEL[sale.payment_method]?.label ?? sale.payment_method}
+          </Text>
+        </View>
+
+        <View style={styles.historyBody}>
+          <Text variant="body" numberOfLines={1}>
+            {sale.lines.map((line) => `${line.qty}× ${line.product_name ?? 'produk'}`).join(', ')}
+          </Text>
+        </View>
+
+        <View style={styles.historyRight}>
+          <Text variant="bodyStrong">{sale.total_qty}</Text>
+          <Text variant="micro" color={semantic.textSubtle}>
+            {rupiah(sale.total_amount)}
+          </Text>
+        </View>
+
+        <Touchable
+          onPress={() => setExpanded((prev) => !prev)}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={`Batalkan transaksi pukul ${clockOf(sale.occurred_at)}`}
+          style={styles.historyVoidButton}
+        >
+          <MaterialCommunityIcons
+            name={expanded ? 'chevron-up' : 'close-circle-outline'}
+            size={18}
+            color={feedback.dangerFg}
+          />
+        </Touchable>
+      </View>
+
+      {expanded ? (
+        <View style={styles.voidPanel}>
+          <Input
+            label="Alasan Pembatalan"
+            placeholder="Mis. salah pilih produk, dobel input"
+            value={reason}
+            onChangeText={setReason}
+            editable={!voidSale.isPending}
+          />
+
+          {error ? <Banner message={error} tone="danger" /> : null}
+
+          <View style={styles.voidActions}>
+            <Button
+              label="Batal"
+              variant="ghost"
+              fullWidth={false}
+              style={styles.voidActionBtn}
+              disabled={voidSale.isPending}
+              onPress={() => {
+                setExpanded(false);
+                setReason('');
+                setError(null);
+              }}
+            />
+            <Button
+              label="Konfirmasi Batalkan Transaksi"
+              variant="danger"
+              fullWidth={false}
+              style={styles.voidActionBtn}
+              loading={voidSale.isPending}
+              disabled={voidSale.isPending}
+              onPress={() => void onConfirmVoid()}
+            />
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * One sale still sitting on this phone, not yet confirmed by the server.
+ *
+ * Deliberately not a `Sale` — a queued entry has no server id, no `occurred_at`, and above all
+ * no price: R15 strips cost/sell prices from what a STAFF account may read from `/products`, so
+ * this screen never knew the rupiah value of what it just sold, online or not. What it CAN show
+ * is which cups and how many, from the same product list the picker grid already loaded.
+ */
+function PendingSaleRow({
+  entry,
+  productName,
+  isFirst,
+}: {
+  entry: QueuedSale;
+  productName: (productId: number) => string;
+  isFirst: boolean;
+}) {
+  return (
+    <View style={[styles.historyRow, !isFirst && styles.historyRowDivided]}>
+      <View style={styles.historyRowMain}>
+        <View style={styles.historyTime}>
+          <Text variant="captionStrong">{clockOf(entry.queuedAt)}</Text>
+          <Chip
+            tone="neutral"
+            label="Menunggu koneksi"
+            icon={<MaterialCommunityIcons name="cloud-off-outline" size={12} color={semantic.textMuted} />}
+          />
+        </View>
+
+        <View style={styles.historyBody}>
+          <Text variant="body" numberOfLines={1}>
+            {entry.input.lines.map((line) => `${line.qty}× ${productName(line.product_id)}`).join(', ')}
+          </Text>
+        </View>
+
+        <View style={styles.historyRight}>
+          <Text variant="bodyStrong">{entry.input.lines.reduce((sum, line) => sum + line.qty, 0)}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export default function SellScreen() {
   const router = useRouter();
   const user = useAuth((s) => s.session?.user);
@@ -83,12 +272,20 @@ export default function SellScreen() {
   const stockQuery = useMyStock();
   const salesQuery = useTodaySales();
   const recordSale = useRecordSale();
+  const offlineQueue = useOfflineSalesQueue();
 
   const [qty, setQty] = useState<Record<number, number>>({});
   const [payment, setPayment] = useState<PaymentMethod>('cash');
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [lastSale, setLastSale] = useState<{ cups: number; amount: number } | null>(null);
+  const [queuedOffline, setQueuedOffline] = useState(false);
+
+  const productName = useCallback(
+    (productId: number): string =>
+      (productsQuery.data ?? []).find((p: Product) => p.id === productId)?.name ?? 'produk',
+    [productsQuery.data],
+  );
 
   // Best-effort, exactly as on the refill screen (E10). A denied or unavailable fix costs the
   // area analysis one precise point and costs the transaction nothing.
@@ -147,6 +344,8 @@ export default function SellScreen() {
   const onSubmit = useCallback(async () => {
     setFormError(null);
     setLastSale(null);
+    setQueuedOffline(false);
+    offlineQueue.clearLastFailure();
 
     if (totalCups <= 0) {
       setFormError('Pilih dulu cups yang terjual.');
@@ -165,6 +364,16 @@ export default function SellScreen() {
       setQty({});
       setLastSale({ cups: sale.total_qty, amount: sale.total_amount });
     } catch (e) {
+      // No response at all, rather than the server refusing the sale: queue it instead of
+      // failing the till. The staff member's own record of what they just sold must not depend
+      // on a bar of signal that happens to be missing at this exact moment.
+      if (e instanceof ApiError && e.isOffline) {
+        await offlineQueue.enqueue({ lines, paymentMethod: payment, gps });
+        setQty({});
+        setQueuedOffline(true);
+        return;
+      }
+
       if (e instanceof ApiError) {
         // A 422 here carries the server's own sentence — "Absen dulu…", "Stok gerobak untuk
         // Kopi Susu hanya 3 cup." — which is more useful than anything this screen could invent.
@@ -173,7 +382,7 @@ export default function SellScreen() {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [totalCups, qty, payment, gps, recordSale]);
+  }, [totalCups, qty, payment, gps, recordSale, offlineQueue]);
 
   if (!user?.cartId) {
     return (
@@ -215,6 +424,25 @@ export default function SellScreen() {
           Gerobak {user.cartCode ?? '-'} · stok berkurang otomatis
         </Text>
       </View>
+
+      {offlineQueue.hasQueued ? (
+        <Card style={styles.queueCard}>
+          <View style={styles.queueRow}>
+            <MaterialCommunityIcons name="cloud-upload-outline" size={20} color={brand[600]} />
+            <Text variant="body" style={styles.queueText}>
+              {offlineQueue.queue.length} transaksi menunggu terkirim ke server.
+            </Text>
+          </View>
+          <Button
+            label="Kirim Sekarang"
+            icon="refresh"
+            variant="secondary"
+            size="sm"
+            loading={offlineQueue.flushing}
+            onPress={() => void offlineQueue.flushNow()}
+          />
+        </Card>
+      ) : null}
 
       {absen.isLoading ? null : hasClockedIn ? null : (
         <Card style={styles.gateCard}>
@@ -355,6 +583,20 @@ export default function SellScreen() {
         />
       ) : null}
 
+      {queuedOffline ? (
+        <Banner
+          tone="info"
+          message="Tidak ada koneksi — transaksi tersimpan di HP ini dan akan terkirim otomatis begitu sinyal kembali."
+        />
+      ) : null}
+
+      {offlineQueue.lastFailure ? (
+        <Banner
+          tone="danger"
+          message={`Satu transaksi yang menunggu ditolak server: ${offlineQueue.lastFailure}`}
+        />
+      ) : null}
+
       <Button
         label="Simpan Transaksi"
         icon="check"
@@ -364,33 +606,25 @@ export default function SellScreen() {
         disabled={isSubmitting || !hasClockedIn || totalCups <= 0}
       />
 
-      {(salesQuery.data ?? []).length > 0 ? (
+      {(salesQuery.data ?? []).length > 0 || offlineQueue.queue.length > 0 ? (
         <>
-          <SectionTitle title="Transaksi hari ini" caption={`${(salesQuery.data ?? []).length} transaksi`} />
+          <SectionTitle
+            title="Transaksi hari ini"
+            caption={`${(salesQuery.data ?? []).length + offlineQueue.queue.length} transaksi`}
+          />
 
           <Card style={styles.historyCard}>
+            {/* Newest first, and a just-queued sale is always the newest thing that happened —
+                so pending rows sit above whatever the server has already confirmed. */}
+            {offlineQueue.queue.map((entry, index) => (
+              <PendingSaleRow key={entry.uuid} entry={entry} productName={productName} isFirst={index === 0} />
+            ))}
             {(salesQuery.data ?? []).map((sale, index) => (
-              <View key={sale.uuid} style={[styles.historyRow, index > 0 && styles.historyRowDivided]}>
-                <View style={styles.historyTime}>
-                  <Text variant="captionStrong">{clockOf(sale.occurred_at)}</Text>
-                  <Text variant="micro" color={semantic.textSubtle}>
-                    {PAYMENT_LABEL[sale.payment_method]?.label ?? sale.payment_method}
-                  </Text>
-                </View>
-
-                <View style={styles.historyBody}>
-                  <Text variant="body" numberOfLines={1}>
-                    {sale.lines.map((line) => `${line.qty}× ${line.product_name ?? 'produk'}`).join(', ')}
-                  </Text>
-                </View>
-
-                <View style={styles.historyRight}>
-                  <Text variant="bodyStrong">{sale.total_qty}</Text>
-                  <Text variant="micro" color={semantic.textSubtle}>
-                    {rupiah(sale.total_amount)}
-                  </Text>
-                </View>
-              </View>
+              <SaleHistoryRow
+                key={sale.uuid}
+                sale={sale}
+                isFirst={index === 0 && offlineQueue.queue.length === 0}
+              />
             ))}
           </Card>
         </>
@@ -405,6 +639,9 @@ const styles = StyleSheet.create({
 
   gateCard: { gap: space.md },
   stateCard: { gap: space.md },
+  queueCard: { gap: space.sm, backgroundColor: brand[50] },
+  queueRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
+  queueText: { flex: 1 },
 
   todayCard: { paddingVertical: space.md },
   todayRow: { flexDirection: 'row', alignItems: 'center' },
@@ -433,9 +670,19 @@ const styles = StyleSheet.create({
   paymentOptionOn: { backgroundColor: brand[700], borderColor: brand[700] },
 
   historyCard: { gap: 0, paddingVertical: space.xs, ...shadow.card },
-  historyRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm },
+  // Column container: holds the row itself and, when a void is in progress, the reason panel
+  // stacked underneath it. The row's own horizontal layout lives in `historyRowMain`.
+  historyRow: { paddingVertical: space.sm },
   historyRowDivided: { borderTopWidth: 1, borderTopColor: semantic.border },
+  historyRowVoided: { opacity: 0.6 },
+  historyRowMain: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   historyTime: { width: 56, gap: 2 },
-  historyBody: { flex: 1 },
+  historyBody: { flex: 1, gap: 2 },
   historyRight: { alignItems: 'flex-end', gap: 2 },
+  historyVoidButton: { padding: space.xxs },
+  strikethrough: { textDecorationLine: 'line-through' },
+
+  voidPanel: { marginTop: space.sm, gap: space.sm },
+  voidActions: { flexDirection: 'row', gap: space.sm, justifyContent: 'flex-end' },
+  voidActionBtn: { minWidth: 0 },
 });
