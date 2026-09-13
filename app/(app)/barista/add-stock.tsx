@@ -86,7 +86,7 @@ export default function BaristaAddStockScreen() {
     allowanceQuery.data !== undefined && allowanceAmount !== allowanceQuery.data.amount_minor;
 
   /**
-   * R11: one gerobak per staff per day. The picker already shows an existing placement, so this
+   * R11: one gerobak per rider per day. The picker already shows an existing placement, so this
    * is caught before the barista types anything rather than after.
    */
   const staffConflict =
@@ -120,7 +120,7 @@ export default function BaristaAddStockScreen() {
       Alert.alert(
         'Stock terkirim',
         `${totalCups} cups masuk ke gerobak ${result.cart_code} untuk ${result.staff_name}. ` +
-          'Stok gerobak di aplikasi staff sudah ikut ter-update.',
+          'Stok gerobak di aplikasi rider sudah ikut ter-update.',
       );
     } catch (e) {
       setBanner(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
@@ -230,10 +230,10 @@ export default function BaristaAddStockScreen() {
       {/* 2 — staff */}
       {cartId !== null ? (
         <Animated.View entering={enter('below')}>
-          <SectionTitle title="2. Pilih staff" caption="Yang bertugas di gerobak ini" icon="account-outline" />
+          <SectionTitle title="2. Pilih rider" caption="Yang bertugas di gerobak ini" icon="account-outline" />
           <Card style={styles.card}>
             {staffList.length === 0 ? (
-              <EmptyState icon="account-off-outline" title="Tidak ada staff aktif" subtitle="Hubungi admin." tone="neutral" />
+              <EmptyState icon="account-off-outline" title="Tidak ada rider aktif" subtitle="Hubungi admin." tone="neutral" />
             ) : (
               <View style={styles.pickList}>
                 {staffList.map((staff, index) => {
@@ -346,7 +346,7 @@ export default function BaristaAddStockScreen() {
               onPress={() => void submit()}
               loading={handToCart.isPending}
               disabled={!canSubmit}
-              hint="Cups berpindah dari showcase ke gerobak, dan staff otomatis masuk penugasan hari ini"
+              hint="Cups berpindah dari showcase ke gerobak, dan rider otomatis masuk penugasan hari ini"
             />
           </Card>
         </Animated.View>

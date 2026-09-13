@@ -227,7 +227,7 @@ export function listStaffOnShift(): {
         .map((t) => ({ productId: t.productId, targetQty: t.targetQty }));
       return {
         staffId: a.userId,
-        staffName: user?.name ?? 'Staff',
+        staffName: user?.name ?? 'Rider',
         cartId: a.cartId,
         cartCode: cart?.code ?? '-',
         locationId: location?.id ?? null,
@@ -694,7 +694,7 @@ export function claimRefill(actor: Actor, id: number): DemoRefillRequest {
   const refill = getRefillById(actor, id);
   if (actor.role !== 'RIDER') throw new DemoError('Anda tidak memiliki akses untuk tindakan ini.', 403);
   if (!canClaim(actor, refill)) {
-    throw new DemoError('Sudah diambil rider lain.', 409);
+    throw new DemoError('Sudah diambil runner lain.', 409);
   }
 
   const previousStatus = refill.status;
@@ -743,7 +743,7 @@ export function deliverRefill(actor: Actor, id: number, input: DeliverInput): De
     // E7 — PIN fallback verifies the requesting staff's own PIN. `stroke_count: 0` is accepted.
     const staffUser = state.users.find((u) => u.id === refill.staffId);
     if (!staffUser?.pin || staffUser.pin !== input.staffPin) {
-      throw new DemoError('PIN staff salah.', 422);
+      throw new DemoError('PIN rider salah.', 422);
     }
   }
   // No method at all is the normal case now: the photo is the evidence.
@@ -773,7 +773,7 @@ export function deliverRefill(actor: Actor, id: number, input: DeliverInput): De
   refill.signatureMethod = input.method ?? null;
   refill.gpsLat = input.gpsLat ?? refill.gpsLat;
   refill.gpsLng = input.gpsLng ?? refill.gpsLng;
-  appendHistory(refill, actor, previousStatus, 'DELIVERED', input.method === 'pin_fallback' ? 'Verifikasi via PIN staff (E7)' : null);
+  appendHistory(refill, actor, previousStatus, 'DELIVERED', input.method === 'pin_fallback' ? 'Verifikasi via PIN rider (E7)' : null);
 
   // R6 — the ledger post, kitchen → cart. The demo never simulates E19's failure path: it always
   // succeeds synchronously, so the request closes in the same call.

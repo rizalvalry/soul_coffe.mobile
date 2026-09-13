@@ -81,10 +81,10 @@ export function useShowcaseStock() {
 }
 
 /**
- * Every active staff member, not only those already rostered.
+ * Every active rider, not only those already rostered.
  *
  * That distinction is the feature: a cart with nobody assigned is precisely the case this form
- * exists to resolve, so a picker limited to today's roster would hide the staff the barista
+ * exists to resolve, so a picker limited to today's roster would hide the rider the barista
  * needs. `assigned_cart_code` lets the row show an existing placement instead.
  */
 export function useShowcaseStaff() {
@@ -107,8 +107,8 @@ export function useCartAllowance(cartId: number | null) {
 /**
  * What decides whether the absen button is pressable.
  *
- * Refetched on focus and on a short interval because the staff button unlocks from someone
- * ELSE's action (a barista pressing "Open Absen"), and a staff member staring at a disabled
+ * Refetched on focus and on a short interval because the rider button unlocks from someone
+ * ELSE's action (a barista pressing "Open Absen"), and a rider staring at a disabled
  * button has no way to know it changed otherwise.
  */
 export function useAttendanceStatus() {
@@ -245,7 +245,7 @@ export function useClockIn() {
   });
 }
 
-/** Barista opens absen for every staff member today. */
+/** Barista opens absen for every rider today. */
 export function useOpenStaffAbsen() {
   const client = useQueryClient();
   return useMutation({

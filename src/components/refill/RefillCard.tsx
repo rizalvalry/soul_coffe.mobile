@@ -29,7 +29,7 @@ export type RefillCardProps = {
 };
 
 /**
- * Shared summary row for every refill list (staff, barista, finance, rider).
+ * Shared summary row for every refill list (rider, barista, finance, runner).
  *
  * `total_cost` is rendered only when the server actually sent it. The field is absent from
  * BARISTA/RIDER/STAFF responses by design (R15), so `showCost` alone is not enough — both the

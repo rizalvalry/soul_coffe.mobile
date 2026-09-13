@@ -11,7 +11,7 @@ import { deviceLabel } from '@/features/push/device';
  *
  * WHAT THIS DOES, PRECISELY — AND WHAT IT DOES NOT
  * ------------------------------------------------
- * It reports while the app is OPEN and in the FOREGROUND, roughly once a minute, for staff
+ * It reports while the app is OPEN and in the FOREGROUND, roughly once a minute, for rider
  * accounts only. It does not track anyone in the background: that needs a foreground service, a
  * second Android permission with its own scary dialog, and a persistent notification, and none of
  * that was asked for. So the honest description of the trail is "where the cart was while the app
@@ -23,9 +23,9 @@ import { deviceLabel } from '@/features/push/device';
  * file that grows a TaskManager task — nothing else needs to change, because the server already
  * accepts a batch of queued fixes.
  *
- * STAFF ONLY
+ * RIDER ONLY
  * ----------
- * A barista stands in a kitchen and a rider's route is not part of a cart's day. Reporting
+ * A barista stands in a kitchen and a runner's route is not part of a cart's day. Reporting
  * everyone's position because the code would be identical is surveillance with no question
  * behind it.
  *

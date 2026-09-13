@@ -108,7 +108,7 @@ export default function BaristaRequestsScreen() {
             </View>
           )}
           ListEmptyComponent={
-            <EmptyState icon="bell-off-outline" title="Belum ada permintaan masuk" subtitle="Permintaan refill dari staff akan muncul di sini." />
+            <EmptyState icon="bell-off-outline" title="Belum ada permintaan masuk" subtitle="Permintaan refill dari rider akan muncul di sini." />
           }
         />
       )}

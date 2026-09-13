@@ -48,7 +48,7 @@ const SLIDES: Slide[] = [
     key: 'tracking',
     icon: 'timeline-check-outline',
     title: 'Pantau Setiap Tahap',
-    body: 'Dari pengajuan, persetujuan Finance, penyiapan Barista, sampai diantar Rider — statusnya terlihat langsung di aplikasi.',
+    body: 'Dari pengajuan, persetujuan Finance, penyiapan Barista, sampai diantar Runner — statusnya terlihat langsung di aplikasi.',
   },
 ];
 

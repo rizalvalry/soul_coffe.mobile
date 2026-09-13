@@ -22,7 +22,7 @@ export const statusLabel: Record<RefillStatus, string> = {
   PREPARING: 'Sedang Disiapkan',
   READY_TO_PICK: 'Siap Diambil',
   PICKED_UP: 'Sedang Diantar',
-  DELIVERED: 'Diterima Staff',
+  DELIVERED: 'Diterima Rider',
   CLOSED: 'Selesai',
   CANCELLED: 'Dibatalkan',
   EXPIRED: 'Kedaluwarsa',

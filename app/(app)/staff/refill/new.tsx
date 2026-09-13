@@ -88,7 +88,7 @@ export default function NewRefillScreen() {
 
         // The address is for the human reading this screen; the request itself carries the raw
         // coordinates either way (submitted below via `gps`), so this runs after the coordinates
-        // are already committed above, and its failure is silent — a staff member must never be
+        // are already committed above, and its failure is silent — a rider must never be
         // blocked from filing a request because the device's geocoder was slow or offline.
         try {
           const [place] = await Location.reverseGeocodeAsync({
@@ -239,7 +239,7 @@ export default function NewRefillScreen() {
             same fix that goes into the request, on-device, so it works with no server round trip
             and needs no separate maps key. Placed directly under the cart code because this is
             the two-line answer to "which cart, and where" that everyone downstream (barista,
-            finance, rider) actually reads this screen for. */}
+            finance, runner) actually reads this screen for. */}
         <View style={styles.locationRow}>
           <MaterialCommunityIcons
             name={gpsStatus === 'granted' ? 'map-marker' : 'map-marker-off-outline'}
@@ -274,7 +274,7 @@ export default function NewRefillScreen() {
           <EmptyState icon="coffee-off-outline" title="Belum ada produk" subtitle="Hubungi Administrator untuk menambahkan produk." tone="neutral" />
         </Card>
       ) : (
-        /* A grid of photographs, not a list of names. Staff recognise the drink they are out of
+        /* A grid of photographs, not a list of names. Riders recognise the drink they are out of
            by sight long before they read its name, and two columns keeps every tile inside a
            thumb's reach. */
         <View style={styles.grid}>
@@ -336,8 +336,8 @@ export default function NewRefillScreen() {
       <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={isSubmitting} />
 
       {/* The photo is re-encoded on the device before it is sent (lib/image.ts), so submit is a
-          multi-second operation with two distinct stages. Naming the stage is what stops a staff
-          member from deciding the app has frozen and killing it mid-upload. */}
+          multi-second operation with two distinct stages. Naming the stage is what stops a rider
+          from deciding the app has frozen and killing it mid-upload. */}
       {isSubmitting ? (
         <Text variant="caption" color={LIGHT_SUBTLE} center>
           {uploadEvidence.isPending ? 'Mengompres dan mengunggah foto bukti...' : 'Mengirim request...'}

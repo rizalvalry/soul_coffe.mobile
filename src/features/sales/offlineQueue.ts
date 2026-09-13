@@ -26,9 +26,9 @@ import type { RecordSaleInput } from './queries';
  * A transport failure (no connection at all) leaves an entry queued for the next attempt. A real
  * rejection — the absen window closed, the cart's assignment changed, the stock no longer covers
  * it — is different: replaying it forever would never succeed, and silently dropping it would
- * lose the staff member's record of having tried to sell those cups with no trace. So a rejected
+ * lose the rider's record of having tried to sell those cups with no trace. So a rejected
  * entry is removed from the retry queue but reported back to the caller as `failed`, with the
- * server's own message, so the screen can tell the staff member plainly rather than have the
+ * server's own message, so the screen can tell the rider plainly rather than have the
  * queue quietly shrink for a reason nobody saw.
  */
 
@@ -83,7 +83,7 @@ async function writeQueue(queue: QueuedSale[]): Promise<void> {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
   } catch {
     // Best-effort. A failed write here means the queue is not durable across an app kill, which
-    // is a smaller loss than failing the sale the staff member just recorded.
+    // is a smaller loss than failing the sale the rider just recorded.
   }
 }
 

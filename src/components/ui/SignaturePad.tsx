@@ -330,7 +330,7 @@ export function SignaturePad({ onSigned, onClear }: SignaturePadProps) {
         <Pressable
           onPress={openPad}
           accessibilityRole="button"
-          accessibilityLabel="Buka area paraf staff"
+          accessibilityLabel="Buka area paraf rider"
           style={({ pressed }) => [styles.trigger, pressed && styles.triggerPressed]}
         >
           <MaterialCommunityIcons name="draw" size={30} color={brand[600]} />
@@ -360,7 +360,7 @@ export function SignaturePad({ onSigned, onClear }: SignaturePadProps) {
         <View style={styles.modal}>
           <View style={styles.modalHeader}>
             <View style={styles.modalHeaderText}>
-              <Text variant="h3">Paraf Staff</Text>
+              <Text variant="h3">Paraf Rider</Text>
               <Text variant="caption" color={semantic.textMuted}>
                 {strokeCount >= MIN_STROKES
                   ? 'Paraf siap disimpan.'
@@ -397,7 +397,7 @@ export function SignaturePad({ onSigned, onClear }: SignaturePadProps) {
             center
             style={styles.hint}
           >
-            {error ?? 'Minta staff menandatangani di area putih di atas.'}
+            {error ?? 'Minta rider menandatangani di area putih di atas.'}
           </Text>
 
           <View style={styles.modalActions}>

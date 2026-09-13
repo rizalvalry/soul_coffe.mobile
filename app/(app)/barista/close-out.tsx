@@ -152,7 +152,7 @@ export default function BaristaCloseOutScreen() {
                     <View style={styles.pickText}>
                       <Text variant="bodyStrong">Gerobak {cart.code}</Text>
                       <Text variant="caption" color={semantic.textMuted}>
-                        {staffOn(cart.id) ?? 'Tanpa staff'}
+                        {staffOn(cart.id) ?? 'Tanpa rider'}
                       </Text>
                     </View>
                     <MaterialCommunityIcons

@@ -8,15 +8,15 @@ import type { DeliveryIncident } from '@/domain/types';
 /**
  * Cups damaged on the way to a cart.
  *
- * The rider reports; Finance or an Administrator decides. This app only ever does the first half
- * — the decision is made in the CMS, and the rider learns the outcome through the notification
+ * The runner reports; Finance or an Administrator decides. This app only ever does the first half
+ * — the decision is made in the CMS, and the runner learns the outcome through the notification
  * and through this list.
  */
 export const incidentKeys = {
   mine: ['incidents'] as const,
 };
 
-/** The caller's own incidents: a rider's reports, or the ones on a staff member's deliveries. */
+/** The caller's own incidents: a runner's reports, or the ones on a rider's deliveries. */
 export function useIncidents(options?: { openOnly?: boolean }) {
   const openOnly = options?.openOnly ?? false;
 
@@ -40,7 +40,7 @@ export type ReportIncidentInput = {
  * why this client streams multipart rather than using React Native's own FormData.
  *
  * The `uuid` is generated here and sent in the body as well as in the Idempotency-Key header: a
- * rider standing over a spilled crate on a bad connection will tap this twice, and one accident
+ * runner standing over a spilled crate on a bad connection will tap this twice, and one accident
  * must not become two reports (R14).
  */
 export function useReportIncident() {
@@ -51,7 +51,7 @@ export function useReportIncident() {
     onSuccess: (_incident, input) => {
       void client.invalidateQueries({ queryKey: incidentKeys.mine });
       // The delivery itself is untouched for now — Finance decides what happens to it — but the
-      // rider's list should reflect anything the server changed on the way.
+      // runner's list should reflect anything the server changed on the way.
       invalidateRefillData(client, input.refillId);
     },
   });

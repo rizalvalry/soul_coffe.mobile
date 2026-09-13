@@ -40,7 +40,7 @@ const MIN_VOID_REASON_LENGTH = 5;
  * Two taps and a submit: which cups, how many, how it was paid. Nothing else. No price entry, no
  * customer, no receipt number, no time field — all of that is either derived on the server or is
  * not a fact worth a queue's worth of somebody's attention. The template is deliberately the
- * refill screen's product grid, because that grid is the one thing every staff member already
+ * refill screen's product grid, because that grid is the one thing every rider already
  * knows how to use.
  *
  * WHY THE GRID ONLY SHOWS WHAT IS ON THE CART
@@ -59,9 +59,9 @@ const MIN_VOID_REASON_LENGTH = 5;
  *
  * PRICES
  * ------
- * The running total counts CUPS, not rupiah: R15 strips prices from what a staff account may
+ * The running total counts CUPS, not rupiah: R15 strips prices from what a rider account may
  * read on `/products`, so this screen genuinely does not know them. The recorded value comes
- * back from the server after submit and is shown on the day's list, which is what a staff member
+ * back from the server after submit and is shown on the day's list, which is what a rider
  * reconciles against at close-out.
  */
 
@@ -84,7 +84,7 @@ function clockOf(iso: string): string {
  * One row in "Transaksi hari ini", with the undo built in.
  *
  * The reason field expands inline rather than popping a dialog — the same pattern Finance's
- * approval screen uses for a rejection reason, so a staff member never meets a native
+ * approval screen uses for a rejection reason, so a rider never meets a native
  * `Alert.prompt`, which does not exist on Android anyway.
  *
  * The server is the only place that actually decides whether this void is still allowed (the
@@ -224,7 +224,7 @@ function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
  * One sale still sitting on this phone, not yet confirmed by the server.
  *
  * Deliberately not a `Sale` — a queued entry has no server id, no `occurred_at`, and above all
- * no price: R15 strips cost/sell prices from what a STAFF account may read from `/products`, so
+ * no price: R15 strips cost/sell prices from what a Rider account may read from `/products`, so
  * this screen never knew the rupiah value of what it just sold, online or not. What it CAN show
  * is which cups and how many, from the same product list the picker grid already loaded.
  */
@@ -365,7 +365,7 @@ export default function SellScreen() {
       setLastSale({ cups: sale.total_qty, amount: sale.total_amount });
     } catch (e) {
       // No response at all, rather than the server refusing the sale: queue it instead of
-      // failing the till. The staff member's own record of what they just sold must not depend
+      // failing the till. The rider's own record of what they just sold must not depend
       // on a bar of signal that happens to be missing at this exact moment.
       if (e instanceof ApiError && e.isOffline) {
         await offlineQueue.enqueue({ lines, paymentMethod: payment, gps });

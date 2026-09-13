@@ -26,7 +26,7 @@ const MIN_REASON_LENGTH = 10;
  * requirement 4 — the approval gate the whole state machine hinges on (R1).
  *
  * This is the single most time-sensitive screen in the app: nothing downstream (barista prep,
- * rider pickup, delivery) can move until a SUBMITTED request is decided here. It must not rely
+ * runner pickup, delivery) can move until a SUBMITTED request is decided here. It must not rely
  * on the operator remembering to pull-to-refresh — see `useRealtime()`'s docblock for what
  * "connected" actually means and what the polling fallback covers when it isn't.
  */

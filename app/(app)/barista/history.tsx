@@ -23,7 +23,7 @@ const TERMINAL_STATUSES = ['READY_TO_PICK', 'PICKED_UP', 'DELIVERED', 'CLOSED'] 
  * Daily-allocation history has no backing endpoint yet: the API contract (docs/04) only exposes
  * `GET /allocations/today`, `GET /allocations/{id}` and `GET /me/allocation/today` — there is no
  * kitchen-wide allocation list. Rather than inventing a fetch call outside the reviewed contract,
- * this screen shows today's allocation status per staff (from the same source the allocation
+ * this screen shows today's allocation status per rider (from the same source the allocation
  * screen uses) and says plainly that older days aren't available yet — the same "show the real
  * status" convention as `coming-soon.tsx`, not a silent gap.
  */
@@ -81,7 +81,7 @@ export default function BaristaHistoryScreen() {
           </Card>
         ) : (staffQuery.data ?? []).length === 0 ? (
           <Card>
-            <EmptyState icon="account-off-outline" title="Tidak ada staff bertugas" subtitle="Belum ada penugasan hari ini." />
+            <EmptyState icon="account-off-outline" title="Tidak ada rider bertugas" subtitle="Belum ada penugasan hari ini." />
           </Card>
         ) : (
           <Card style={styles.card}>

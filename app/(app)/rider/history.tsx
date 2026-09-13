@@ -44,14 +44,14 @@ export default function RiderHistoryScreen() {
           onRefresh={() => void refillsQuery.refetch()}
           renderItem={({ item, index }) => (
             <View style={styles.item}>
-              {/* R15 — cost never shown to Rider. */}
+              {/* R15 — cost never shown to Runner. */}
               <RefillCard refill={item} showCost={false} index={index} />
 
               <Card style={styles.signatureCard}>
                 <View style={styles.signatureHeader}>
                   <MaterialCommunityIcons name="draw-pen" size={16} color={semantic.textMuted} />
                   <Text variant="caption" color={semantic.textMuted}>
-                    Diterima {formatTime(item.delivered_at)} · {item.signature_method === 'pin_fallback' ? 'Verifikasi PIN' : 'Paraf Staff'}
+                    Diterima {formatTime(item.delivered_at)} · {item.signature_method === 'pin_fallback' ? 'Verifikasi PIN' : 'Paraf Rider'}
                   </Text>
                 </View>
                 {item.signature_url ? (

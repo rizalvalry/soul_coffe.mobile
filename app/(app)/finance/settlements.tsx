@@ -26,7 +26,7 @@ import type { SettlementQueueRow } from '@/domain/types';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 
 /**
- * Setoran — the Finance desk, on a phone, with a queue of staff in front of it.
+ * Setoran — the Finance desk, on a phone, with a queue of riders in front of it.
  *
  * WHAT THIS SCREEN ASKS FOR
  * -------------------------
@@ -214,7 +214,7 @@ function DepositSheet({ row, onClose }: { row: SettlementQueueRow; onClose: () =
                       label="Alasan selisih"
                       value={reason}
                       onChangeText={setReason}
-                      placeholder="Mis. uang kembalian kurang, staff ganti besok"
+                      placeholder="Mis. uang kembalian kurang, rider ganti besok"
                       multiline
                       maxLength={500}
                     />

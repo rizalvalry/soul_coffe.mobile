@@ -179,13 +179,13 @@ export type NewsReaction = (typeof NEWS_REACTIONS)[number];
 
 // ── Showcase stock (barista) ─────────────────────────────────────────────────
 
-/** A staff member the barista can hand a cart to — see `GET /showcase/staff`. */
+/** A rider the barista can hand a cart to — see `GET /showcase/staff`. */
 export type StaffPickerRow = {
   id: number;
   name: string;
   phone: string;
   /**
-   * The cart this person is already on today, if any. R11 allows exactly one cart per staff per
+   * The cart this person is already on today, if any. R11 allows exactly one cart per rider per
    * day, so a non-null value here means picking them is a conflict — the picker says so up
    * front rather than letting it surface as a 422 after the cups are typed.
    */
@@ -223,7 +223,7 @@ export type HandoverResult = {
  * Everything needed to render both absen buttons, decided server-side.
  *
  * The client deliberately does not re-derive these from role + timestamps: the gating rule
- * (barista clocks in, then opens, then staff may clock in) lives in one place on the server, and
+ * (barista clocks in, then opens, then rider may clock in) lives in one place on the server, and
  * a second copy here is a second place for it to be wrong.
  */
 export type AttendanceStatus = {
@@ -282,7 +282,7 @@ export type SaleLine = {
  * One recorded transaction.
  *
  * `is_suspect` is deliberately NOT part of this type even though the API returns it. The flag is
- * addressed to Administrator and Finance; showing a staff member "you look suspicious" would be
+ * addressed to Administrator and Finance; showing a rider "you look suspicious" would be
  * both an accusation and a hint about how to stay under the threshold next time.
  */
 export type Sale = {
@@ -314,8 +314,8 @@ export type IncidentStatus = 'REPORTED' | 'RESOLVED_CANCELLED' | 'RESOLVED_PARTI
 /**
  * Cups damaged on the way to a cart.
  *
- * The rider files it; Finance or an Administrator decides. Everything from `decided_by` onwards
- * is null until then, which is exactly what the rider is waiting to see.
+ * The runner files it; Finance or an Administrator decides. Everything from `decided_by` onwards
+ * is null until then, which is exactly what the runner is waiting to see.
  */
 export type DeliveryIncident = {
   id: number;

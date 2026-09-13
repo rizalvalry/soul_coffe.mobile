@@ -11,7 +11,7 @@ import type { PaymentMethod, Sale } from '@/domain/types';
  *
  * Its own feature folder for the same reason `features/showcase` is: this shares no state machine
  * with the refill flow. What it DOES share is the cart's stock, which is why every successful
- * sale invalidates `myStock` — a staff member who sells four cups and then opens "Stok Gerobak"
+ * sale invalidates `myStock` — a rider who sells four cups and then opens "Stok Gerobak"
  * must see four fewer, without pulling to refresh.
  */
 export const salesKeys = {
@@ -40,7 +40,7 @@ export type RecordSaleInput = {
  * The `uuid` is generated here, ONCE per submit, and travels in the body as well as in the
  * Idempotency-Key header. That is not belt-and-braces: the header protects against a retry of
  * the same HTTP request, and the body's uuid protects against the app resending a transaction it
- * already sent — which is what happens when a staff member in a queue taps submit, loses signal
+ * already sent — which is what happens when a rider in a queue taps submit, loses signal
  * before the response lands, and taps again. The server returns the sale that already exists
  * rather than selling the cups twice (R14).
  *

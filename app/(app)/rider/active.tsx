@@ -26,9 +26,9 @@ import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
  * How a delivery is proved, as of 2026-09-10.
  *
  * `none` is the default and the normal case: a photograph of the cups changing hands. The other
- * two are additions a rider may make when the staff member is present and willing — a signature,
+ * two are additions a runner may make when the rider is present and willing — a signature,
  * or their PIN. The old arrangement had this backwards: a signature was required and no photo was
- * collected at all, which meant a rider holding a crate in the street could be unable to close a
+ * collected at all, which meant a runner holding a crate in the street could be unable to close a
  * delivery that had plainly happened, and a dispute had nothing but a squiggle to look at.
  */
 type ProofMode = 'none' | 'staff_signature' | 'pin_fallback';
@@ -228,7 +228,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
         <Card style={styles.card}>
           <Text variant="bodyStrong">Jumlah Diterima</Text>
-          {/* R15 — no cost shown to Rider. */}
+          {/* R15 — no cost shown to Runner. */}
           {refill.lines.map((line) => (
             <View key={line.id} style={styles.lineRow}>
               <Text variant="body" style={styles.lineText} numberOfLines={1}>
@@ -266,17 +266,17 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
         </View>
 
         <Card style={styles.card}>
-          <Text variant="bodyStrong">Tanda tangan staff (opsional)</Text>
+          <Text variant="bodyStrong">Tanda tangan rider (opsional)</Text>
           <Text variant="caption" color={semantic.textMuted}>
-            Foto di atas sudah cukup. Tambahkan ini hanya jika staff ada di tempat dan bersedia.
+            Foto di atas sudah cukup. Tambahkan ini hanya jika rider ada di tempat dan bersedia.
           </Text>
 
           <View style={styles.proofRow}>
             {(
               [
                 { mode: 'none' as ProofMode, label: 'Tanpa paraf', icon: 'camera-outline' },
-                { mode: 'staff_signature' as ProofMode, label: 'Paraf staff', icon: 'draw' },
-                { mode: 'pin_fallback' as ProofMode, label: 'PIN staff', icon: 'dialpad' },
+                { mode: 'staff_signature' as ProofMode, label: 'Paraf rider', icon: 'draw' },
+                { mode: 'pin_fallback' as ProofMode, label: 'PIN rider', icon: 'dialpad' },
               ]
             ).map((option) => {
               const active = proof === option.mode;
@@ -315,7 +315,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
           {proof === 'pin_fallback' ? (
             <Input
-              label="PIN Staff (6 digit)"
+              label="PIN Rider (6 digit)"
               value={staffPin}
               onChangeText={(t) => setStaffPin(t.replace(/\D/g, '').slice(0, 6))}
               keyboardType="number-pad"
@@ -348,8 +348,8 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 /**
  * The accident report.
  *
- * Deliberately does NOT ask the rider what should happen next. Finance or an Administrator
- * decides whether the run is cancelled or the survivors still go out — the rider is the one
+ * Deliberately does NOT ask the runner what should happen next. Finance or an Administrator
+ * decides whether the run is cancelled or the survivors still go out — the runner is the one
  * person who should not rule on their own accident, and either answer has money in it. So this
  * screen collects the facts and says plainly that somebody else will answer.
  */
@@ -547,7 +547,7 @@ export default function RiderActiveScreen() {
               <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setDeliverId(item.id)} disabled={!item.can.deliver} />
 
               {/* Second, quieter action: something went wrong on the road. Deliberately on the
-                  same card as the delivery, because a rider standing over a spilled crate should
+                  same card as the delivery, because a runner standing over a spilled crate should
                   not have to go looking for it. */}
               <Button
                 label="Laporkan Insiden"

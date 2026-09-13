@@ -52,14 +52,14 @@ export const roleMeta: Record<Role, RoleMeta> = {
   },
   RIDER: {
     priority: 4,
-    label: 'Rider',
-    description: 'Antar cups yang sudah siap ke staff di lapangan',
+    label: 'Runner',
+    description: 'Antar cups yang sudah siap ke rider di lapangan',
     icon: 'motorbike',
     home: '/menu',
   },
   STAFF: {
     priority: 5,
-    label: 'Staff',
+    label: 'Rider',
     description: 'Berjualan di gerobak & request refill cups',
     icon: 'storefront',
     home: '/menu',

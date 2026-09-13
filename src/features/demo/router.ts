@@ -455,7 +455,7 @@ export async function demoUpload<T>(
     return { data: { id: media.id, url: media.url, sha256: media.sha256 } as T, status: 201 };
   }
 
-  // The rider's accident report. The demo takes the report and stops there, which is honest:
+  // The runner's accident report. The demo takes the report and stops there, which is honest:
   // the decision is made in the CMS, and this fixture has no CMS.
   const incidentMatch = /^\/refills\/(\d+)\/incident$/.exec(base);
   if (incidentMatch) {

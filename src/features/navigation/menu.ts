@@ -112,8 +112,8 @@ const roleMenus: Record<Role, MenuItem[]> = {
     },
     {
       id: 'admin-assignments',
-      label: 'Penugasan Staff',
-      sublabel: 'Staff ↔ gerobak ↔ lokasi per hari',
+      label: 'Penugasan Rider',
+      sublabel: 'Rider ↔ gerobak ↔ lokasi per hari',
       icon: 'account-switch-outline',
       route: '/admin/assignments',
       requirement: 'R11',
@@ -187,10 +187,10 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'barista-absen',
       label: 'Absen',
-      sublabel: 'Absen sendiri, lalu buka absen untuk staff',
+      sublabel: 'Absen sendiri, lalu buka absen untuk rider',
       icon: 'fingerprint',
       route: '/absen',
-      requirement: 'Absen — barista membuka akses staff',
+      requirement: 'Absen — barista membuka akses rider',
     },
     {
       id: 'barista-close-out',
@@ -203,7 +203,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'barista-requests',
       label: 'Permintaan Refill',
-      sublabel: 'Masuk dari staff — perlu approval Finance',
+      sublabel: 'Masuk dari rider — perlu approval Finance',
       icon: 'bell-ring-outline',
       route: '/barista/requests',
       requirement: 'req 2, req 4',
@@ -249,7 +249,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'rider-active',
       label: 'Pengiriman Saya',
-      sublabel: 'Sedang diantar — selesaikan dengan paraf staff',
+      sublabel: 'Sedang diantar — selesaikan dengan paraf rider',
       icon: 'motorbike',
       route: '/rider/active',
       requirement: 'req 6, req 7',
@@ -346,7 +346,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
  * Entries every role gets, appended rather than repeated six times.
  *
  * Settings is universal because the sign-in PIN it manages is an account-level convenience, not a
- * role capability — a Rider needs it exactly as much as a staff member does. News is universal
+ * role capability — a Runner needs it exactly as much as a rider does. News is universal
  * because the server already decides who sees which article, by `audience_roles`: duplicating
  * that decision in the client menu would only create a second place for it to be wrong.
  *

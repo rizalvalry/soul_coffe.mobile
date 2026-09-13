@@ -24,7 +24,7 @@ export default function AppLayout() {
   usePushNotifications();
 
   // Same reasoning, and the same ordering constraint: reporting needs a session, and it decides
-  // for itself that it only applies to staff accounts. See features/location/reporter.ts for
+  // for itself that it only applies to rider accounts. See features/location/reporter.ts for
   // what it does report and what it deliberately does not.
   useLocationReporter();
 

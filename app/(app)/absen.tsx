@@ -25,14 +25,14 @@ import { ApiError } from '@/lib/api';
 import { brand, feedback, radius, semantic, space } from '@/theme';
 
 /**
- * Absen — one screen for both Barista and Staff.
+ * Absen — one screen for both Barista and Rider.
  *
  * Every enable/disable decision here comes from `GET /absen/status`, not from re-deriving the
- * rule client-side. The sequence (barista clocks in, opens the gate, then staff may clock in)
+ * rule client-side. The sequence (barista clocks in, opens the gate, then rider may clock in)
  * lives in one place on the server; a second copy in the app would be a second place for it to
  * be wrong, and the two would drift the first time the rule changed.
  *
- * The status query polls, because a staff member's button unlocks from somebody ELSE's action —
+ * The status query polls, because a rider's button unlocks from somebody ELSE's action —
  * without that they would sit looking at a disabled button with no way to know it had changed.
  */
 function clockTime(iso: string | null): string {
@@ -278,21 +278,21 @@ export default function AbsenScreen() {
           <Animated.View entering={enter('below')}>
             <Banner
               tone="info"
-              message="Kopi sudah siap di showcase? Buka absen agar staff bisa mulai absen."
+              message="Kopi sudah siap di showcase? Buka absen agar rider bisa mulai absen."
             />
             <Button
-              label="Open Absen Staff"
+              label="Open Absen Rider"
               icon="lock-open-variant-outline"
               variant="secondary"
               onPress={() => void act(() => openStaffAbsen.mutateAsync())}
               loading={openStaffAbsen.isPending}
-              hint="Membuka absen untuk seluruh staff hari ini"
+              hint="Membuka absen untuk seluruh rider hari ini"
             />
           </Animated.View>
         ) : null}
 
         {role === 'BARISTA' && status.staff_window_open ? (
-          <Banner tone="success" message="Absen staff sudah dibuka untuk hari ini." />
+          <Banner tone="success" message="Absen rider sudah dibuka untuk hari ini." />
         ) : null}
       </Card>
 

@@ -207,7 +207,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
  * What the four business screens read instead of opening their own connection.
  *
  * Same shape `useRealtime()` used to return (`state`, `isRealtime`) so ConnectionBanner and the
- * staff requests header needed no changes beyond the import.
+ * rider requests header needed no changes beyond the import.
  */
 export function useRealtimeState(): RealtimeContextValue {
   return useContext(RealtimeContext);

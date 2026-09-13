@@ -27,7 +27,7 @@ export default function RiderAvailableScreen() {
       await claim.mutateAsync({ id: refill.id });
     } catch (e) {
       if (e instanceof ApiError && e.isConflict) {
-        Alert.alert('Sudah diambil rider lain.');
+        Alert.alert('Sudah diambil runner lain.');
         void refillsQuery.refetch();
       } else if (e instanceof ApiError) {
         Alert.alert('Gagal mengambil pesanan', e.message);
@@ -61,7 +61,7 @@ export default function RiderAvailableScreen() {
           onRefresh={() => void refillsQuery.refetch()}
           renderItem={({ item, index }) => (
             <View style={styles.item}>
-              {/* R15 — cost never shown to Rider. */}
+              {/* R15 — cost never shown to Runner. */}
               <RefillCard refill={item} showCost={false} index={index} />
               <Button
                 label="Ambil"
