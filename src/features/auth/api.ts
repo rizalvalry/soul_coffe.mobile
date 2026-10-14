@@ -191,6 +191,7 @@ export async function loginAsDemoRole(role: Role): Promise<Session> {
   const demoUsers: Record<Role, AuthUser> = {
     ADMINISTRATOR: { id: 'demo-admin', name: 'Admin Demo', role: 'ADMINISTRATOR' },
     FINANCE: { id: 'demo-finance', name: 'Finance Demo', role: 'FINANCE' },
+    MANAGEMENT: { id: 'demo-management', name: 'Management Demo', role: 'MANAGEMENT' },
     BARISTA: {
       id: 'demo-barista',
       name: 'Barista Demo',

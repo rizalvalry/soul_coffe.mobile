@@ -260,7 +260,11 @@ function notify(
   args: { type: string; title: string; body: string; refillRequestId: number | null },
 ) {
   const at = new Date().toISOString();
-  for (const r of recipients) {
+  const expanded = recipients.flatMap((r) => r.role === 'FINANCE'
+    ? [r, { role: 'MANAGEMENT' as const }]
+    : [r]);
+
+  for (const r of expanded) {
     state.notifications.push({
       id: nextId('notification'),
       eventId: `evt-${state.nextIds.notification}-${Date.now()}`,
@@ -301,7 +305,7 @@ export function getBadges(actor: Actor): {
   const counts = { pendingApprovals: 0, incomingRequests: 0, readyToPick: 0, myRequests: 0 };
   const OPEN: RefillStatusValue[] = ['SUBMITTED', 'APPROVED', 'PREPARING', 'READY_TO_PICK', 'PICKED_UP'];
 
-  if (actor.role === 'FINANCE') {
+  if (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT') {
     counts.pendingApprovals = state.refillRequests.filter((r) => r.status === 'SUBMITTED').length;
   } else if (actor.role === 'BARISTA') {
     counts.incomingRequests = state.refillRequests.filter(
@@ -325,6 +329,7 @@ function isVisibleTo(actor: Actor, refill: DemoRefillRequest): boolean {
   switch (actor.role) {
     case 'ADMINISTRATOR':
     case 'FINANCE':
+    case 'MANAGEMENT':
       return true;
     case 'BARISTA':
       return refill.kitchenId === actor.kitchenId;
@@ -338,11 +343,11 @@ function isVisibleTo(actor: Actor, refill: DemoRefillRequest): boolean {
 }
 
 function canApprove(actor: Actor, r: DemoRefillRequest): boolean {
-  return actor.role === 'FINANCE' && r.status === 'SUBMITTED';
+  return (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT') && r.status === 'SUBMITTED';
 }
 
 function canReject(actor: Actor, r: DemoRefillRequest): boolean {
-  return actor.role === 'FINANCE' && r.status === 'SUBMITTED';
+  return (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT') && r.status === 'SUBMITTED';
 }
 
 function canCancel(actor: Actor, r: DemoRefillRequest): boolean {

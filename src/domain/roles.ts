@@ -1,11 +1,12 @@
 /**
- * The five roles, in the hierarchy the business specified.
+ * Employee roles in business priority order.
  * Order here IS the business priority order — do not re-sort for aesthetics.
  *
  * Reference: docs/02-context-business-process.md §2
  */
 export const ROLES = [
   'ADMINISTRATOR',
+  'MANAGEMENT',
   'FINANCE',
   'BARISTA',
   'RIDER',
@@ -36,29 +37,36 @@ export const roleMeta: Record<Role, RoleMeta> = {
     icon: 'shield-account',
     home: '/menu',
   },
-  FINANCE: {
+  MANAGEMENT: {
     priority: 2,
+    label: 'Management',
+    description: 'Hak Finance serta laporan Management dan payroll di CMS',
+    icon: 'briefcase-account-outline',
+    home: '/menu',
+  },
+  FINANCE: {
+    priority: 3,
     label: 'Finance',
     description: 'Approval permintaan refill & rekonsiliasi setoran',
     icon: 'cash-check',
     home: '/menu',
   },
   BARISTA: {
-    priority: 3,
+    priority: 4,
     label: 'Barista',
     description: 'Alokasi harian & penyiapan cups di dapur',
     icon: 'coffee-maker',
     home: '/menu',
   },
   RIDER: {
-    priority: 4,
+    priority: 5,
     label: 'Runner',
     description: 'Antar cups yang sudah siap ke rider di lapangan',
     icon: 'motorbike',
     home: '/menu',
   },
   STAFF: {
-    priority: 5,
+    priority: 6,
     label: 'Rider',
     description: 'Berjualan di gerobak & request refill cups',
     icon: 'storefront',
@@ -67,7 +75,7 @@ export const roleMeta: Record<Role, RoleMeta> = {
   // Writes the in-app news feed and touches no part of the operational flow, which is why it
   // sits last rather than anywhere in the hierarchy above.
   CONTENT_CREATOR: {
-    priority: 6,
+    priority: 7,
     label: 'Content Creator',
     description: 'Menulis artikel & kabar untuk seluruh tim',
     icon: 'pencil-outline',

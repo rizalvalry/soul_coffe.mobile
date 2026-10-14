@@ -173,6 +173,9 @@ const roleMenus: Record<Role, MenuItem[]> = {
     },
   ],
 
+  // The shared Finance menu is assigned below after shared items are appended.
+  MANAGEMENT: [],
+
   BARISTA: [
     // First and primary, per the brief: the "+" the barista reaches for every morning.
     {
@@ -381,3 +384,5 @@ export const menuByRole: Record<Role, MenuItem[]> = Object.fromEntries(
     return [role, [...items, ...SHARED_ITEMS.filter((item) => !own.has(item.route))]];
   }),
 ) as Record<Role, MenuItem[]>;
+
+menuByRole.MANAGEMENT = menuByRole.FINANCE;
