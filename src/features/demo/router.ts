@@ -55,7 +55,7 @@ function currentActor(): Actor {
 }
 
 function hasCostAccess(actor: Actor): boolean {
-  return actor.role === 'ADMINISTRATOR' || actor.role === 'FINANCE';
+  return actor.role === 'ADMINISTRATOR' || actor.role === 'FINANCE' || actor.role === 'MANAGEMENT';
 }
 
 // ── Serializers — internal record → docs/04 JSON shape ──────────────────────────────────────────

@@ -25,6 +25,7 @@ export const LOCATION_KEMANG_ID = 3;
 
 export const USER_ADMIN_ID = 1;
 export const USER_FINANCE_ID = 2;
+export const USER_MANAGEMENT_ID = 7;
 export const USER_BARISTA_ID = 3;
 export const USER_RIDER_ID = 4;
 export const USER_STAFF_ID = 5;
@@ -122,10 +123,12 @@ export type DemoUser = {
   kitchenName?: string;
 };
 
-/** Mirrors `UserSeeder.php` exactly — same names, phones, passwords, roles. */
+/** Base users mirror `UserSeeder.php`; Management is a synthetic account for the new role. */
 export const USERS: DemoUser[] = [
   { id: USER_ADMIN_ID, name: 'Rizal Admin', role: 'ADMINISTRATOR', phone: '+6281100000001', password: 'admin123' },
   { id: USER_FINANCE_ID, name: 'Sari Finance', role: 'FINANCE', phone: '+6281100000002', password: 'finance123' },
+  // Role switcher preview only; no demo password is distributed for this account.
+  { id: USER_MANAGEMENT_ID, name: 'Management Demo', role: 'MANAGEMENT', phone: '+6281100000007', password: '' },
   {
     id: USER_BARISTA_ID,
     name: 'Dimas Barista',
