@@ -18,7 +18,7 @@ import { syncRegistration } from './registration';
  * looking at (E15) — the notification still exists in the tray, it simply does not interrupt.
  */
 Notifications.setNotificationHandler({
-  handleNotification: async (notification) => {
+  handleNotification: async (notification: Notifications.Notification) => {
     const data = notification.request.content.data as Record<string, unknown> | undefined;
     const eventId = typeof data?.['event_id'] === 'string' ? data['event_id'] : null;
     const isNew = claimEvent(eventId);
@@ -103,14 +103,14 @@ export function usePushNotifications() {
   useEffect(() => {
     if (!session) return;
 
-    const received = Notifications.addNotificationReceivedListener((notification) => {
+    const received = Notifications.addNotificationReceivedListener((notification: Notifications.Notification) => {
       const data = notification.request.content.data as Record<string, unknown> | undefined;
       const refillId = Number(data?.['refill_request_id']);
 
       invalidateRefillData(client, Number.isFinite(refillId) && refillId > 0 ? refillId : undefined);
     });
 
-    const tapped = Notifications.addNotificationResponseReceivedListener((response) => {
+    const tapped = Notifications.addNotificationResponseReceivedListener((response: Notifications.NotificationResponse) => {
       const data = (response.notification.request.content.data ?? {}) as Record<string, unknown>;
       const target = routeFor(data);
       if (target) routerRef.current.push(target as never);
