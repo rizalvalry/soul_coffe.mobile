@@ -23,9 +23,6 @@ export function useSettlementQueue(date?: string) {
   return useQuery({
     queryKey: settlementKeys.queue(date),
     queryFn: () => request<SettlementQueueRow[]>(`/settlements/queue${date ? `?date=${date}` : ''}`),
-    // The queue changes as riders keep selling right up to the moment they hand over, so this is
-    // one of the few reads worth refetching on its own.
-    refetchInterval: 60_000,
   });
 }
 

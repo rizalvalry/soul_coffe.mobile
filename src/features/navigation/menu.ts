@@ -1,4 +1,5 @@
 import type { Role } from '@/domain/roles';
+import type { SitemapType } from 'expo-router';
 
 /**
  * The role-driven application menu.
@@ -27,14 +28,6 @@ export type MenuItem = {
 };
 
 /**
- * Routes that actually have a screen behind them right now.
- *
- * Kept as one explicit list rather than a per-item flag so there is a single place to check
- * against `find app -name '*.tsx'`. Anything not listed here routes to `coming-soon`, which
- * names the route and its requirement instead of rendering a misleading blank screen.
- *
- * Remove an entry from this list only by deleting its screen.
- *
  * WHY THERE IS NO "ALOKASI" ENTRY ANY MORE
  * ---------------------------------------
  * There were two: a barista typed the morning allocation, and a staff member then read it back.
@@ -45,27 +38,6 @@ export type MenuItem = {
  * Finance's "Approval Alokasi" went with them: it existed only to approve an over-target
  * allocation that nothing creates now.
  */
-export const IMPLEMENTED_ROUTES: ReadonlySet<string> = new Set([
-  '/staff/refill/new',
-  '/staff/sell',
-  '/staff/requests',
-  '/staff/stock',
-  '/finance/approvals',
-  '/finance/settlements',
-  '/finance/history',
-  '/barista/add-stock',
-  '/barista/close-out',
-  '/barista/requests',
-  '/barista/preparing',
-  '/barista/stock',
-  '/barista/history',
-  '/absen',
-  '/rider/available',
-  '/rider/active',
-  '/rider/history',
-  '/news',
-  '/settings',
-]);
 
 const roleMenus: Record<Role, MenuItem[]> = {
   ADMINISTRATOR: [
@@ -386,3 +358,26 @@ export const menuByRole: Record<Role, MenuItem[]> = Object.fromEntries(
 ) as Record<Role, MenuItem[]>;
 
 menuByRole.MANAGEMENT = menuByRole.FINANCE;
+
+/** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */
+export function menuItemsWithScreens(items: MenuItem[], sitemap: SitemapType | null): MenuItem[] {
+  if (!sitemap) return [];
+
+  const routes = new Set<string>();
+  const visit = (node: SitemapType) => {
+    if (!node.isGenerated && !node.isInternal && /\.[jt]sx?$/.test(node.contextKey)) {
+      const segments = node.contextKey
+        .replace(/^\.\//, '')
+        .replace(/\.[jt]sx?$/, '')
+        .split('/')
+        .filter((segment) => segment !== 'index' && !/^\(.+\)$/.test(segment));
+      if (!segments.some((segment) => segment.startsWith('_') || segment.startsWith('+'))) {
+        routes.add(`/${segments.join('/')}`);
+      }
+    }
+    node.children.forEach(visit);
+  };
+  visit(sitemap);
+
+  return items.filter((item) => routes.has(item.route));
+}
