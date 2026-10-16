@@ -7,6 +7,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/store';
 import { invalidateRefillData } from '@/features/refill/queries';
 import { claimEvent } from '@/features/realtime/seen';
+import { settlementRoute, settlementTarget } from '@/features/settlements/navigation';
+import { invalidateSettlementData } from '@/features/settlements/queries';
 import { syncRegistration } from './registration';
 
 /**
@@ -40,12 +42,15 @@ Notifications.setNotificationHandler({
  * of two that could quietly drift apart.
  */
 export function routeFor(data: Record<string, unknown>): string | null {
+  const type = typeof data['type'] === 'string' ? data['type'] : '';
+  if (type === 'SettlementVarianceFlagged') {
+    return settlementRoute(data);
+  }
+
   const refillId = data['refill_request_id'];
   if (refillId !== null && refillId !== undefined && `${refillId}` !== '') {
     return `/staff/requests/${refillId}`;
   }
-
-  const type = typeof data['type'] === 'string' ? data['type'] : '';
 
   switch (type) {
     case 'AttendanceClockedIn':
@@ -68,12 +73,13 @@ export function routeFor(data: Record<string, unknown>): string | null {
  *
  * Mounted once, from the authenticated layout. Everything it does is additive to `RealtimeProvider` —
  * if push never arrives (permission denied, no Firebase config, no Play Services) the socket and
- * its polling fallback still keep every screen current.
+ * reconnect, foreground refresh, and pull-to-refresh keep active screens current.
  */
 export function usePushNotifications() {
   const router = useRouter();
   const client = useQueryClient();
   const session = useAuth((s) => s.session);
+  const lastResponse = Notifications.useLastNotificationResponse();
   const routerRef = useRef(router);
   routerRef.current = router;
 
@@ -108,17 +114,27 @@ export function usePushNotifications() {
       const refillId = Number(data?.['refill_request_id']);
 
       invalidateRefillData(client, Number.isFinite(refillId) && refillId > 0 ? refillId : undefined);
-    });
-
-    const tapped = Notifications.addNotificationResponseReceivedListener((response: Notifications.NotificationResponse) => {
-      const data = (response.notification.request.content.data ?? {}) as Record<string, unknown>;
-      const target = routeFor(data);
-      if (target) routerRef.current.push(target as never);
+      if (data?.['type'] === 'SettlementVarianceFlagged' &&
+        (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT')) {
+        invalidateSettlementData(client, settlementTarget(data).cartId);
+      }
     });
 
     return () => {
       received.remove();
-      tapped.remove();
     };
   }, [session, client]);
+
+  // The SDK hook also returns a tap that launched the app before this layout mounted.
+  useEffect(() => {
+    if (!session || !lastResponse) return;
+    const data = (lastResponse.notification.request.content.data ?? {}) as Record<string, unknown>;
+    const allowedVarianceViewer = session.user.role === 'FINANCE' ||
+      session.user.role === 'MANAGEMENT' || session.user.role === 'ADMINISTRATOR';
+    if (data['type'] !== 'SettlementVarianceFlagged' || allowedVarianceViewer) {
+      const target = routeFor(data);
+      if (target) routerRef.current.push(target as never);
+    }
+    Notifications.clearLastNotificationResponse();
+  }, [session, lastResponse]);
 }
