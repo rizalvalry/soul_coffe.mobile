@@ -107,16 +107,13 @@ export function useCartAllowance(cartId: number | null) {
 /**
  * What decides whether the absen button is pressable.
  *
- * Refetched on focus and on a short interval because the rider button unlocks from someone
- * ELSE's action (a barista pressing "Open Absen"), and a rider staring at a disabled
- * button has no way to know it changed otherwise.
+ * The barista's open event invalidates this query; reconnect, foreground, and the screen's
+ * pull-to-refresh also refresh it after a missed event.
  */
 export function useAttendanceStatus() {
   return useQuery({
     queryKey: showcaseKeys.absenStatus,
     queryFn: () => request<AttendanceStatus>('/absen/status'),
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
   });
 }
 

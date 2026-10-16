@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
+import { useRouter, useSitemap, type Href } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated from 'react-native-reanimated';
@@ -17,7 +17,7 @@ import { SoulLogo } from '@/components/brand/SoulLogo';
 import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { useBadges } from '@/features/refill/queries';
-import { IMPLEMENTED_ROUTES, menuByRole, type MenuItem } from '@/features/navigation/menu';
+import { menuByRole, menuItemsWithScreens, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
 import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
 
@@ -27,9 +27,9 @@ import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } fr
  * This used to return `{}` on purpose, while the realtime layer did not exist yet — showing an
  * invented count of pending approvals would have taught people to distrust the number. The
  * realtime layer exists now, so the honest thing is the real count: `GET /badges` is scoped
- * server-side to the caller's own role, and `invalidateRefillData()` already invalidates
- * `qk.badges` on every inbound Pusher event and on the 10s poll fallback, so these numbers move
- * on their own without this screen subscribing to anything itself.
+ * server-side to the caller's own role, and `invalidateRefillData()` invalidates `qk.badges`
+ * on inbound Pusher events. Reconnect, foreground return, and this screen's pull-to-refresh
+ * catch up after missed events.
  *
  * `pendingSync` stays absent rather than being faked as 0: it would count writes queued on the
  * device, which nothing tracks yet, and no menu item asks for it. A tile that always reads "0
@@ -62,6 +62,7 @@ function greeting(): string {
 
 export default function MenuScreen() {
   const router = useRouter();
+  const sitemap = useSitemap();
   const session = useAuth((s) => s.session);
   const signOut = useAuth((s) => s.signOut);
   const badges = useMenuBadges();
@@ -69,7 +70,7 @@ export default function MenuScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const user = session?.user;
-  const items = useMemo(() => (user ? menuByRole[user.role] : []), [user]);
+  const items = useMemo(() => (user ? menuItemsWithScreens(menuByRole[user.role], sitemap) : []), [user, sitemap]);
 
   // Declared above the `!user` bail-out: a hook after an early return runs conditionally, which
   // is exactly the ordering violation React cannot recover from.
@@ -92,17 +93,7 @@ export default function MenuScreen() {
   };
 
   const open = (item: MenuItem) => {
-    if (IMPLEMENTED_ROUTES.has(item.route)) {
-      router.push(item.route as Href);
-      return;
-    }
-
-    // Not built yet. Report the route and its requirement rather than 404-ing or showing a
-    // blank screen that looks broken.
-    router.push({
-      pathname: '/coming-soon',
-      params: { title: item.label, route: item.route, requirement: item.requirement },
-    });
+    router.push(item.route as Href);
   };
 
   return (

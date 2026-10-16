@@ -1,11 +1,13 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import Constants from 'expo-constants';
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/store';
 import { apiBaseUrl } from '@/lib/api';
-import { invalidateRefillData } from '@/features/refill/queries';
+import { invalidateRefillData, qk as refillKeys } from '@/features/refill/queries';
+import { showcaseKeys } from '@/features/showcase/queries';
 import { claimEvent } from './seen';
 import type { RefillStatus, Role } from '@/domain/types';
 
@@ -91,7 +93,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const cluster = extra['pusherCluster'] as string | undefined;
 
     if (!key || !cluster) {
-      // Nothing to connect to — degrade to the polling fallback below rather than throwing.
+      // No socket configuration: manual refresh and foreground refresh still work.
       setState('disconnected');
       return;
     }
@@ -143,21 +145,51 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       pusher?: { connection?: { bind: (e: string, cb: () => void) => void } };
     };
     const connection = connector.pusher?.connection;
-    connection?.bind('connected', () => setState('connected'));
+    connection?.bind('connected', () => {
+      setState('connected');
+      // One catch-up refresh per connection. Pusher does not replay events missed offline.
+      void client.invalidateQueries();
+    });
     connection?.bind('connecting', () => setState('connecting'));
     connection?.bind('disconnected', () => setState('disconnected'));
     connection?.bind('unavailable', () => setState('disconnected'));
     connection?.bind('failed', () => setState('disconnected'));
 
+    // One event can arrive on several subscribed channels. Keep socket delivery deduplication
+    // separate from the shared push/banner claim: FCM may claim the ID before the socket does.
+    const handledSocketEventIds = new Set<string>();
     const dispatch = (raw: unknown) => {
       const event = raw as RealtimeEvent;
-      if (!event?.event_id) return;
+      if (!event?.event_id || handledSocketEventIds.has(event.event_id)) return;
+      handledSocketEventIds.add(event.event_id);
+      if (handledSocketEventIds.size > 500) {
+        const oldest = handledSocketEventIds.values().next().value;
+        if (oldest) handledSocketEventIds.delete(oldest);
+      }
 
-      // First arrival wins. If the push got here first, the screen is already being refreshed and
-      // this copy is dropped; if this got here first, the push's foreground banner is suppressed.
-      if (!claimEvent(event.event_id)) return;
+      // A socket-first delivery suppresses the later push banner. A push-first delivery must
+      // still refresh non-refill queries, which the push listener does not know about yet.
+      claimEvent(event.event_id);
 
       invalidateRefillData(client, event.refill_request_id ?? undefined);
+
+      if (event.type === 'StaffAttendanceWindowOpened' || event.type === 'AttendanceClockedIn') {
+        void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
+        void client.invalidateQueries({ queryKey: ['absen', 'roll'] });
+      }
+      if (event.type === 'ShowcaseBrewed' || event.type === 'CartStockHandedOver' || event.type === 'CartClosedOut') {
+        void client.invalidateQueries({ queryKey: showcaseKeys.stock });
+        void client.invalidateQueries({ queryKey: refillKeys.myStock });
+        void client.invalidateQueries({ queryKey: refillKeys.kitchenStock });
+      }
+      if (event.type === 'CartStockHandedOver') {
+        void client.invalidateQueries({ queryKey: showcaseKeys.staff });
+        void client.invalidateQueries({ queryKey: ['showcase', 'allowance'] });
+        void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
+      }
+      if (event.type === 'CartClosedOut' || event.type === 'SaleVoided' || event.type === 'SaleFlaggedSuspect') {
+        void client.invalidateQueries({ queryKey: ['settlements'] });
+      }
     };
 
     const names = channelsFor(
@@ -178,27 +210,17 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     };
   }, [session, client]);
 
-  // One catch-up refetch the moment the socket comes up.
-  //
-  // Events that fired while it was down were broadcast to nobody — Pusher has no replay on
-  // subscribe, and the outbox is a delivery log, not a mailbox the client can read back. Without
-  // this, a reconnect would leave the screen showing whatever it held before the drop until the
-  // next event happened to arrive. This is the poll's actual job, done once instead of forever.
+  // React Query's window-focus signal is not reliable on native. Refresh active queries when
+  // the app returns, including settlement data without complete event coverage until T-023.
   useEffect(() => {
-    if (state !== 'connected') return;
-    invalidateRefillData(client);
-  }, [state, client]);
-
-  // Fallback refetch while the socket is NOT up. Never runs alongside the socket: the guard below
-  // means the timer is torn down the instant `connected` arrives, so a working Pusher connection
-  // costs zero polling requests. It exists for the case where the socket genuinely cannot be
-  // established — no key configured, a captive-portal network — where the alternative is a screen
-  // that silently stops updating.
-  useEffect(() => {
-    if (state === 'connected' || !session) return;
-    const timer = setInterval(() => invalidateRefillData(client), 10_000);
-    return () => clearInterval(timer);
-  }, [state, session, client]);
+    if (!session) return;
+    let previous: AppStateStatus = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active' && previous !== 'active') void client.invalidateQueries();
+      previous = next;
+    });
+    return () => subscription.remove();
+  }, [session, client]);
 
   return <RealtimeContext.Provider value={{ state, isRealtime: state === 'connected' }}>{children}</RealtimeContext.Provider>;
 }
