@@ -55,6 +55,7 @@ type QueuedPing = {
 
 export function useLocationReporter(): void {
   const role = useAuth((s) => s.session?.user.role);
+  const userId = useAuth((s) => s.session?.user.id);
   const isStaff = role === 'STAFF';
 
   const queue = useRef<QueuedPing[]>([]);
@@ -63,13 +64,14 @@ export function useLocationReporter(): void {
   const inFlight = useRef(false);
 
   useEffect(() => {
-    if (!isStaff) return;
+    queue.current = [];
+    if (!isStaff || !userId) return;
 
     let cancelled = false;
     let granted = false;
 
     const flush = async (): Promise<void> => {
-      if (inFlight.current || queue.current.length === 0) return;
+      if (cancelled || inFlight.current || queue.current.length === 0) return;
 
       inFlight.current = true;
       const batch = queue.current.slice(0, MAX_QUEUED);
@@ -84,6 +86,7 @@ export function useLocationReporter(): void {
 
         // Sent successfully, so drop exactly what was sent — not the whole queue, which may have
         // grown while the request was in flight.
+        if (cancelled) return;
         queue.current = queue.current.slice(batch.length);
 
         // The reporting interval is a server decision. That way it can be tuned for a busy month
@@ -114,6 +117,8 @@ export function useLocationReporter(): void {
           // battery over a ten-hour shift.
           accuracy: Location.LocationAccuracy.Balanced,
         });
+
+        if (cancelled) return;
 
         const { latitude, longitude, accuracy } = position.coords;
 
@@ -174,9 +179,10 @@ export function useLocationReporter(): void {
 
     return () => {
       cancelled = true;
+      queue.current = [];
       subscription.remove();
       if (timer.current) clearInterval(timer.current);
       timer.current = null;
     };
-  }, [isStaff]);
+  }, [isStaff, userId]);
 }

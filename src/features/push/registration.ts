@@ -1,5 +1,6 @@
 import { registerDevice, unregisterDevice } from './api';
 import { deviceLabel, getDeviceToken, rememberedToken, rememberToken } from './device';
+import { useAuth } from '@/features/auth/store';
 
 /**
  * The registration lifecycle: one device token, kept in step with who is signed in.
@@ -18,7 +19,31 @@ import { deviceLabel, getDeviceToken, rememberedToken, rememberToken } from './d
 export type PushStatus = 'idle' | 'registered' | 'denied' | 'unavailable';
 
 let lastStatus: PushStatus = 'idle';
-let inFlight: Promise<PushStatus> | null = null;
+let inFlight: { authToken: string; promise: Promise<PushStatus> } | null = null;
+const PUSH_TIMEOUT_MS = 5000;
+
+function withinTimeout<T>(promise: Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('Push timeout')), PUSH_TIMEOUT_MS);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+}
+
+async function withAbortTimeout<T>(call: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Push timeout'));
+    }, PUSH_TIMEOUT_MS);
+  });
+  try { return await Promise.race([call(controller.signal), timeout]); }
+  finally { clearTimeout(timer!); }
+}
 
 export function pushStatus(): PushStatus {
   return lastStatus;
@@ -31,12 +56,18 @@ export function pushStatus(): PushStatus {
  * calls share one attempt, because two sign-in paths (password and PIN) can both land here within
  * the same frame.
  */
-export function syncRegistration(): Promise<PushStatus> {
-  if (inFlight) return inFlight;
+export function syncRegistration(authToken: string): Promise<PushStatus> {
+  if (inFlight) {
+    if (inFlight.authToken === authToken) return inFlight.promise;
+    return inFlight.promise.then(() => syncRegistration(authToken));
+  }
 
-  inFlight = (async (): Promise<PushStatus> => {
+  const promise = Promise.resolve().then(async (): Promise<PushStatus> => {
     try {
-      const availability = await getDeviceToken();
+      if (useAuth.getState().session?.token !== authToken) return 'idle';
+      const availability = await withinTimeout(getDeviceToken());
+
+      if (useAuth.getState().session?.token !== authToken) return 'idle';
 
       if (availability.status === 'denied') {
         lastStatus = 'denied';
@@ -54,8 +85,8 @@ export function syncRegistration(): Promise<PushStatus> {
       // The server upserts on the token, so re-sending the same one is cheap and it also refreshes
       // `last_seen_at`. It is sent even when unchanged because the account behind it may have
       // changed — a shared handset must move the token to whoever signed in now.
-      await registerDevice(availability.token, deviceLabel());
-      await rememberToken(availability.token);
+      await withAbortTimeout((signal) => registerDevice(availability.token, deviceLabel(), authToken, signal));
+      await withinTimeout(rememberToken(availability.token));
 
       lastStatus = 'registered';
       return lastStatus;
@@ -66,9 +97,10 @@ export function syncRegistration(): Promise<PushStatus> {
     } finally {
       inFlight = null;
     }
-  })();
+  });
 
-  return inFlight;
+  inFlight = { authToken, promise };
+  return promise;
 }
 
 /**
@@ -78,17 +110,20 @@ export function syncRegistration(): Promise<PushStatus> {
  * fail on a phone that is already offline, and the value we registered is the value the server
  * knows about.
  */
-export async function releaseRegistration(): Promise<void> {
+export async function releaseRegistration(authToken?: string): Promise<void> {
   try {
-    const token = await rememberedToken();
+    // A sign-in registration already in flight must finish before we delete the old association.
+    // Otherwise its late POST could restore the departing account after this DELETE.
+    if (inFlight) await withinTimeout(inFlight.promise).catch(() => {});
+    const token = await withinTimeout(rememberedToken());
     if (!token) return;
 
-    await unregisterDevice(token);
+    await withAbortTimeout((signal) => unregisterDevice(token, authToken, signal));
   } catch {
     // Offline, or the token was already reclaimed by another account on this phone. Either way
     // the local clear below is what keeps this device honest.
   } finally {
-    await rememberToken(null);
+    await withinTimeout(rememberToken(null)).catch(() => {});
     lastStatus = 'idle';
   }
 }

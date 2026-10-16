@@ -68,6 +68,8 @@ type RequestOptions = {
   /** Sent as Idempotency-Key. Required by the server on every state transition (R12). */
   idempotencyKey?: string;
   signal?: AbortSignal;
+  /** The departing session's token for cleanup after local auth state has been cleared. */
+  authToken?: string;
 };
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -110,25 +112,30 @@ function messageFrom(body: unknown, status: number): string {
  * Signing out on those is what produced the repeated re-logins, because each one silently threw
  * away a token that was still perfectly valid.
  *
- * So the token is re-checked once against `/me` before anything is discarded. `probing` keeps
- * that check from recursing when it is itself answered with a 401.
+ * So the token is re-checked once against `/me` before anything is discarded. Concurrent probes
+ * for the same token share one request; different accounts are checked independently.
  */
-let probing = false;
+const probes = new Map<string, Promise<boolean>>();
 
 async function tokenIsStillValid(token: string): Promise<boolean> {
-  if (probing) return false;
-  probing = true;
+  const inFlight = probes.get(token);
+  if (inFlight) return inFlight;
+  const probe = (async () => {
+    try {
+      const response = await fetch(`${apiBaseUrl()}/me`, {
+        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+      });
+      return response.ok;
+    } catch {
+      // An unreachable probe says nothing about validity; retain the session.
+      return true;
+    }
+  })();
+  probes.set(token, probe);
   try {
-    const response = await fetch(`${apiBaseUrl()}/me`, {
-      headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-    });
-    return response.ok;
-  } catch {
-    // The probe could not reach the server, so nothing was learned about the token. Keep the
-    // session: losing it over a dead network is the failure being fixed here.
-    return true;
+    return await probe;
   } finally {
-    probing = false;
+    if (probes.get(token) === probe) probes.delete(token);
   }
 }
 
@@ -136,6 +143,8 @@ async function handleUnauthorized(token: string | undefined): Promise<void> {
   // Nothing was sent, so nothing was rejected — there is no session to invalidate.
   if (!token) return;
   if (await tokenIsStillValid(token)) return;
+  // The probe can outlive a logout and a different person's login on a shared phone.
+  if (useAuth.getState().session?.token !== token) return;
   void useAuth.getState().signOut();
 }
 
@@ -153,7 +162,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
  * choice rather than one of them hiding it.
  */
 export async function requestWithStatus<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
-  const { method = 'GET', body, idempotencyKey, signal } = options;
+  const { method = 'GET', body, idempotencyKey, signal, authToken } = options;
 
   // Demo mode (see features/demo/config.ts) never touches the network — every hook in
   // features/refill/queries.ts calls this same function unmodified either way.
@@ -167,7 +176,7 @@ export async function requestWithStatus<T>(path: string, options: RequestOptions
     }
   }
 
-  const token = useAuth.getState().session?.token;
+  const token = authToken ?? useAuth.getState().session?.token;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;

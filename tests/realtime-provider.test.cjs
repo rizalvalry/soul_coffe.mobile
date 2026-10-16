@@ -14,6 +14,9 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   const effects = [];
   const connectionCallbacks = new Map();
   const channelCallbacks = [];
+  const channelNames = [];
+  const leftChannels = [];
+  let disconnects = 0;
   const calls = [];
   let appStateCallback;
   let refillInvalidations = 0;
@@ -28,9 +31,9 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   };
   class Echo {
     connector = { pusher: { connection: { bind: (event, callback) => connectionCallbacks.set(event, callback) } } };
-    private() { return { listen: (_event, callback) => channelCallbacks.push(callback) }; }
-    leave() {}
-    disconnect() {}
+    private(name) { channelNames.push(name); return { listen: (_event, callback) => channelCallbacks.push(callback) }; }
+    leave(name) { leftChannels.push(name); }
+    disconnect() { disconnects++; }
   }
   const modules = {
     react,
@@ -64,9 +67,27 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
     return modules[name];
   } });
   module.exports.RealtimeProvider({ children: null });
-  effects.forEach((effect) => effect());
-  return { calls, channelCallbacks, connectionCallbacks, appState: (state) => appStateCallback(state), refillInvalidations: () => refillInvalidations };
+  const cleanups = effects.map((effect) => effect());
+  return {
+    calls, channelCallbacks, channelNames, leftChannels, connectionCallbacks,
+    cleanup: () => cleanups.forEach((cleanup) => cleanup?.()),
+    disconnects: () => disconnects,
+    appState: (state) => appStateCallback(state),
+    refillInvalidations: () => refillInvalidations,
+  };
 }
+
+test('old account channels are left and socket disconnected on sign-out', () => {
+  const app = mountRealtimeProvider();
+  assert.ok(app.channelNames.includes('user.7'));
+  app.cleanup();
+  assert.deepEqual(app.leftChannels, app.channelNames);
+  assert.equal(app.disconnects(), 1);
+  const before = app.calls.length;
+  app.channelCallbacks[0]({ event_id: 'late', type: 'SaleRecorded', refill_request_id: null });
+  app.connectionCallbacks.get('connected')();
+  assert.equal(app.calls.length, before);
+});
 
 test('push-first event still refreshes Absen and duplicate socket channels do not refetch again', () => {
   const app = mountRealtimeProvider(() => false);

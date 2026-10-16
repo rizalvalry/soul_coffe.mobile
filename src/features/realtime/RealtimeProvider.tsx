@@ -85,6 +85,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const echoRef = useRef<Echo<'pusher'> | null>(null);
 
   useEffect(() => {
+    let active = true;
     if (!session) {
       setState('disconnected');
       return;
@@ -148,19 +149,21 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     };
     const connection = connector.pusher?.connection;
     connection?.bind('connected', () => {
+      if (!active) return;
       setState('connected');
       // One catch-up refresh per connection. Pusher does not replay events missed offline.
       void client.invalidateQueries();
     });
-    connection?.bind('connecting', () => setState('connecting'));
-    connection?.bind('disconnected', () => setState('disconnected'));
-    connection?.bind('unavailable', () => setState('disconnected'));
-    connection?.bind('failed', () => setState('disconnected'));
+    connection?.bind('connecting', () => { if (active) setState('connecting'); });
+    connection?.bind('disconnected', () => { if (active) setState('disconnected'); });
+    connection?.bind('unavailable', () => { if (active) setState('disconnected'); });
+    connection?.bind('failed', () => { if (active) setState('disconnected'); });
 
     // One event can arrive on several subscribed channels. Keep socket delivery deduplication
     // separate from the shared push/banner claim: FCM may claim the ID before the socket does.
     const handledSocketEventIds = new Set<string>();
     const dispatch = (raw: unknown) => {
+      if (!active) return;
       const event = raw as RealtimeEvent;
       if (!event?.event_id || handledSocketEventIds.has(event.event_id)) return;
       handledSocketEventIds.add(event.event_id);
@@ -211,6 +214,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     }
 
     return () => {
+      active = false;
       for (const name of names) echo?.leave(name);
       echo?.disconnect();
       echoRef.current = null;

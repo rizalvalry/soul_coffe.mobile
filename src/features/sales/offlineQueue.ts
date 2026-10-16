@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ApiError, request, uuidv4 } from '@/lib/api';
 import type { Sale } from '@/domain/types';
 import type { RecordSaleInput } from './queries';
+import { useAuth } from '@/features/auth/store';
 
 /**
  * The offline queue for penjualan gerobak.
@@ -25,20 +26,29 @@ import type { RecordSaleInput } from './queries';
  * --------------------------------------------------------------
  * A transport failure (no connection at all) leaves an entry queued for the next attempt. A real
  * rejection — the absen window closed, the cart's assignment changed, the stock no longer covers
- * it — is different: replaying it forever would never succeed, and silently dropping it would
- * lose the rider's record of having tried to sell those cups with no trace. So a rejected
- * entry is removed from the retry queue but reported back to the caller as `failed`, with the
- * server's own message, so the screen can tell the rider plainly rather than have the
- * queue quietly shrink for a reason nobody saw.
+ * it — is different: replaying it forever would never succeed. A rejected entry stays in the
+ * owner's local record with the server's message, but is skipped by automatic replay.
  */
 
-const STORAGE_KEY = 'soul.sales.offline_queue.v1';
+const LEGACY_STORAGE_KEY = 'soul.sales.offline_queue.v1';
+const STORAGE_KEY_PREFIX = 'soul.sales.offline_queue.v2.';
+
+function storageKey(ownerId: string): string {
+  if (!ownerId) throw new Error('Pemilik antrean penjualan tidak diketahui.');
+  return `${STORAGE_KEY_PREFIX}${encodeURIComponent(ownerId)}`;
+}
+
+function isCurrentOwner(ownerId: string): boolean {
+  return useAuth.getState().session?.user.id === ownerId;
+}
 
 /** One sale waiting to be sent. */
 export type QueuedSale = {
   uuid: string;
   queuedAt: string;
   input: RecordSaleInput;
+  /** A server rejection remains on this account's device until explicitly resolved. */
+  rejection?: string;
 };
 
 /** What one flush attempt actually did, so the caller can tell the two outcomes apart. */
@@ -65,46 +75,69 @@ export function buildSaleBody(uuid: string, input: RecordSaleInput): Record<stri
   };
 }
 
-async function readQueue(): Promise<QueuedSale[]> {
+async function readQueue(ownerId: string): Promise<QueuedSale[]> {
+  const raw = await AsyncStorage.getItem(storageKey(ownerId));
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed)) throw new Error('Antrean offline rusak; data lama tetap disimpan.');
+  return parsed as QueuedSale[];
+}
+
+async function writeQueue(ownerId: string, queue: QueuedSale[]): Promise<void> {
+  // A failed write must be visible to the caller; claiming a sale is queued when it was not
+  // persisted would silently lose a transaction on the next app launch.
+  await AsyncStorage.setItem(storageKey(ownerId), JSON.stringify(queue));
+}
+
+const pendingWrites = new Map<string, Promise<void>>();
+
+/** Serialize local edits; a flush must merge into the latest queue after its network await. */
+async function updateQueue(ownerId: string, change: (queue: QueuedSale[]) => QueuedSale[]): Promise<void> {
+  const previous = pendingWrites.get(ownerId) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(async () => {
+    const queue = await readQueue(ownerId);
+    await writeQueue(ownerId, change(queue));
+  });
+  pendingWrites.set(ownerId, next);
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
+    await next;
+  } finally {
+    if (pendingWrites.get(ownerId) === next) pendingWrites.delete(ownerId);
+  }
+}
+
+export async function loadQueuedSales(ownerId: string): Promise<QueuedSale[]> {
+  return readQueue(ownerId);
+}
+
+/** V1 entries have no owner field. Keep them untouched and never replay them under a guess. */
+export async function legacyQueuedSaleCount(): Promise<number> {
+  try {
+    const raw = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+    if (!raw) return 0;
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as QueuedSale[]) : [];
+    return Array.isArray(parsed) ? parsed.length : 0;
   } catch {
-    // A corrupted local queue must never crash the till — treat it as empty. Whatever was in it
-    // is unrecoverable, but the app keeps working for the next sale.
-    return [];
+    // The legacy blob still exists. Surface a warning even if its count cannot be decoded.
+    return 1;
   }
-}
-
-async function writeQueue(queue: QueuedSale[]): Promise<void> {
-  try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
-  } catch {
-    // Best-effort. A failed write here means the queue is not durable across an app kill, which
-    // is a smaller loss than failing the sale the rider just recorded.
-  }
-}
-
-export async function loadQueuedSales(): Promise<QueuedSale[]> {
-  return readQueue();
 }
 
 /** Appends one sale to the queue and persists it. Returns the entry, so the caller can show it. */
-export async function enqueueSale(input: RecordSaleInput): Promise<QueuedSale> {
+export async function enqueueSale(ownerId: string, input: RecordSaleInput): Promise<QueuedSale> {
+  if (!isCurrentOwner(ownerId)) throw new Error('Sesi berubah. Penjualan belum disimpan; masuk kembali.');
   const entry: QueuedSale = { uuid: uuidv4(), queuedAt: new Date().toISOString(), input };
 
-  const queue = await readQueue();
-  queue.push(entry);
-  await writeQueue(queue);
+  await updateQueue(ownerId, (queue) => {
+    if (!isCurrentOwner(ownerId)) throw new Error('Sesi berubah. Penjualan belum disimpan; masuk kembali.');
+    return [...queue, entry];
+  });
 
   return entry;
 }
 
-export async function removeQueuedSale(uuid: string): Promise<void> {
-  const queue = await readQueue();
-  await writeQueue(queue.filter((entry) => entry.uuid !== uuid));
+export async function removeQueuedSale(ownerId: string, uuid: string): Promise<void> {
+  await updateQueue(ownerId, (queue) => queue.filter((entry) => entry.uuid !== uuid));
 }
 
 /**
@@ -114,18 +147,22 @@ export async function removeQueuedSale(uuid: string): Promise<void> {
  * Stops at the first TRANSPORT failure (no response at all) rather than racing through every
  * remaining entry against a connection that has already proven itself dead this round; the next
  * trigger (a network-state change, the next screen focus) tries again from where this left off.
- * A REJECTION (a real HTTP error) does not stop the flush — that entry is dropped from the queue
- * and every entry after it still gets its own chance.
+ * A REJECTION (a real HTTP error) does not stop the flush — that entry is retained with its
+ * reason, and every entry after it still gets its own chance.
  */
-export async function flushSalesQueue(): Promise<FlushResult> {
-  const queue = await readQueue();
+export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
+  const queue = await readQueue(ownerId);
   const synced: Sale[] = [];
   const failed: { entry: QueuedSale; message: string }[] = [];
   let stillOffline = false;
 
-  const remaining = [...queue];
+  const syncedIds = new Set<string>();
+  const rejected = new Map<string, string>();
 
   for (const entry of queue) {
+    if (entry.rejection) continue;
+    // A queued sale must never be sent using the next person's bearer token.
+    if (!isCurrentOwner(ownerId)) break;
     try {
       const sale = await request<Sale>('/sales', {
         method: 'POST',
@@ -136,23 +173,27 @@ export async function flushSalesQueue(): Promise<FlushResult> {
       });
 
       synced.push(sale);
-      const index = remaining.findIndex((row) => row.uuid === entry.uuid);
-      if (index >= 0) remaining.splice(index, 1);
+      syncedIds.add(entry.uuid);
     } catch (e) {
-      if (e instanceof ApiError && e.isOffline) {
+      // A revoked session is not a rejected sale. Keep it for this account's next login.
+      if (!isCurrentOwner(ownerId) || (e instanceof ApiError && (e.isOffline || e.status === 401))) {
         stillOffline = true;
         break;
       }
 
-      // A genuine rejection: keep it out of the retry loop, but tell the caller exactly what the
-      // server said rather than letting the entry vanish with no explanation.
-      failed.push({ entry, message: e instanceof ApiError ? e.message : 'Gagal mengirim transaksi.' });
-      const index = remaining.findIndex((row) => row.uuid === entry.uuid);
-      if (index >= 0) remaining.splice(index, 1);
+      // Preserve the rejected transaction and its reason for this account after the screen
+      // unmounts or the phone changes hands. It is no longer retried automatically.
+      const message = e instanceof ApiError ? e.message : 'Gagal mengirim transaksi.';
+      failed.push({ entry, message });
+      rejected.set(entry.uuid, message);
     }
   }
 
-  await writeQueue(remaining);
+  await updateQueue(ownerId, (latest) => latest
+    .filter((entry) => !syncedIds.has(entry.uuid))
+    .map((entry) => rejected.has(entry.uuid)
+      ? { ...entry, rejection: rejected.get(entry.uuid) }
+      : entry));
 
   return { synced, failed, stillOffline };
 }

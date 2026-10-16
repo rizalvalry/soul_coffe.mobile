@@ -4,11 +4,12 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { AppSplash } from '@/components/brand/AppSplash';
 import { useAuth } from '@/features/auth/store';
 import { useOnboarding } from '@/features/onboarding/store';
 import { semantic } from '@/theme';
+import { getQueryClient } from '@/lib/queryClient';
 
 // Global scope, not an effect: by the time a component mounts the native splash may already be
 // gone, which is exactly what made the brand moment invisible (expo-splash-screen SDK 57 docs).
@@ -21,26 +22,10 @@ void SplashScreen.preventAutoHideAsync();
  */
 const MIN_SPLASH_MS = 1200;
 
-/**
- * Retry defaults are tuned for field conditions: staff work on motorbikes with intermittent
- * signal, so a transient failure should be retried rather than surfaced as an error.
- */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 30_000,
-      refetchOnReconnect: true,
-    },
-    mutations: {
-      retry: 0, // Writes are replayed by the offline outbox (Phase 6), not by blind retry.
-    },
-  },
-});
-
 export default function RootLayout() {
   const restore = useAuth((s) => s.restore);
   const authStatus = useAuth((s) => s.status);
+  const sessionToken = useAuth((s) => s.session?.token);
   const loadOnboarding = useOnboarding((s) => s.load);
   const onboardingStatus = useOnboarding((s) => s.status);
 
@@ -70,7 +55,7 @@ export default function RootLayout() {
   }, [booting]);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider key={sessionToken ?? 'signed-out'} client={getQueryClient()}>
       <SafeAreaProvider>
         <StatusBar style="dark" />
         <Stack
