@@ -1,9 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
+import * as Notifications from 'expo-notifications';
 import { create } from 'zustand';
 import { isRole, type Role } from '@/domain/roles';
 import { releaseRegistration, syncRegistration } from '@/features/push/registration';
 import { resetSeenEvents } from '@/features/realtime/seen';
+import { resetQueryClient } from '@/lib/queryClient';
 import {
   AuthError,
   login,
@@ -64,6 +66,51 @@ type AuthState = {
 };
 
 const HINT_KEY = 'soul.signin.hint.v1';
+const LOGOUT_PENDING_KEY = 'soul.logout.pending.v1';
+let endingSession: Promise<void> | null = null;
+
+async function persistLoggedOut(): Promise<void> {
+  let markerWritten = false;
+  try {
+    await AsyncStorage.setItem(LOGOUT_PENDING_KEY, '1');
+    markerWritten = true;
+  } catch {
+    // SecureStore deletion can still make the logout durable without the fallback marker.
+  }
+  try {
+    await persist(null);
+    if (markerWritten) {
+      try { await AsyncStorage.removeItem(LOGOUT_PENDING_KEY); } catch { /* A stale marker only forces login. */ }
+    }
+  } catch {
+    if (!markerWritten) throw new Error('Sesi lama belum dapat dihapus dari perangkat. Coba lagi.');
+    // The marker prevents restore() from signing the old user back in after an app kill.
+  }
+}
+
+async function clearLogoutMarker(): Promise<void> {
+  try { await AsyncStorage.removeItem(LOGOUT_PENDING_KEY); } catch { /* Next launch safely requires login. */ }
+}
+
+function clearAccountState(): Promise<void> {
+  // Clear active, inactive, and mutation caches before another identity can mount a screen.
+  resetQueryClient();
+  resetSeenEvents();
+  // Delivered push content and an unconsumed tap are also previous-user data on a shared phone.
+  try { Notifications.clearLastNotificationResponse(); } catch { /* Native notifications unavailable. */ }
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, 5000);
+    try {
+      Notifications.dismissAllNotificationsAsync().then(
+        () => { clearTimeout(timer); resolve(); },
+        () => { clearTimeout(timer); resolve(); },
+      );
+    } catch {
+      clearTimeout(timer);
+      resolve();
+    }
+  });
+}
 
 type SignInHint = { phone: string; hasPin: boolean };
 
@@ -105,6 +152,23 @@ export const useAuth = create<AuthState>((set) => ({
   pinAvailable: false,
 
   restore: async () => {
+    // A previous logout interrupted during SecureStore deletion must never restore that token.
+    try {
+      if (await AsyncStorage.getItem(LOGOUT_PENDING_KEY)) {
+        try {
+          await persist(null);
+          await clearLogoutMarker();
+        } catch { /* Keep the marker for the next launch. */ }
+        await persistHint(null);
+        await clearAccountState();
+        set({ session: null, status: 'unauthenticated', lastPhone: null, pinAvailable: false });
+        return;
+      }
+    } catch {
+      // If the marker cannot be read, do not trust an old token from this shared phone.
+      set({ session: null, status: 'unauthenticated', lastPhone: null, pinAvailable: false });
+      return;
+    }
     // The sign-in hint lives in AsyncStorage, not SecureStore: it holds a phone number, never a
     // credential, and the login screen needs it even when there is no session to restore.
     try {
@@ -138,29 +202,34 @@ export const useAuth = create<AuthState>((set) => ({
     if (!read) {
       // Still unreadable. Send the user to login so the app is usable, but leave the stored blob
       // alone — the next launch will very likely read it and sign them straight back in.
-      set({ session: null, status: 'unauthenticated' });
+      set({ session: null, status: 'unauthenticated', lastPhone: null, pinAvailable: false });
       return;
     }
 
     const session = raw ? parseSession(raw) : null;
 
     if (session) {
+      await clearAccountState();
       set({ session, status: 'authenticated' });
       return;
     }
 
     // A corrupt or schema-drifted blob is discarded rather than half-trusted.
     if (raw) await persist(null);
-    set({ session: null, status: 'unauthenticated' });
+    await persistHint(null);
+    set({ session: null, status: 'unauthenticated', lastPhone: null, pinAvailable: false });
   },
 
   signIn: async (credentials) => {
     set({ submitting: true, error: null });
     try {
+      if (endingSession) await endingSession;
       const session = await login(credentials);
       await persist(session);
+      await clearLogoutMarker();
       const hasPin = session.user.hasLoginPin === true;
       await persistHint({ phone: credentials.phone, hasPin });
+      await clearAccountState();
       set({
         session,
         status: 'authenticated',
@@ -170,7 +239,7 @@ export const useAuth = create<AuthState>((set) => ({
       });
 
       // Fire and forget: a phone that cannot register for push must still be able to sign in.
-      void syncRegistration();
+      void syncRegistration(session.token);
 
       return { result: 'ok' };
     } catch (e) {
@@ -197,9 +266,12 @@ export const useAuth = create<AuthState>((set) => ({
   signInWithPin: async (phone, pin) => {
     set({ submitting: true, error: null });
     try {
+      if (endingSession) await endingSession;
       const session = await loginWithPin(phone, pin);
       await persist(session);
+      await clearLogoutMarker();
       await persistHint({ phone, hasPin: true });
+      await clearAccountState();
       set({
         session,
         status: 'authenticated',
@@ -208,7 +280,7 @@ export const useAuth = create<AuthState>((set) => ({
         pinAvailable: true,
       });
 
-      void syncRegistration();
+      void syncRegistration(session.token);
 
       return { result: 'ok' };
     } catch (e) {
@@ -243,8 +315,11 @@ export const useAuth = create<AuthState>((set) => ({
   signInAsDemo: async (role) => {
     set({ submitting: true, error: null });
     try {
+      if (endingSession) await endingSession;
       const session = await loginAsDemoRole(role);
       await persist(session);
+      await clearLogoutMarker();
+      await clearAccountState();
       set({ session, status: 'authenticated', submitting: false });
       return true;
     } catch (e) {
@@ -254,32 +329,53 @@ export const useAuth = create<AuthState>((set) => ({
     }
   },
 
-  signOut: async () => {
+  signOut: () => {
+    if (endingSession) return endingSession;
+    const token = useAuth.getState().session?.token;
+    const clearedNotifications = clearAccountState();
+    // Remove the authenticated tree now. It owns the socket, push listeners, and screen-local
+    // state; leaving it mounted during network cleanup could repopulate the old query cache.
+    set({ session: null, status: 'restoring', error: null, submitting: false,
+      lastPhone: null, pinAvailable: false });
+
     // Order matters: the push registration is deleted through an authenticated call, so it has to
-    // happen while the token is still valid. Doing it after the revoke would leave this device
+    // happen before revoke. Doing it after the revoke would leave this device
     // subscribed to the departing user's events — and the next person to sign in on this phone
     // would receive them.
-    await releaseRegistration();
-
-    // Revoke server-side next, best-effort. Tokens never expire on their own, so a session
-    // dropped only on the device would leave a valid credential alive on the server forever.
-    // Failure here must not trap the user in a signed-in state, so the local clear happens
-    // either way.
-    const token = useAuth.getState().session?.token;
-    if (token) await revokeToken(token);
-
-    resetSeenEvents();
-    await persist(null);
-    set({ session: null, status: 'unauthenticated', error: null });
+    const cleanup = (async () => {
+      // Durable local logout first; a failed SecureStore deletion leaves a restore marker.
+      let localError: Error | null = null;
+      try { await persistLoggedOut(); } catch (e) { localError = e as Error; }
+      await persistHint(null);
+      await clearedNotifications;
+      set({ status: 'unauthenticated', ...(localError ? { error: localError.message } : {}) });
+      if (token) {
+        await releaseRegistration(token);
+        await revokeToken(token);
+      }
+      if (localError) throw localError;
+    })();
+    endingSession = cleanup.finally(() => { endingSession = null; });
+    return endingSession;
   },
 
-  endRevokedSession: async () => {
+  endRevokedSession: () => {
+    if (endingSession) return endingSession;
     // No revoke call and no device-release call: the server has already dropped every token for
     // this account, so both would 401. The push registration is deliberately LEFT in place — the
     // same person is about to sign back in on this same phone with their new PIN.
-    resetSeenEvents();
-    await persist(null);
-    set({ session: null, status: 'unauthenticated', error: null });
+    const clearedNotifications = clearAccountState();
+    set({ session: null, status: 'restoring', error: null,
+      lastPhone: null, pinAvailable: false });
+    const cleanup = (async () => {
+      let localError: Error | null = null;
+      try { await persistLoggedOut(); } catch (e) { localError = e as Error; }
+      await persistHint(null);
+      await clearedNotifications;
+      set({ status: 'unauthenticated', ...(localError ? { error: localError.message } : {}) });
+    })();
+    endingSession = cleanup.finally(() => { endingSession = null; });
+    return endingSession;
   },
 
   clearError: () => set({ error: null }),

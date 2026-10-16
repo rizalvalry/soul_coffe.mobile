@@ -13,13 +13,15 @@ export type DeviceRegistration = {
   registered_at: string | null;
 };
 
-export function registerDevice(token: string, deviceName: string): Promise<DeviceRegistration> {
+export function registerDevice(token: string, deviceName: string, authToken?: string, signal?: AbortSignal): Promise<DeviceRegistration> {
   return request<DeviceRegistration>('/me/devices', {
     method: 'POST',
     body: { token, platform: 'android', device_name: deviceName },
+    authToken,
+    signal,
   });
 }
 
-export function unregisterDevice(token: string): Promise<void> {
-  return request<void>('/me/devices', { method: 'DELETE', body: { token } });
+export function unregisterDevice(token: string, authToken?: string, signal?: AbortSignal): Promise<void> {
+  return request<void>('/me/devices', { method: 'DELETE', body: { token }, authToken, signal });
 }

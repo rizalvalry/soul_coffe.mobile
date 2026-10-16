@@ -87,16 +87,16 @@ export function usePushNotifications() {
   useEffect(() => {
     if (!session) return;
 
-    void syncRegistration();
+    void syncRegistration(session.token);
 
     const rotation = Notifications.addPushTokenListener(() => {
-      void syncRegistration();
+      void syncRegistration(session.token);
     });
 
     // Coming back from the background is when a permission granted in Settings, or a token
     // refreshed while the app slept, actually becomes visible to us.
     const appState = AppState.addEventListener('change', (state: AppStateStatus) => {
-      if (state === 'active') void syncRegistration();
+      if (state === 'active') void syncRegistration(session.token);
     });
 
     return () => {

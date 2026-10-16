@@ -218,13 +218,24 @@ export async function loginAsDemoRole(role: Role): Promise<Session> {
 export async function revokeToken(token: string): Promise<void> {
   if (isDemoMode()) return;
 
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort();
+      reject(new Error('Logout timeout'));
+    }, 5000);
+  });
   try {
-    await fetch(`${apiBaseUrl()}/auth/logout`, {
+    await Promise.race([fetch(`${apiBaseUrl()}/auth/logout`, {
       method: 'POST',
       headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-    });
+      signal: controller.signal,
+    }), timeout]);
   } catch {
     // Offline, or the token was already gone. Either way the device-side clear is what matters.
+  } finally {
+    clearTimeout(timer!);
   }
 }
 

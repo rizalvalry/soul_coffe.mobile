@@ -243,9 +243,9 @@ function PendingSaleRow({
         <View style={styles.historyTime}>
           <Text variant="captionStrong">{clockOf(entry.queuedAt)}</Text>
           <Chip
-            tone="neutral"
-            label="Menunggu koneksi"
-            icon={<MaterialCommunityIcons name="cloud-off-outline" size={12} color={semantic.textMuted} />}
+            tone={entry.rejection ? 'amber' : 'neutral'}
+            label={entry.rejection ? 'Ditolak server' : 'Menunggu koneksi'}
+            icon={<MaterialCommunityIcons name={entry.rejection ? 'alert-outline' : 'cloud-off-outline'} size={12} color={semantic.textMuted} />}
           />
         </View>
 
@@ -253,6 +253,7 @@ function PendingSaleRow({
           <Text variant="body" numberOfLines={1}>
             {entry.input.lines.map((line) => `${line.qty}× ${productName(line.product_id)}`).join(', ')}
           </Text>
+          {entry.rejection ? <Text variant="caption" color={semantic.textMuted}>{entry.rejection}</Text> : null}
         </View>
 
         <View style={styles.historyRight}>
@@ -368,9 +369,13 @@ export default function SellScreen() {
       // failing the till. The rider's own record of what they just sold must not depend
       // on a bar of signal that happens to be missing at this exact moment.
       if (e instanceof ApiError && e.isOffline) {
-        await offlineQueue.enqueue({ lines, paymentMethod: payment, gps });
-        setQty({});
-        setQueuedOffline(true);
+        try {
+          await offlineQueue.enqueue({ lines, paymentMethod: payment, gps });
+          setQty({});
+          setQueuedOffline(true);
+        } catch {
+          setFormError('Transaksi belum tersimpan di perangkat. Catat ulang setelah masuk dan periksa antrean offline.');
+        }
         return;
       }
 
@@ -441,6 +446,25 @@ export default function SellScreen() {
             loading={offlineQueue.flushing}
             onPress={() => void offlineQueue.flushNow()}
           />
+        </Card>
+      ) : null}
+
+      {offlineQueue.legacyCount > 0 ? (
+        <Banner
+          tone="warning"
+          message="Ada transaksi offline dari versi sebelumnya yang belum diketahui pemiliknya. Data tetap tersimpan di perangkat dan tidak dikirim otomatis. Hubungi Administrator untuk pemulihan."
+        />
+      ) : null}
+
+      {offlineQueue.rejected.length > 0 ? (
+        <Card style={styles.queueCard}>
+          <Banner
+            tone="warning"
+            message={`${offlineQueue.rejected.length} transaksi offline ditolak server. Catatannya tetap tersimpan di perangkat untuk diperiksa bersama Administrator.`}
+          />
+          {offlineQueue.rejected.map((entry, index) => (
+            <PendingSaleRow key={entry.uuid} entry={entry} productName={productName} isFirst={index === 0} />
+          ))}
         </Card>
       ) : null}
 

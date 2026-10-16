@@ -16,6 +16,7 @@ import { semantic } from '@/theme';
  */
 export default function AppLayout() {
   const status = useAuth((s) => s.status);
+  const userId = useAuth((s) => s.session?.user.id);
 
   // Mounted here rather than in the root layout: registration needs a bearer token, and this is
   // the first point in the tree where there is guaranteed to be a session. Declared above the
@@ -35,7 +36,7 @@ export default function AppLayout() {
     // The socket connects here, above the Stack, so it stays alive across every authenticated
     // screen instead of only the handful that used to open it themselves — see
     // RealtimeProvider's docblock for what broke while it didn't.
-    <RealtimeProvider>
+    <RealtimeProvider key={userId}>
       <View style={{ flex: 1, backgroundColor: semantic.bg }}>
         <DemoBanner />
         <Stack
