@@ -60,7 +60,7 @@ export type RecordSettlementInput = {
   cash: number;
   qris: number;
   transfer: number;
-  /** Required by the server when the total does not match the transactions. */
+  /** Optional, including when the total differs from the transactions. */
   varianceReason?: string;
 };
 

@@ -67,3 +67,12 @@ test('ordinary settlement requests keep the current-day endpoint', async () => {
   await record.mutationFn({ cartId: 18, cash: 12000, qris: 0, transfer: 0 });
   assert.equal(requests.at(-1).path, '/settlements');
 });
+
+test('zero declared money and an omitted variance reason remain valid request inputs', async () => {
+  const record = useRecordSettlement();
+  await record.mutationFn({ cartId: 18, cash: 0, qris: 0, transfer: 0 });
+  assert.deepEqual({ ...requests.at(-1).options.body }, {
+    cart_id: 18, cash: 0, qris: 0, transfer: 0,
+  });
+  assert.equal(requests.at(-1).options.idempotencyKey, 'test-key');
+});

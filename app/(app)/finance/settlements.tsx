@@ -21,6 +21,7 @@ import {
   useSettlementDraft,
   useSettlementQueue,
 } from '@/features/settlements/queries';
+import { settlementExpectations } from '@/features/settlements/expectations';
 import { settlementTarget } from '@/features/settlements/navigation';
 import { ApiError } from '@/lib/api';
 import type { SettlementQueueRow } from '@/domain/types';
@@ -46,13 +47,18 @@ import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
  */
 
 function rupiah(amount: number): string {
-  return `Rp ${Math.round(amount).toLocaleString('id-ID')}`;
+  return `Rp ${amount.toLocaleString('id-ID')}`;
 }
 
 /** Digits only. A money field that accepts "50.000,00" is a money field that will be typed wrong. */
 function toAmount(text: string): number {
   const digits = text.replace(/\D/g, '');
   return digits === '' ? 0 : Number.parseInt(digits, 10);
+}
+
+/** The API caps each method at Rp 1 trillion; 13 digits also stay inside JS's safe integer range. */
+function moneyDigits(text: string): string {
+  return text.replace(/\D/g, '').slice(0, 13);
 }
 
 function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: string; onClose: () => void }) {
@@ -65,6 +71,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
   const [transfer, setTransfer] = useState('');
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [recordedVariance, setRecordedVariance] = useState<number | null>(null);
 
   // Set once the money is in; the screen then switches to the cups.
   const [settlementId, setSettlementId] = useState<number | null>(row.settlement_id);
@@ -77,8 +84,10 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
 
   const draft = draftQuery.data;
   const declared = toAmount(cash) + toAmount(qris) + toAmount(transfer);
-  const expected = draft?.expected_total ?? row.expected_total;
+  const expectations = settlementExpectations(draft, row);
+  const expected = expectations.total;
   const variance = declared - expected;
+  const flaggedVariance = recordedVariance ?? row.variance_minor ?? 0;
 
   const remainingLines = useMemo(
     () => (draft?.lines ?? []).filter((line) => line.qty_remaining > 0),
@@ -99,9 +108,14 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
       });
 
       setSettlementId(settlement.id);
+      setRecordedVariance(settlement.variance);
+      if (settlement.variance !== 0) {
+        Alert.alert(
+          'Setoran Tercatat',
+          `Selisih ${rupiah(Math.abs(settlement.variance))} tercatat dan dilaporkan ke Administrator & Finance.`,
+        );
+      }
     } catch (e) {
-      // The server's own sentence is more useful than anything invented here — it names the two
-      // totals and asks for the reason.
       setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
     }
   }, [row.cart_id, date, cash, qris, transfer, reason, record]);
@@ -170,6 +184,26 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   <Text variant="h3">{rupiah(expected)}</Text>
                 </View>
               </View>
+              {expectations.cash !== null && expectations.qris !== null && expectations.transfer !== null ? (
+                <View style={styles.expectedMethods}>
+                  <View style={styles.totalRow}>
+                    <Text variant="caption">Ekspektasi tunai</Text>
+                    <Text variant="bodyStrong">{rupiah(expectations.cash)}</Text>
+                  </View>
+                  <View style={styles.methodRow}>
+                    <Text variant="caption">Ekspektasi QRIS</Text>
+                    <Text variant="bodyStrong">{rupiah(expectations.qris)}</Text>
+                  </View>
+                  <View style={styles.methodRow}>
+                    <Text variant="caption">Ekspektasi transfer</Text>
+                    <Text variant="bodyStrong">{rupiah(expectations.transfer)}</Text>
+                  </View>
+                </View>
+              ) : (
+                <Text variant="caption" color={semantic.textMuted}>
+                  Rincian per metode belum tersedia. Total memakai data setoran yang ada.
+                </Text>
+              )}
             </Card>
 
             {!settlementId ? (
@@ -179,21 +213,21 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   <Input
                     label="Tunai / Cash"
                     value={cash}
-                    onChangeText={(t) => setCash(String(toAmount(t) || ''))}
+                    onChangeText={(t) => setCash(moneyDigits(t))}
                     keyboardType="number-pad"
                     placeholder="0"
                   />
                   <Input
                     label="QRIS / Online"
                     value={qris}
-                    onChangeText={(t) => setQris(String(toAmount(t) || ''))}
+                    onChangeText={(t) => setQris(moneyDigits(t))}
                     keyboardType="number-pad"
                     placeholder="0"
                   />
                   <Input
                     label="Transfer"
                     value={transfer}
-                    onChangeText={(t) => setTransfer(String(toAmount(t) || ''))}
+                    onChangeText={(t) => setTransfer(moneyDigits(t))}
                     keyboardType="number-pad"
                     placeholder="0"
                   />
@@ -209,15 +243,15 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                       tone={variance < 0 ? 'danger' : 'warning'}
                       message={
                         variance < 0
-                          ? `Kurang ${rupiah(Math.abs(variance))} dari transaksi tercatat. Isi alasannya di bawah.`
-                          : `Lebih ${rupiah(variance)} dari transaksi tercatat. Isi alasannya di bawah.`
+                          ? `Kurang ${rupiah(Math.abs(variance))} dari transaksi tercatat. Selisih tetap dapat dicatat.`
+                          : `Lebih ${rupiah(variance)} dari transaksi tercatat. Selisih tetap dapat dicatat.`
                       }
                     />
                   ) : null}
 
                   {variance !== 0 ? (
                     <Input
-                      label="Alasan selisih"
+                      label="Alasan selisih (opsional)"
                       value={reason}
                       onChangeText={setReason}
                       placeholder="Mis. uang kembalian kurang, rider ganti besok"
@@ -234,15 +268,23 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   icon="cash-check"
                   onPress={() => void submitMoney()}
                   loading={record.isPending}
-                  disabled={record.isPending || declared <= 0}
+                  disabled={record.isPending}
                 />
               </>
             ) : (
               <>
                 <Banner
                   tone="success"
-                  message="Uang sudah tercatat. Sekarang pisahkan cups yang masih layak dari yang harus dibuang."
+                  message={flaggedVariance !== 0 || row.settlement_status === 'VARIANCE_FLAGGED'
+                    ? 'Setoran dengan selisih tercatat dan dilaporkan ke Administrator & Finance. Sekarang pisahkan cups sisa.'
+                    : 'Uang sudah tercatat. Sekarang pisahkan cups yang masih layak dari yang harus dibuang.'}
                 />
+                {row.expected_stale ? (
+                  <Banner
+                    tone="warning"
+                    message="Ekspektasi berubah setelah setoran dicatat. Periksa kembali nilainya sebelum menyelesaikan."
+                  />
+                ) : null}
 
                 {remainingLines.length === 0 ? (
                   <Card style={styles.card}>
@@ -367,8 +409,12 @@ export default function FinanceSettlementsScreen() {
         <>
           <SectionTitle title={date ? `Antrean ${date}` : 'Antrean hari ini'} caption={`${rows.length} gerobak`} />
 
-          {rows.map((row) => {
+          {rows.map((row, index) => {
             const done = row.settlement_id !== null;
+            const arrivalDate = row.arrived_at ? new Date(row.arrived_at) : null;
+            const arrivedTime = arrivalDate && !Number.isNaN(arrivalDate.getTime())
+              ? arrivalDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+              : null;
 
             return (
               <Touchable
@@ -391,13 +437,21 @@ export default function FinanceSettlementsScreen() {
                     {row.cart_code} · {row.staff_name ?? '-'}
                   </Text>
                   <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
-                    {row.cups_sold} cups terjual · sisa {row.cups_remaining} · {rupiah(row.expected_total)}
+                    {row.cups_sold} cups terjual · sisa {row.cups_remaining} · {rupiah(row.expected_total_minor ?? row.expected_total ?? 0)}
+                  </Text>
+                  <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
+                    Urutan {index + 1} · {row.arrived_at === undefined
+                      ? 'Status kedatangan belum tersedia'
+                      : row.arrived_at === null
+                        ? 'Belum tiba di dapur'
+                        : arrivedTime ? `Tiba di dapur ${arrivedTime}` : 'Tiba di dapur'}
                   </Text>
                 </View>
 
                 <Chip
-                  tone={done ? 'brand' : 'neutral'}
-                  label={done ? (row.settlement_status === 'RECONCILED' ? 'Selesai' : 'Uang masuk') : 'Menunggu'}
+                  tone={done || row.arrived_at ? 'brand' : 'neutral'}
+                  label={done ? (row.settlement_status === 'RECONCILED' ? 'Selesai' : 'Uang masuk')
+                    : row.arrived_at ? 'Tiba' : 'Menunggu'}
                 />
               </Touchable>
             );
@@ -448,6 +502,8 @@ const styles = StyleSheet.create({
     borderTopColor: semantic.border,
     paddingTop: space.md,
   },
+  expectedMethods: { gap: space.sm },
+  methodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   lineHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   lineName: { flex: 1 },

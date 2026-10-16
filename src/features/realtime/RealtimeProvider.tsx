@@ -195,7 +195,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
       const existingEvent = ['CartClosedOut', 'SaleVoided', 'SaleFlaggedSuspect'].includes(event.type);
       const queueEvent = ['SaleRecorded', 'SettlementRecorded', 'SettlementApproved',
-        'SettlementVarianceFlagged'].includes(event.type);
+        'SettlementExpectedStale', 'SettlementVarianceFlagged'].includes(event.type);
       if ((isFinanceOrManagement && (existingEvent || queueEvent)) ||
         (session.user.role === 'ADMINISTRATOR' && existingEvent)) {
         invalidateSettlementData(client, event.cart_id);
