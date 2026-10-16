@@ -57,7 +57,7 @@ function statusParam(status?: RefillStatus | RefillStatus[]): string {
   return `?status=${Array.isArray(status) ? status.join(',') : status}`;
 }
 
-/** Called by the realtime layer on every inbound event, and by the polling fallback. */
+/** Called by the realtime layer on inbound events and by the push listener. */
 export function invalidateRefillData(client: QueryClient, refillId?: number) {
   void client.invalidateQueries({ queryKey: ['refills'] });
   void client.invalidateQueries({ queryKey: qk.badges });

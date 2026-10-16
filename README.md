@@ -67,18 +67,15 @@ every screen:
 - **`total_requested`/`total_qty`** are computed client-side from `lines`, matching what
   `demo/router.ts` already did.
 - **Realtime moved from self-hosted Reverb to Pusher Channels** (`pusherKey`/`pusherCluster` in
-  `app.json`, `useRealtime.ts`). Confirmed directly against this host that self-hosted Reverb
+  `app.json`, `src/features/realtime/RealtimeProvider.tsx`). Confirmed directly against this host that self-hosted Reverb
   cannot work here: a raw WebSocket upgrade to the API domain returned Laravel's own 404 page
   (nothing proxies it to a Reverb process — shared hosting has no way to add that reverse-proxy
   rule), and the raw Reverb port (8080) timed out (host firewall). Pusher is a hosted service, so
   the mobile client only needs a public `key` + `cluster` — no host/port to keep in sync between
   environments, and `App Secret` never leaves the Laravel `.env`.
-  **This does not by itself make notifications arrive**: `PublishOutboxEvent` — the job that
-  actually calls the broadcaster — is a queued job (`QUEUE_CONNECTION=database`), and nothing on
-  this shared hosting processes that queue (no cron entry, no `supervisorctl`/`systemd` for a
-  persistent `queue:work`). Until that's added on the backend, events never reach Pusher either;
-  `useRealtime()` degrades to its documented 10s-refetch fallback and an honest "Mode luring"
-  banner rather than failing silently either way.
+  The backend broadcasts outbox events after commit and queues failed deliveries for retry.
+  `RealtimeProvider` subscribes throughout the signed-in session. When the socket reconnects or
+  the app returns to the foreground, active queries refresh; list screens also support pull-to-refresh.
 
 None of the above was guesswork — every gap was confirmed by reading the actual PHP resource
 source in soul_coffe.backend before writing the corresponding mapper or fallback.
@@ -122,17 +119,17 @@ longer authenticate, and the next person on this handset would inherit the previ
 The token is the native FCM one, not an Expo push token: the Laravel side talks to Firebase
 directly, so there is no Expo relay and no Expo account in the path of an operational alert.
 
-Push and the Pusher socket carry the same `event_id`, and `src/features/realtime/seen.ts` is the
-single dedupe set both go through. Whichever arrives first refreshes the screen; the second is
-dropped, and a foreground banner is suppressed for an event the socket already applied. That set
-lives outside the hook deliberately — the push handler is not a hook and fires with nothing
-mounted.
+Push and the Pusher socket carry the same `event_id`, and `src/features/realtime/seen.ts` prevents
+duplicate foreground banners. The socket refreshes its mapped queries once per event ID even if
+the push arrives first; a variance push also refreshes the settlement queue if the socket is down.
+The dedupe set lives outside the hook because the notification handler can run before a component
+mounts.
 
 **`google-services.json` is required for delivery and is not in git.** Download it from the
 Firebase console for an Android app registered as `id.soulcoffeemate.ops.demo`, and drop it in
 this directory before `prebuild`. `app.config.js` adds `android.googleServicesFile` only when the
 file is present, so a build without it still succeeds: the app logs that push is unavailable once
-and keeps using the socket and its 10-second poll. Nothing else degrades.
+  and keeps using the socket and foreground or pull-to-refresh updates.
 
 ## Build an APK locally
 

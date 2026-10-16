@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { Screen } from '@/components/ui/Screen';
@@ -21,6 +21,7 @@ import {
   useSettlementDraft,
   useSettlementQueue,
 } from '@/features/settlements/queries';
+import { settlementTarget } from '@/features/settlements/navigation';
 import { ApiError } from '@/lib/api';
 import type { SettlementQueueRow } from '@/domain/types';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
@@ -54,8 +55,8 @@ function toAmount(text: string): number {
   return digits === '' ? 0 : Number.parseInt(digits, 10);
 }
 
-function DepositSheet({ row, onClose }: { row: SettlementQueueRow; onClose: () => void }) {
-  const draftQuery = useSettlementDraft(row.cart_id);
+function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: string; onClose: () => void }) {
+  const draftQuery = useSettlementDraft(row.cart_id, date);
   const record = useRecordSettlement();
   const approve = useApproveSettlement();
 
@@ -69,6 +70,10 @@ function DepositSheet({ row, onClose }: { row: SettlementQueueRow; onClose: () =
   const [settlementId, setSettlementId] = useState<number | null>(row.settlement_id);
   const [returned, setReturned] = useState<Record<number, number>>({});
   const [rejected, setRejected] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    if (row.settlement_id !== null) setSettlementId(row.settlement_id);
+  }, [row.settlement_id]);
 
   const draft = draftQuery.data;
   const declared = toAmount(cash) + toAmount(qris) + toAmount(transfer);
@@ -86,6 +91,7 @@ function DepositSheet({ row, onClose }: { row: SettlementQueueRow; onClose: () =
     try {
       const settlement = await record.mutateAsync({
         cartId: row.cart_id,
+        date,
         cash: toAmount(cash),
         qris: toAmount(qris),
         transfer: toAmount(transfer),
@@ -98,7 +104,7 @@ function DepositSheet({ row, onClose }: { row: SettlementQueueRow; onClose: () =
       // totals and asks for the reason.
       setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
     }
-  }, [row.cart_id, cash, qris, transfer, reason, record]);
+  }, [row.cart_id, date, cash, qris, transfer, reason, record]);
 
   const submitCups = useCallback(async () => {
     setError(null);
@@ -317,8 +323,12 @@ function DepositSheet({ row, onClose }: { row: SettlementQueueRow; onClose: () =
 
 export default function FinanceSettlementsScreen() {
   const router = useRouter();
-  const queueQuery = useSettlementQueue();
-  const [openCartId, setOpenCartId] = useState<number | null>(null);
+  const params = useLocalSearchParams<{ date?: string; cart_id?: string }>();
+  const { date, cartId } = settlementTarget(params);
+  const queueQuery = useSettlementQueue(date);
+  const [openCartId, setOpenCartId] = useState<number | null>(cartId);
+
+  useEffect(() => setOpenCartId(cartId), [cartId, date]);
 
   const rows = queueQuery.data ?? [];
   const open = rows.find((row) => row.cart_id === openCartId) ?? null;
@@ -348,14 +358,14 @@ export default function FinanceSettlementsScreen() {
         <Card style={styles.card}>
           <EmptyState
             icon="cash-remove"
-            title="Belum ada gerobak bertugas hari ini"
+            title={date ? `Belum ada gerobak bertugas pada ${date}` : 'Belum ada gerobak bertugas hari ini'}
             subtitle="Antrean setoran terisi setelah barista menyerahkan cups ke gerobak."
             tone="neutral"
           />
         </Card>
       ) : (
         <>
-          <SectionTitle title="Antrean hari ini" caption={`${rows.length} gerobak`} />
+          <SectionTitle title={date ? `Antrean ${date}` : 'Antrean hari ini'} caption={`${rows.length} gerobak`} />
 
           {rows.map((row) => {
             const done = row.settlement_id !== null;
@@ -396,7 +406,7 @@ export default function FinanceSettlementsScreen() {
       )}
 
       <Modal visible={open !== null} animationType="slide" onRequestClose={() => setOpenCartId(null)}>
-        {open ? <DepositSheet row={open} onClose={() => setOpenCartId(null)} /> : null}
+        {open ? <DepositSheet key={`${date ?? 'today'}:${open.cart_id}`} row={open} date={date} onClose={() => setOpenCartId(null)} /> : null}
       </Modal>
     </Screen>
   );

@@ -27,8 +27,8 @@ const MIN_REASON_LENGTH = 10;
  *
  * This is the single most time-sensitive screen in the app: nothing downstream (barista prep,
  * runner pickup, delivery) can move until a SUBMITTED request is decided here. It must not rely
- * on the operator remembering to pull-to-refresh — see `useRealtime()`'s docblock for what
- * "connected" actually means and what the polling fallback covers when it isn't.
+ * on the operator remembering to pull-to-refresh. `RealtimeProvider` subscribes while signed in
+ * and refreshes active queries after a reconnect or foreground return.
  */
 export default function FinanceApprovalsScreen() {
   const router = useRouter();

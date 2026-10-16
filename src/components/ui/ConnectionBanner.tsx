@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {
+  cancelAnimation,
   Easing,
   ReduceMotion,
   useAnimatedStyle,
@@ -24,19 +25,20 @@ export type ConnectionBannerProps = {
  * Honest indicator of which transport is actually live (docs/02 §8, §11).
  *
  * `connected` renders nothing — the socket is doing its job and a banner would just be noise.
- * `connecting` / `disconnected` renders the polling notice, because the app really has fallen
- * back to a 10s refetch loop at that point and requirement 3 (realtime) is not being met. Never
- * hide this to make the app look more "realtime" than it is.
+ * `connecting` / `disconnected` reports the socket state. Active queries refresh on reconnect
+ * or foreground return; users can also pull to refresh.
  *
- * The pulsing dot on the polling notice is not decoration — it is what makes the banner read as
- * an ACTIVE fallback ("still trying") rather than a dead error message the operator learns to
- * ignore.
+ * The dot pulses only while connecting. A missing socket configuration stays disconnected.
  */
 export function ConnectionBanner({ state }: ConnectionBannerProps) {
   const pulse = useSharedValue(0);
 
   useEffect(() => {
-    if (state === 'connected') return;
+    if (state !== 'connecting') {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
     pulse.value = withRepeat(
       withSequence(
         withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
@@ -63,7 +65,7 @@ export function ConnectionBanner({ state }: ConnectionBannerProps) {
     >
       <MaterialCommunityIcons name="cloud-off-outline" size={16} color={feedback.warningFg} />
       <Text variant="caption" color={feedback.warningFg} style={styles.text}>
-        {state === 'connecting' ? 'Menyambungkan — data diperbarui berkala' : 'Mode luring — data diperbarui berkala'}
+        {state === 'connecting' ? 'Menyambungkan realtime' : 'Realtime tidak tersambung — tarik untuk memperbarui data'}
       </Text>
       <Animated.View style={[styles.dot, dotStyle]} />
     </Animated.View>

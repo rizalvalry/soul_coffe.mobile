@@ -5,7 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function mountRealtimeProvider(claimEvent = () => true) {
+function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   const source = readFileSync(join(__dirname, '..', 'src/features/realtime/RealtimeProvider.tsx'), 'utf8');
   const javascript = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
@@ -18,7 +18,7 @@ function mountRealtimeProvider(claimEvent = () => true) {
   let appStateCallback;
   let refillInvalidations = 0;
   const client = { invalidateQueries: (filter) => { calls.push(filter?.queryKey ?? 'all'); return Promise.resolve(); } };
-  const session = { token: 'test-token', user: { id: '7', role: 'STAFF', cartId: 1 } };
+  const session = { token: 'test-token', user: { id: '7', role, cartId: 1 } };
   const react = {
     createContext: () => ({ Provider: () => null }),
     useContext: () => null,
@@ -50,6 +50,12 @@ function mountRealtimeProvider(claimEvent = () => true) {
       qk: { myStock: ['me', 'stock'], kitchenStock: ['kitchen', 'stock'], allocationsToday: ['allocations', 'today'] },
     },
     '@/features/showcase/queries': { showcaseKeys: { absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'], staff: ['showcase', 'staff'] } },
+    '@/features/settlements/queries': { invalidateSettlementData: (queryClient, cartId) => {
+      queryClient.invalidateQueries({ queryKey: ['settlements', 'queue'] });
+      queryClient.invalidateQueries({ queryKey: ['settlements', 'list'] });
+      queryClient.invalidateQueries({ queryKey: Number.isSafeInteger(cartId) && cartId > 0
+        ? ['settlements', 'draft', cartId] : ['settlements', 'draft'] });
+    } },
     './seen': { claimEvent },
   };
   const module = { exports: {} };
@@ -90,18 +96,60 @@ test('connection and foreground transitions refresh once without an interval', (
 });
 
 test('existing stock and sale events refresh their affected query families', () => {
-  const app = mountRealtimeProvider();
+  const app = mountRealtimeProvider(() => true, 'FINANCE');
   const cases = [
     ['ShowcaseBrewed', ['showcase/stock', 'me/stock', 'kitchen/stock']],
     ['CartStockHandedOver', ['showcase/stock', 'showcase/staff', 'showcase/allowance', 'allocations/today']],
-    ['CartClosedOut', ['showcase/stock', 'settlements']],
-    ['SaleVoided', ['settlements']],
-    ['SaleFlaggedSuspect', ['settlements']],
+    ['CartClosedOut', ['showcase/stock', 'settlements/queue', 'settlements/list', 'settlements/draft']],
+    ['SaleVoided', ['settlements/queue', 'settlements/list', 'settlements/draft']],
+    ['SaleFlaggedSuspect', ['settlements/queue', 'settlements/list', 'settlements/draft']],
   ];
   for (const [type, expectedKeys] of cases) {
     app.calls.length = 0;
     app.channelCallbacks[0]({ event_id: type, type, refill_request_id: null });
     const keys = app.calls.map((key) => Array.isArray(key) ? key.join('/') : key);
     for (const expected of expectedKeys) assert.ok(keys.includes(expected), `${type} missed ${expected}`);
+  }
+});
+
+test('Finance and Management refresh queue, list, and only the affected cart draft for settlement events', () => {
+  const types = ['SaleRecorded', 'SaleVoided', 'SettlementRecorded', 'SettlementApproved', 'SettlementVarianceFlagged'];
+  for (const role of ['FINANCE', 'MANAGEMENT']) {
+    const app = mountRealtimeProvider(() => false, role);
+    for (const type of types) {
+      app.calls.length = 0;
+      const event = { event_id: `${role}-${type}`, type, cart_id: 18, refill_request_id: null };
+      app.channelCallbacks[0](event);
+      assert.deepEqual(app.calls.map((key) => Array.from(key)), [
+        ['settlements', 'queue'],
+        ['settlements', 'list'],
+        ['settlements', 'draft', 18],
+      ], `${role} ${type}`);
+      app.channelCallbacks[1](event);
+      assert.equal(app.calls.length, 3, `${role} ${type} refetched twice`);
+    }
+  }
+});
+
+test('variance without cart context refreshes every draft, and other roles do not refresh settlements', () => {
+  const finance = mountRealtimeProvider(() => true, 'FINANCE');
+  finance.channelCallbacks[0]({ event_id: 'variance-no-cart', type: 'SettlementVarianceFlagged', refill_request_id: null });
+  assert.deepEqual(finance.calls.map((key) => Array.from(key)), [
+    ['settlements', 'queue'], ['settlements', 'list'], ['settlements', 'draft'],
+  ]);
+
+  const admin = mountRealtimeProvider(() => true, 'ADMINISTRATOR');
+  admin.channelCallbacks[0]({ event_id: 'admin-void', type: 'SaleVoided', cart_id: 18, refill_request_id: null });
+  assert.deepEqual(admin.calls.map((key) => Array.from(key)), [
+    ['settlements', 'queue'], ['settlements', 'list'], ['settlements', 'draft', 18],
+  ]);
+  admin.calls.length = 0;
+  admin.channelCallbacks[0]({ event_id: 'admin-recorded', type: 'SaleRecorded', cart_id: 18, refill_request_id: null });
+  assert.equal(admin.calls.length, 0);
+
+  for (const role of ['BARISTA', 'RIDER', 'STAFF', 'CONTENT_CREATOR']) {
+    const app = mountRealtimeProvider(() => true, role);
+    app.channelCallbacks[0]({ event_id: `void-${role}`, type: 'SaleVoided', cart_id: 18, refill_request_id: null });
+    assert.equal(app.calls.some((key) => Array.isArray(key) && key[0] === 'settlements'), false, role);
   }
 });

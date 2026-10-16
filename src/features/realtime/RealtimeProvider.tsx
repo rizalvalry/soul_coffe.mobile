@@ -8,6 +8,7 @@ import { useAuth } from '@/features/auth/store';
 import { apiBaseUrl } from '@/lib/api';
 import { invalidateRefillData, qk as refillKeys } from '@/features/refill/queries';
 import { showcaseKeys } from '@/features/showcase/queries';
+import { invalidateSettlementData } from '@/features/settlements/queries';
 import { claimEvent } from './seen';
 import type { RefillStatus, Role } from '@/domain/types';
 
@@ -22,6 +23,7 @@ export type RealtimeEvent = {
   title: string;
   body: string;
   at: string;
+  cart_id?: number | null;
 };
 
 export type ConnectionState = 'connecting' | 'connected' | 'disconnected';
@@ -167,8 +169,8 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         if (oldest) handledSocketEventIds.delete(oldest);
       }
 
-      // A socket-first delivery suppresses the later push banner. A push-first delivery must
-      // still refresh non-refill queries, which the push listener does not know about yet.
+      // A socket-first delivery suppresses the later push banner. A push-first delivery still
+      // needs the socket's mapped query refreshes, even when both transports share an event ID.
       claimEvent(event.event_id);
 
       invalidateRefillData(client, event.refill_request_id ?? undefined);
@@ -187,8 +189,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         void client.invalidateQueries({ queryKey: ['showcase', 'allowance'] });
         void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
       }
-      if (event.type === 'CartClosedOut' || event.type === 'SaleVoided' || event.type === 'SaleFlaggedSuspect') {
-        void client.invalidateQueries({ queryKey: ['settlements'] });
+      const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
+      const existingEvent = ['CartClosedOut', 'SaleVoided', 'SaleFlaggedSuspect'].includes(event.type);
+      const queueEvent = ['SaleRecorded', 'SettlementRecorded', 'SettlementApproved',
+        'SettlementVarianceFlagged'].includes(event.type);
+      if ((isFinanceOrManagement && (existingEvent || queueEvent)) ||
+        (session.user.role === 'ADMINISTRATOR' && existingEvent)) {
+        invalidateSettlementData(client, event.cart_id);
       }
     };
 
@@ -211,7 +218,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   }, [session, client]);
 
   // React Query's window-focus signal is not reliable on native. Refresh active queries when
-  // the app returns, including settlement data without complete event coverage until T-023.
+  // the app returns, including events missed while the socket was disconnected.
   useEffect(() => {
     if (!session) return;
     let previous: AppStateStatus = AppState.currentState;

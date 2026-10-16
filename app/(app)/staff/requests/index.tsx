@@ -25,7 +25,7 @@ export default function StaffRequestsScreen() {
           <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
           <Text variant="h2">Status Permintaan</Text>
           <Text variant="caption" color={semantic.textMuted}>
-            {isRealtime ? 'Realtime aktif' : 'Menyinkronkan secara berkala'}
+            {isRealtime ? 'Realtime aktif' : 'Realtime terputus — tarik untuk memperbarui'}
           </Text>
         </View>
 
