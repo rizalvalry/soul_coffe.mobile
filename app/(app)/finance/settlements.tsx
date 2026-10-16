@@ -249,7 +249,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     <EmptyState
                       icon="cup-off-outline"
                       title="Tidak ada cups sisa"
-                      subtitle="Gerobak ini habis terjual, atau sudah ditutup barista. Tinggal selesaikan setorannya."
+                      subtitle="Gerobak ini habis terjual, atau sudah ditutup Produksi. Tinggal selesaikan setorannya."
                       tone="neutral"
                     />
                   </Card>
@@ -359,7 +359,7 @@ export default function FinanceSettlementsScreen() {
           <EmptyState
             icon="cash-remove"
             title={date ? `Belum ada gerobak bertugas pada ${date}` : 'Belum ada gerobak bertugas hari ini'}
-            subtitle="Antrean setoran terisi setelah barista menyerahkan cups ke gerobak."
+            subtitle="Antrean setoran terisi setelah Produksi menyerahkan cups ke gerobak."
             tone="neutral"
           />
         </Card>

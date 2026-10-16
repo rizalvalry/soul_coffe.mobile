@@ -399,7 +399,7 @@ export default function SellScreen() {
           <EmptyState
             icon="moped-off"
             title="Anda tidak bertugas di gerobak hari ini"
-            subtitle="Hubungi Barista atau Administrator untuk penugasan gerobak hari ini."
+            subtitle="Hubungi Produksi atau Administrator untuk penugasan gerobak hari ini."
             tone="neutral"
           />
         </Card>

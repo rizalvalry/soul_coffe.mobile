@@ -27,6 +27,21 @@ test('Management login role shows the Finance menu and its own label', () => {
   assert.equal(demo.USERS.find((user) => user.role === 'MANAGEMENT')?.password, '');
 });
 
+test('BARISTA keeps its role code and routes while showing Produksi', () => {
+  const roles = loadTypeScript('src/domain/roles.ts');
+  const navigation = loadTypeScript('src/features/navigation/menu.ts');
+  const demo = loadTypeScript('src/features/demo/seed.ts');
+
+  assert.equal(roles.isRole('BARISTA'), true);
+  assert.equal(roles.roleMeta.BARISTA.label, 'Produksi');
+  assert.ok(navigation.menuByRole.BARISTA.some((item) => item.route === '/barista/add-stock'));
+  assert.equal(navigation.menuByRole.STAFF.find((item) => item.id === 'staff-absen')?.sublabel,
+    'Aktif setelah Produksi membuka absen');
+  assert.equal(demo.USERS.find((user) => user.role === 'BARISTA')?.name, 'Dimas Produksi');
+  assert.match(readFileSync(join(__dirname, '..', 'app', '(app)', 'absen.tsx'), 'utf8'),
+    /\{roleMeta\[row\.role\]\.label\}/);
+});
+
 function screenFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
