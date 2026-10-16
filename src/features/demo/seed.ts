@@ -131,7 +131,7 @@ export const USERS: DemoUser[] = [
   { id: USER_MANAGEMENT_ID, name: 'Management Demo', role: 'MANAGEMENT', phone: '+6281100000007', password: '' },
   {
     id: USER_BARISTA_ID,
-    name: 'Dimas Barista',
+    name: 'Dimas Produksi',
     role: 'BARISTA',
     phone: '+6281100000003',
     password: 'barista123',
@@ -530,8 +530,8 @@ export function buildSeed(): SeedResult {
     statusHistory: [
       { fromStatus: null, toStatus: 'SUBMITTED', actorId: GHOST_STAFF_BUDI_ID, actorName: 'Budi', actorRole: 'STAFF', reason: null, at: req2SubmittedAt },
       { fromStatus: 'SUBMITTED', toStatus: 'APPROVED', actorId: USER_FINANCE_ID, actorName: 'Sari Finance', actorRole: 'FINANCE', reason: null, at: req2DecidedAt },
-      { fromStatus: 'APPROVED', toStatus: 'PREPARING', actorId: USER_BARISTA_ID, actorName: 'Dimas Barista', actorRole: 'BARISTA', reason: null, at: req2PreparingAt },
-      { fromStatus: 'PREPARING', toStatus: 'READY_TO_PICK', actorId: USER_BARISTA_ID, actorName: 'Dimas Barista', actorRole: 'BARISTA', reason: null, at: req2ReadyAt },
+      { fromStatus: 'APPROVED', toStatus: 'PREPARING', actorId: USER_BARISTA_ID, actorName: 'Dimas Produksi', actorRole: 'BARISTA', reason: null, at: req2PreparingAt },
+      { fromStatus: 'PREPARING', toStatus: 'READY_TO_PICK', actorId: USER_BARISTA_ID, actorName: 'Dimas Produksi', actorRole: 'BARISTA', reason: null, at: req2ReadyAt },
       { fromStatus: 'READY_TO_PICK', toStatus: 'PICKED_UP', actorId: USER_RIDER_ID, actorName: 'Agus Rider', actorRole: 'RIDER', reason: null, at: req2PickedUpAt },
       { fromStatus: 'PICKED_UP', toStatus: 'DELIVERED', actorId: USER_RIDER_ID, actorName: 'Agus Rider', actorRole: 'RIDER', reason: null, at: req2DeliveredAt },
     ],

@@ -53,7 +53,7 @@ export const roleMeta: Record<Role, RoleMeta> = {
   },
   BARISTA: {
     priority: 4,
-    label: 'Barista',
+    label: 'Produksi',
     description: 'Alokasi harian & penyiapan cups di dapur',
     icon: 'coffee-maker',
     home: '/menu',

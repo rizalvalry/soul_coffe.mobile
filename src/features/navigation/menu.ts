@@ -165,7 +165,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
       sublabel: 'Absen sendiri, lalu buka absen untuk rider',
       icon: 'fingerprint',
       route: '/absen',
-      requirement: 'Absen — barista membuka akses rider',
+      requirement: 'Absen — Produksi membuka akses rider',
     },
     {
       id: 'barista-close-out',
@@ -265,10 +265,10 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'staff-absen',
       label: 'Absen',
-      sublabel: 'Aktif setelah barista membuka absen',
+      sublabel: 'Aktif setelah Produksi membuka absen',
       icon: 'fingerprint',
       route: '/absen',
-      requirement: 'Absen — dibuka oleh barista',
+      requirement: 'Absen — dibuka oleh Produksi',
     },
     {
       id: 'staff-requests',

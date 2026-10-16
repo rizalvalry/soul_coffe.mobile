@@ -194,7 +194,7 @@ export async function loginAsDemoRole(role: Role): Promise<Session> {
     MANAGEMENT: { id: 'demo-management', name: 'Management Demo', role: 'MANAGEMENT' },
     BARISTA: {
       id: 'demo-barista',
-      name: 'Barista Demo',
+      name: 'Produksi Demo',
       role: 'BARISTA',
       kitchenName: 'Dapur Pusat Jakarta',
       kitchenId: 1,

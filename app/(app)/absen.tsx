@@ -21,6 +21,7 @@ import {
   useOpenStaffAbsen,
 } from '@/features/showcase/queries';
 import { useAuth } from '@/features/auth/store';
+import { roleMeta } from '@/domain/roles';
 import { ApiError } from '@/lib/api';
 import { brand, feedback, radius, semantic, space } from '@/theme';
 
@@ -303,7 +304,7 @@ export default function AbsenScreen() {
           <EmptyState
             icon="account-clock-outline"
             title="Belum ada yang absen"
-            subtitle="Barista biasanya yang pertama, sebelum meracik kopi."
+            subtitle="Produksi biasanya yang pertama, sebelum meracik kopi."
             tone="neutral"
           />
         ) : (
@@ -319,7 +320,7 @@ export default function AbsenScreen() {
                       {row.user_name ?? `#${row.user_id}`}
                     </Text>
                     <Text variant="micro" color={semantic.textSubtle}>
-                      {row.role}
+                      {roleMeta[row.role].label}
                     </Text>
                   </View>
                   <Chip tone="brand" label={clockTime(row.clocked_in_at)} />
