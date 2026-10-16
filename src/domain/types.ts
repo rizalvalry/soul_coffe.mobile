@@ -354,7 +354,14 @@ export type SettlementQueueRow = {
   transactions: number;
   cups_sold: number;
   /** Whole rupiah, from the transactions themselves. */
-  expected_total: number;
+  expected_total?: number;
+  expected_total_minor?: number;
+  expected_cash_minor?: number;
+  expected_qris_minor?: number;
+  expected_transfer_minor?: number;
+  arrived_at?: string | null;
+  variance_minor?: number | null;
+  expected_stale?: boolean;
   cups_remaining: number;
   settlement_id: number | null;
   settlement_status: string | null;
@@ -384,7 +391,11 @@ export type SettlementDraft = {
   staff_id: number | null;
   staff_name: string | null;
   area: string | null;
-  expected_total: number;
+  expected_total?: number;
+  expected_total_minor?: number;
+  expected_cash_minor?: number;
+  expected_qris_minor?: number;
+  expected_transfer_minor?: number;
   lines: SettlementDraftLine[];
 };
 
@@ -401,7 +412,13 @@ export type Settlement = {
   transfer: number;
   declared_total: number;
   expected_total: number;
-  /** Signed: positive is a surplus, negative a shortfall. Both need explaining. */
+  expected_total_minor?: number;
+  expected_cash_minor?: number | null;
+  expected_qris_minor?: number | null;
+  expected_transfer_minor?: number | null;
+  expected_stale?: boolean;
+  stale_delta_minor?: number;
+  /** Signed: positive is a surplus, negative a shortfall. The reason is optional. */
   variance: number;
   variance_reason: string | null;
   reconciled_by: string | null;
