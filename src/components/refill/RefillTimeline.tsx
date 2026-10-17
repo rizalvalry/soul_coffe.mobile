@@ -23,7 +23,7 @@ type TimelineStep = {
   time: string | null;
 };
 
-/** Forward path of the §6 state machine — CANCELLED/REJECTED/EXPIRED branch off SUBMITTED. */
+/** Forward path of the §6 state machine; expiry may branch from any open status. */
 const FORWARD_ORDER: RefillStatus[] = [
   'SUBMITTED',
   'APPROVED',
@@ -37,11 +37,18 @@ const FORWARD_ORDER: RefillStatus[] = [
 const TERMINAL_EXITS: RefillStatus[] = ['REJECTED', 'CANCELLED', 'EXPIRED'];
 
 /**
- * Builds the timeline from the fields `RefillRequest` actually carries (submitted_at,
- * decided_at, prepared_at, picked_up_at, delivered_at) rather than a `status_history[]` the
- * domain type does not declare — see docs/04 §Flow B for the field set this reads.
+ * Detail responses carry the complete status history, including system expiry from any open
+ * status. Older responses fall back to the timestamp fields already available in the app.
  */
 function buildSteps(refill: RefillRequest): TimelineStep[] {
+  if (refill.status_history?.length) {
+    return refill.status_history.map((entry) => ({
+      status: entry.to_status,
+      actor: entry.actor_role === 'SYSTEM' ? null : actorForStatus(refill, entry.to_status),
+      time: entry.created_at,
+    }));
+  }
+
   if (TERMINAL_EXITS.includes(refill.status)) {
     return [
       { status: 'SUBMITTED', actor: refill.staff_name, time: refill.submitted_at },
@@ -87,6 +94,26 @@ function buildSteps(refill: RefillRequest): TimelineStep[] {
     actor: actorFor[status],
     time: timeFor[status],
   }));
+}
+
+function actorForStatus(refill: RefillRequest, status: RefillStatus): string | null {
+  switch (status) {
+    case 'SUBMITTED':
+    case 'CANCELLED':
+      return refill.staff_name;
+    case 'APPROVED':
+    case 'REJECTED':
+      return refill.finance_name;
+    case 'PREPARING':
+    case 'READY_TO_PICK':
+      return refill.barista_name;
+    case 'PICKED_UP':
+    case 'DELIVERED':
+      return refill.rider_name;
+    case 'CLOSED':
+    case 'EXPIRED':
+      return null;
+  }
 }
 
 /**

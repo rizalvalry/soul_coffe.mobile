@@ -91,6 +91,12 @@ export type RefillRequest = {
   id: number;
   code: string;
   status: RefillStatus;
+  status_message?: string | null;
+  status_history?: {
+    to_status: RefillStatus;
+    actor_role: string | null;
+    created_at: string | null;
+  }[];
   operating_date: string;
   cart_code: string;
   staff_name: string;
