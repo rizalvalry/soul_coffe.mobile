@@ -56,6 +56,8 @@ export type RawRefillRequest = {
   id: number;
   code: string;
   status: RefillRequest['status'];
+  status_message?: string | null;
+  status_history?: RefillRequest['status_history'];
   operating_date: string;
   cart: { id: number; code: string } | null;
   staff: { id: number; name: string } | null;
@@ -99,6 +101,8 @@ export function toRefillRequest(raw: RawRefillRequest, unitOf: UnitLookup): Refi
     id: raw.id,
     code: raw.code,
     status: raw.status,
+    status_message: raw.status_message ?? null,
+    status_history: raw.status_history ?? [],
     operating_date: raw.operating_date,
     cart_code: raw.cart?.code ?? '-',
     staff_name: raw.staff?.name ?? '-',

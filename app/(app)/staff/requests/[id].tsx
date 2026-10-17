@@ -109,6 +109,17 @@ function RequestDetail({
         </Card>
       </Animated.View>
 
+      {refill.status === 'EXPIRED' ? (
+        <Animated.View entering={enter('below', 1)}>
+          <Card style={styles.expiredCard}>
+            <Text variant="bodyStrong" color={feedback.warningFg}>Request Kedaluwarsa</Text>
+            <Text variant="body">
+              {refill.status_message ?? 'Request ini tidak selesai pada tanggal operasionalnya. Anda dapat mengajukan request baru; Finance menangani barang fisik secara terpisah.'}
+            </Text>
+          </Card>
+        </Animated.View>
+      ) : null}
+
       {refill.status === 'REJECTED' && refill.decision_reason ? (
         <Animated.View entering={enter('below', 1)}>
           <Card style={styles.reasonCard}>
@@ -225,6 +236,7 @@ const styles = StyleSheet.create({
   headerText: { flex: 1, gap: space.xxs },
 
   reasonCard: { gap: space.sm, borderColor: feedback.dangerBorder, backgroundColor: feedback.dangerBg },
+  expiredCard: { gap: space.sm, borderColor: feedback.warningBorder, backgroundColor: feedback.warningBg },
   reasonHeader: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
 
   evidenceCard: { gap: space.md },
