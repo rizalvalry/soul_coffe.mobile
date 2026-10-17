@@ -233,6 +233,28 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     return () => subscription.remove();
   }, [session, client]);
 
+  // A window opened yesterday is closed at the server's next operating-day boundary, even if
+  // the phone stays foregrounded with a healthy socket (no event is emitted for that rollover).
+  // Schedule a single refresh at each plausible boundary: Laravel defaults to UTC and operations
+  // run in WIB. These are date-change triggers, not an interval that polls for an open window.
+  useEffect(() => {
+    if (session?.user.role !== 'STAFF') return;
+    let timer: ReturnType<typeof setTimeout>;
+    const day = 24 * 60 * 60 * 1000;
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const schedule = () => {
+      const now = Date.now();
+      const nextUtc = (Math.floor(now / day) + 1) * day;
+      const nextWib = (Math.floor((now + wibOffset) / day) + 1) * day - wibOffset;
+      timer = setTimeout(() => {
+        void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
+        schedule();
+      }, Math.min(nextUtc, nextWib) - now + 1000);
+    };
+    schedule();
+    return () => clearTimeout(timer);
+  }, [session?.user.role, client]);
+
   return <RealtimeContext.Provider value={{ state, isRealtime: state === 'connected' }}>{children}</RealtimeContext.Provider>;
 }
 

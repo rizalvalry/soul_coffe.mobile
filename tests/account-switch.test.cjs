@@ -84,7 +84,8 @@ function setup({ saleError, saleRequest, deleteFails = false, markerFails = fals
     '@react-native-async-storage/async-storage': storage,
     '@/lib/api': {
       ApiError,
-      request: async (_path, options) => {
+      request: async (path, options) => {
+        if (path === '/absen/status') return { staff_window_open: true, has_clocked_in: true };
         calls.push(`sale:${state.session?.user.id}:${options.idempotencyKey}`);
         if (saleRequest) return saleRequest(options);
         if (saleError) throw new ApiError('Sesi berakhir', saleError);
@@ -93,6 +94,12 @@ function setup({ saleError, saleRequest, deleteFails = false, markerFails = fals
       uuidv4: () => `sale-uuid-${++nextUuid}`,
     },
     '@/features/auth/store': { useAuth },
+    '@/features/showcase/riderDayGate': {
+      DAY_NOT_OPEN_MESSAGE: 'Produksi belum membuka absen hari ini. Fitur transaksi belum bisa dipakai.',
+      isDayNotOpen: () => false,
+      riderDayGate: () => 'ready',
+      riderGateMessage: () => null,
+    },
   });
   return { useAuth, queue, getQueryClient: queryModule.getQueryClient, disk, secure, calls };
 }

@@ -22,10 +22,11 @@ import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useMyStock } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
+import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { useRecordSale, useTodaySales, useVoidSale } from '@/features/sales/queries';
 import type { QueuedSale } from '@/features/sales/offlineQueue';
 import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
-import { ApiError } from '@/lib/api';
+import { ApiError, uuidv4 } from '@/lib/api';
 import { PAYMENT_METHODS, type PaymentMethod, type Product, type Sale } from '@/domain/types';
 import { brand, feedback, neutral, radius, semantic, shadow, space } from '@/theme';
 
@@ -91,7 +92,9 @@ function clockOf(iso: string): string {
  * window, whose sale it is, whether the day is already settled); this row just offers the button
  * and shows whatever sentence comes back once it is too late.
  */
-function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
+function SaleHistoryRow({ sale, isFirst, gateMessage, onDayClosed }: {
+  sale: Sale; isFirst: boolean; gateMessage: string | null; onDayClosed: () => void;
+}) {
   const voidSale = useVoidSale();
 
   const [expanded, setExpanded] = useState(false);
@@ -100,6 +103,11 @@ function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
 
   const onConfirmVoid = async () => {
     setError(null);
+
+    if (gateMessage) {
+      setError(gateMessage);
+      return;
+    }
 
     if (reason.trim().length < MIN_VOID_REASON_LENGTH) {
       setError(`Alasan pembatalan wajib diisi (min. ${MIN_VOID_REASON_LENGTH} karakter).`);
@@ -113,7 +121,8 @@ function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
     } catch (e) {
       // A 422 here carries the server's own sentence — "Pembatalan hanya bisa dilakukan dalam
       // 10 menit…", "sudah direkonsiliasi…" — more useful than anything invented here.
-      setError(e instanceof ApiError ? e.message : 'Gagal membatalkan transaksi. Coba lagi.');
+      setError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e instanceof ApiError ? e.message : 'Gagal membatalkan transaksi. Coba lagi.');
+      if (isDayNotOpen(e)) onDayClosed();
     }
   };
 
@@ -166,10 +175,12 @@ function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
 
         <Touchable
           onPress={() => setExpanded((prev) => !prev)}
+          disabled={!!gateMessage}
+          accessibilityState={{ disabled: !!gateMessage }}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={`Batalkan transaksi pukul ${clockOf(sale.occurred_at)}`}
-          style={styles.historyVoidButton}
+          style={[styles.historyVoidButton, gateMessage && styles.disabledAction]}
         >
           <MaterialCommunityIcons
             name={expanded ? 'chevron-up' : 'close-circle-outline'}
@@ -210,7 +221,7 @@ function SaleHistoryRow({ sale, isFirst }: { sale: Sale; isFirst: boolean }) {
               fullWidth={false}
               style={styles.voidActionBtn}
               loading={voidSale.isPending}
-              disabled={voidSale.isPending}
+              disabled={voidSale.isPending || !!gateMessage}
               onPress={() => void onConfirmVoid()}
             />
           </View>
@@ -341,12 +352,20 @@ export default function SellScreen() {
 
   const isSubmitting = recordSale.isPending;
   const hasClockedIn = absen.data?.has_clocked_in ?? false;
+  const dayGate = riderDayGate(absen.data);
+  const gateMessage = riderGateMessage(dayGate);
+  const canSell = dayGate === 'ready' || (dayGate === 'legacy' && hasClockedIn);
 
   const onSubmit = useCallback(async () => {
     setFormError(null);
     setLastSale(null);
     setQueuedOffline(false);
     offlineQueue.clearLastFailure();
+
+    if (gateMessage) {
+      setFormError(gateMessage);
+      return;
+    }
 
     if (totalCups <= 0) {
       setFormError('Pilih dulu cups yang terjual.');
@@ -356,9 +375,10 @@ export default function SellScreen() {
     const lines = Object.entries(qty)
       .map(([productId, sold]) => ({ product_id: Number(productId), qty: sold }))
       .filter((line) => line.qty > 0);
+    const uuid = uuidv4();
 
     try {
-      const sale = await recordSale.mutateAsync({ lines, paymentMethod: payment, gps });
+      const sale = await recordSale.mutateAsync({ uuid, lines, paymentMethod: payment, gps });
 
       // The form empties itself: the next customer is already waiting, and a screen that keeps
       // the last order on it is a screen that will eventually record it twice.
@@ -370,7 +390,7 @@ export default function SellScreen() {
       // on a bar of signal that happens to be missing at this exact moment.
       if (e instanceof ApiError && e.isOffline) {
         try {
-          await offlineQueue.enqueue({ lines, paymentMethod: payment, gps });
+          await offlineQueue.enqueue({ uuid, lines, paymentMethod: payment, gps });
           setQty({});
           setQueuedOffline(true);
         } catch {
@@ -382,12 +402,13 @@ export default function SellScreen() {
       if (e instanceof ApiError) {
         // A 422 here carries the server's own sentence — "Absen dulu…", "Stok gerobak untuk
         // Kopi Susu hanya 3 cup." — which is more useful than anything this screen could invent.
-        setFormError(e.message);
+        setFormError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e.message);
+        if (isDayNotOpen(e)) void absen.refetch();
       } else {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [totalCups, qty, payment, gps, recordSale, offlineQueue]);
+  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen]);
 
   if (!user?.cartId) {
     return (
@@ -409,13 +430,14 @@ export default function SellScreen() {
 
   return (
     <Screen
-      refreshing={stockQuery.isRefetching || salesQuery.isRefetching}
+      refreshing={stockQuery.isRefetching || salesQuery.isRefetching || productsQuery.isRefetching}
       {...(isSubmitting
         ? {}
         : {
             onRefresh: () => {
               void stockQuery.refetch();
               void salesQuery.refetch();
+              void productsQuery.refetch();
             },
           })}
     >
@@ -444,6 +466,7 @@ export default function SellScreen() {
             variant="secondary"
             size="sm"
             loading={offlineQueue.flushing}
+            disabled={!!gateMessage}
             onPress={() => void offlineQueue.flushNow()}
           />
         </Card>
@@ -468,12 +491,14 @@ export default function SellScreen() {
         </Card>
       ) : null}
 
-      {absen.isLoading ? null : hasClockedIn ? null : (
+      {dayGate === 'closed' ? <Banner tone="warning" message={DAY_NOT_OPEN_MESSAGE} /> : null}
+
+      {absen.isLoading || canSell || dayGate === 'closed' ? null : (
         <Card style={styles.gateCard}>
           <EmptyState
             icon="fingerprint-off"
             title="Absen dulu sebelum mencatat penjualan"
-            subtitle={absen.data?.blocked_reason ?? 'Penjualan tercatat atas nama shift Anda hari ini.'}
+            subtitle={gateMessage ?? absen.data?.blocked_reason ?? 'Penjualan tercatat atas nama shift Anda hari ini.'}
             tone="neutral"
           />
           <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} />
@@ -528,7 +553,7 @@ export default function SellScreen() {
             subtitle="Tidak ada cups yang bisa dijual. Ajukan refill supaya stok terisi lagi."
             tone="neutral"
           />
-          <Button label="Request Refill" icon="plus-box-outline" variant="secondary" onPress={() => router.push('/staff/refill/new')} />
+          <Button label="Request Refill" icon="plus-box-outline" variant="secondary" disabled={!!gateMessage} onPress={() => router.push('/staff/refill/new')} />
         </Card>
       ) : (
         <View style={styles.grid}>
@@ -540,7 +565,7 @@ export default function SellScreen() {
                 // The cap is what is really on the cart, so the stepper simply stops where the
                 // stock does instead of letting someone build an order the server must refuse.
                 max={available}
-                disabled={isSubmitting || !hasClockedIn}
+                disabled={isSubmitting || !canSell}
                 index={index}
                 onChange={(next) => setQty((prev) => ({ ...prev, [product.id]: next }))}
               />
@@ -617,7 +642,7 @@ export default function SellScreen() {
       {offlineQueue.lastFailure ? (
         <Banner
           tone="danger"
-          message={`Satu transaksi yang menunggu ditolak server: ${offlineQueue.lastFailure}`}
+          message={`Antrean offline menunggu: ${offlineQueue.lastFailure}`}
         />
       ) : null}
 
@@ -627,7 +652,7 @@ export default function SellScreen() {
         iconTrailing
         onPress={() => void onSubmit()}
         loading={isSubmitting}
-        disabled={isSubmitting || !hasClockedIn || totalCups <= 0}
+        disabled={isSubmitting || !canSell || totalCups <= 0}
       />
 
       {(salesQuery.data ?? []).length > 0 || offlineQueue.queue.length > 0 ? (
@@ -647,6 +672,8 @@ export default function SellScreen() {
               <SaleHistoryRow
                 key={sale.uuid}
                 sale={sale}
+                gateMessage={gateMessage}
+                onDayClosed={() => void absen.refetch()}
                 isFirst={index === 0 && offlineQueue.queue.length === 0}
               />
             ))}
@@ -704,6 +731,7 @@ const styles = StyleSheet.create({
   historyBody: { flex: 1, gap: 2 },
   historyRight: { alignItems: 'flex-end', gap: 2 },
   historyVoidButton: { padding: space.xxs },
+  disabledAction: { opacity: 0.4 },
   strikethrough: { textDecorationLine: 'line-through' },
 
   voidPanel: { marginTop: space.sm, gap: space.sm },

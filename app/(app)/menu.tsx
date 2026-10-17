@@ -8,6 +8,7 @@ import Animated from 'react-native-reanimated';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
+import { Banner } from '@/components/ui/Banner';
 import { CountBadge, Chip } from '@/components/ui/Badge';
 import { IconButton } from '@/components/ui/Button';
 import { NotificationBell } from '@/components/ui/NotificationBell';
@@ -17,6 +18,8 @@ import { SoulLogo } from '@/components/brand/SoulLogo';
 import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { useBadges } from '@/features/refill/queries';
+import { useAttendanceStatus } from '@/features/showcase/queries';
+import { riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { menuByRole, menuItemsWithScreens, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
 import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
@@ -70,6 +73,9 @@ export default function MenuScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const user = session?.user;
+  const attendance = useAttendanceStatus(user?.role === 'STAFF');
+  const dayGate = user?.role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
+  const gateMessage = riderGateMessage(dayGate);
   const items = useMemo(() => (user ? menuItemsWithScreens(menuByRole[user.role], sitemap) : []), [user, sitemap]);
 
   // Declared above the `!user` bail-out: a hook after an early return runs conditionally, which
@@ -95,6 +101,8 @@ export default function MenuScreen() {
   const open = (item: MenuItem) => {
     router.push(item.route as Href);
   };
+  const isGatedTransaction = (item: MenuItem) =>
+    !!gateMessage && (item.id === 'staff-sell' || item.id === 'staff-refill-new');
 
   return (
     // The menu owns no query of its own, so its pull-to-refresh drops every cached read instead.
@@ -164,6 +172,8 @@ export default function MenuScreen() {
           see NewsSlider for why a permanent empty state here would be worse than no slider. */}
       <NewsSlider />
 
+      {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
+
       {primary.length > 0 ? (
         <Animated.View entering={enter('below', 2)}>
           <Text variant="micro" color={semantic.textSubtle} style={styles.sectionLabel}>
@@ -176,11 +186,13 @@ export default function MenuScreen() {
         <Animated.View key={item.id} entering={enter('below', 3 + index)}>
           <Touchable
             onPress={() => open(item)}
+            disabled={isGatedTransaction(item)}
+            accessibilityState={{ disabled: isGatedTransaction(item) }}
             scaleTo={pressScale.surface}
             accessibilityRole="button"
             accessibilityLabel={item.label}
-            accessibilityHint={item.sublabel}
-            style={styles.primaryTile}
+            accessibilityHint={isGatedTransaction(item) ? gateMessage ?? undefined : item.sublabel}
+            style={[styles.primaryTile, isGatedTransaction(item) && styles.disabledTile]}
           >
             <View style={styles.primaryIcon}>
               <MaterialCommunityIcons name={item.icon as never} size={28} color={neutral[0]} />
@@ -190,7 +202,7 @@ export default function MenuScreen() {
                 {item.label}
               </Text>
               <Text variant="caption" color={brand[100]}>
-                {item.sublabel}
+                {isGatedTransaction(item) ? gateMessage : item.sublabel}
               </Text>
             </View>
             {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
@@ -212,11 +224,13 @@ export default function MenuScreen() {
           <Animated.View key={item.id} entering={enter('below', 5 + index)} style={styles.tileWrap}>
             <Touchable
               onPress={() => open(item)}
+              disabled={isGatedTransaction(item)}
+              accessibilityState={{ disabled: isGatedTransaction(item) }}
               scaleTo={pressScale.surface}
               accessibilityRole="button"
               accessibilityLabel={item.label}
-              accessibilityHint={item.sublabel}
-              style={styles.tile}
+              accessibilityHint={isGatedTransaction(item) ? gateMessage ?? undefined : item.sublabel}
+              style={[styles.tile, isGatedTransaction(item) && styles.disabledTile]}
             >
               <View style={styles.tileTop}>
                 <View style={styles.tileIcon}>
@@ -227,8 +241,8 @@ export default function MenuScreen() {
               <Text variant="bodyStrong" numberOfLines={2}>
                 {item.label}
               </Text>
-              <Text variant="caption" color={semantic.textMuted} numberOfLines={2}>
-                {item.sublabel}
+              <Text variant="caption" color={semantic.textMuted}>
+                {isGatedTransaction(item) ? gateMessage : item.sublabel}
               </Text>
             </Touchable>
           </Animated.View>
@@ -312,6 +326,7 @@ const styles = StyleSheet.create({
     gap: space.xs,
   },
   tileTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  disabledTile: { opacity: 0.48 },
   tileIcon: {
     width: 40,
     height: 40,

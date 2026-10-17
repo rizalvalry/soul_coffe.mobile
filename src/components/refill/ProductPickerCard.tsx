@@ -57,7 +57,7 @@ export type ProductPickerCardProps = {
  * of merely registered.
  */
 export function ProductPickerCard({ product, value, max, disabled = false, onChange, index = 0 }: ProductPickerCardProps) {
-  // Prefers the photo uploaded in the CMS, falling back to the bundled menu artwork.
+  // Only the CMS upload may supply a product photo; null shows the icon below.
   const image = productImageSource(product);
   const selected = value > 0;
   const atMax = value >= max;
@@ -94,10 +94,11 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
   }));
 
   return (
-    <Animated.View entering={enter('below', index)} style={[styles.card, cardStyle]}>
+    <Animated.View entering={enter('below', index)} style={[styles.card, cardStyle, disabled && styles.disabledCard]}>
       <Touchable
         onPress={add}
         disabled={disabled || atMax}
+        accessibilityState={{ disabled: disabled || atMax }}
         scaleTo={pressScale.surface}
         dim={false}
         accessibilityRole="button"
@@ -192,6 +193,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...shadow.card,
   },
+  disabledCard: { opacity: 0.5 },
 
   imageWrap: { aspectRatio: 1, backgroundColor: brand[50] },
   image: { width: '100%', height: '100%' },

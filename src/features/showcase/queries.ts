@@ -110,10 +110,11 @@ export function useCartAllowance(cartId: number | null) {
  * The barista's open event invalidates this query; reconnect, foreground, and the screen's
  * pull-to-refresh also refresh it after a missed event.
  */
-export function useAttendanceStatus() {
+export function useAttendanceStatus(enabled = true) {
   return useQuery({
     queryKey: showcaseKeys.absenStatus,
     queryFn: () => request<AttendanceStatus>('/absen/status'),
+    enabled,
   });
 }
 

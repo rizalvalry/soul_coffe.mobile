@@ -27,6 +27,8 @@ export function useTodaySales() {
 }
 
 export type RecordSaleInput = {
+  /** Shared by the first HTTP attempt and its offline replay if the response is lost. */
+  uuid?: string;
   lines: { product_id: number; qty: number }[];
   paymentMethod: PaymentMethod;
   gps: { lat: number; lng: number } | null;
@@ -37,7 +39,8 @@ export type RecordSaleInput = {
 /**
  * Records one transaction.
  *
- * The `uuid` is generated here, ONCE per submit, and travels in the body as well as in the
+ * The `uuid` is supplied by the screen for the first attempt and offline replay, or generated
+ * here for other callers. It travels in the body as well as in the
  * Idempotency-Key header. That is not belt-and-braces: the header protects against a retry of
  * the same HTTP request, and the body's uuid protects against the app resending a transaction it
  * already sent — which is what happens when a rider in a queue taps submit, loses signal
@@ -52,7 +55,7 @@ export function useRecordSale() {
 
   return useMutation({
     mutationFn: (input: RecordSaleInput) => {
-      const uuid = uuidv4();
+      const uuid = input.uuid ?? uuidv4();
 
       // Same body shape the offline queue replays later under this same uuid — see
       // offlineQueue.ts's `buildSaleBody` for why that sharing matters.
