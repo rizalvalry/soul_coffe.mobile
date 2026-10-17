@@ -21,6 +21,8 @@ import { enter } from '@/components/ui/Motion';
 import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
+import { useAttendanceStatus } from '@/features/showcase/queries';
+import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { ApiError } from '@/lib/api';
 import { brand, neutral, radius, semantic, shadow, space } from '@/theme';
 
@@ -56,6 +58,7 @@ export default function NewRefillScreen() {
   const user = useAuth((s) => s.session?.user);
 
   const productsQuery = useProducts();
+  const attendance = useAttendanceStatus();
   const uploadEvidence = useUploadEvidence();
   const submitRefill = useSubmitRefill();
 
@@ -122,6 +125,8 @@ export default function NewRefillScreen() {
   const totalCups = useMemo(() => Object.values(qty).reduce((sum, n) => sum + n, 0), [qty]);
   const selectedCount = useMemo(() => Object.values(qty).filter((n) => n > 0).length, [qty]);
   const isSubmitting = uploadEvidence.isPending || submitRefill.isPending;
+  const dayGate = riderDayGate(attendance.data);
+  const gateMessage = riderGateMessage(dayGate);
 
   const capturePhoto = useCallback(async () => {
     setCameraError(null);
@@ -147,6 +152,11 @@ export default function NewRefillScreen() {
 
   const onSubmit = useCallback(async () => {
     setFormError(null);
+
+    if (gateMessage) {
+      setFormError(gateMessage);
+      return;
+    }
 
     if (!user?.cartId) {
       setFormError('Anda tidak bertugas di gerobak ini hari ini.');
@@ -180,7 +190,10 @@ export default function NewRefillScreen() {
       router.replace(`/staff/requests/${created.id}`);
     } catch (e) {
       if (e instanceof ApiError) {
-        if (e.isConflict) {
+        if (isDayNotOpen(e)) {
+          setFormError(DAY_NOT_OPEN_MESSAGE);
+          void attendance.refetch();
+        } else if (e.isConflict) {
           setFormError('Masih ada request yang belum selesai untuk gerobak ini.');
         } else if (e.isForbidden) {
           setFormError('Anda tidak bertugas di gerobak ini hari ini.');
@@ -191,7 +204,7 @@ export default function NewRefillScreen() {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [user, totalCups, photo, qty, gps, uploadEvidence, submitRefill, router]);
+  }, [user, totalCups, photo, qty, gps, uploadEvidence, submitRefill, router, gateMessage, attendance]);
 
   if (!user?.cartId) {
     return (
@@ -256,6 +269,11 @@ export default function NewRefillScreen() {
         </View>
       </View>
 
+      {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
+      {dayGate === 'attendance' ? (
+        <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} />
+      ) : null}
+
       <SectionTitle
         title="Pilih produk"
         caption={selectedCount > 0 ? `${selectedCount} produk dipilih` : 'Ketuk foto untuk menambah'}
@@ -284,7 +302,7 @@ export default function NewRefillScreen() {
                 product={product}
                 value={qty[product.id] ?? 0}
                 max={MAX_PER_LINE}
-                disabled={isSubmitting}
+                disabled={isSubmitting || !!gateMessage}
                 index={index}
                 onChange={(next) => setQty((prev) => ({ ...prev, [product.id]: next }))}
               />
@@ -321,10 +339,10 @@ export default function NewRefillScreen() {
                   />
                 </View>
               </View>
-              <Button label="Ambil Ulang" icon="camera-retake-outline" variant="secondary" onPress={capturePhoto} disabled={isSubmitting} />
+              <Button label="Ambil Ulang" icon="camera-retake-outline" variant="secondary" onPress={capturePhoto} disabled={isSubmitting || !!gateMessage} />
             </View>
           ) : (
-            <Button label="Ambil Foto" icon="camera-outline" onPress={capturePhoto} disabled={isSubmitting} />
+            <Button label="Ambil Foto" icon="camera-outline" onPress={capturePhoto} disabled={isSubmitting || !!gateMessage} />
           )}
 
           {cameraError ? <Banner message={cameraError} tone="danger" /> : null}
@@ -333,7 +351,7 @@ export default function NewRefillScreen() {
 
       {formError ? <Banner message={formError} tone="danger" /> : null}
 
-      <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={isSubmitting} />
+      <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={isSubmitting || !!gateMessage} />
 
       {/* The photo is re-encoded on the device before it is sent (lib/image.ts), so submit is a
           multi-second operation with two distinct stages. Naming the stage is what stops a rider

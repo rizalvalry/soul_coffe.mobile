@@ -18,6 +18,9 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   const leftChannels = [];
   let disconnects = 0;
   const calls = [];
+  let nowMs = Date.UTC(2026, 9, 17, 16, 0, 0);
+  const timers = new Map();
+  let nextTimerId = 0;
   let appStateCallback;
   let refillInvalidations = 0;
   const client = { invalidateQueries: (filter) => { calls.push(filter?.queryKey ?? 'all'); return Promise.resolve(); } };
@@ -62,7 +65,11 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
     './seen': { claimEvent },
   };
   const module = { exports: {} };
-  vm.runInNewContext(javascript, { module, exports: module.exports, require: (name) => {
+  vm.runInNewContext(javascript, {
+    Date: { now: () => nowMs },
+    setTimeout: (callback, delay) => { const id = ++nextTimerId; timers.set(id, { callback, delay }); return id; },
+    clearTimeout: (id) => { timers.delete(id); },
+    module, exports: module.exports, require: (name) => {
     assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
     return modules[name];
   } });
@@ -74,6 +81,13 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
     disconnects: () => disconnects,
     appState: (state) => appStateCallback(state),
     refillInvalidations: () => refillInvalidations,
+    nextBoundaryDelay: () => timers.values().next().value?.delay,
+    runBoundary: () => {
+      const [id, timer] = timers.entries().next().value;
+      timers.delete(id);
+      nowMs += timer.delay;
+      timer.callback();
+    },
   };
 }
 
@@ -114,6 +128,15 @@ test('connection and foreground transitions refresh once without an interval', (
   assert.deepEqual(app.calls, ['all', 'all']);
   app.appState('active');
   assert.deepEqual(app.calls, ['all', 'all']);
+});
+
+test('a continuously foregrounded Rider refreshes attendance at the operating-day boundary', () => {
+  const app = mountRealtimeProvider();
+  assert.equal(app.nextBoundaryDelay(), 60 * 60 * 1000 + 1000);
+  app.runBoundary();
+  assert.ok(app.calls.some((key) => Array.isArray(key) && key.join('/') === 'absen/status'));
+  assert.ok(app.nextBoundaryDelay() > 0);
+  app.cleanup();
 });
 
 test('existing stock and sale events refresh their affected query families', () => {

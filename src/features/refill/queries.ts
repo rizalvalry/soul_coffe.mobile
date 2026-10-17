@@ -71,7 +71,9 @@ export function useProducts() {
   return useQuery({
     queryKey: qk.products,
     queryFn: () => request<Product[]>('/products'),
-    staleTime: 10 * 60_000, // master data; the menu changes rarely
+    // A CMS photo may change between visits; refetch on mount without a timer or polling.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 

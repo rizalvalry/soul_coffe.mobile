@@ -10,9 +10,7 @@ export type Product = {
   /**
    * The photo an administrator uploaded in the CMS, absolute and ready to fetch, or null.
    *
-   * Null means "no photo", not "broken": the tiles fall back to the bundled artwork in
-   * `domain/productImages.ts` and then to an icon, so a product added in the CMS this morning is
-   * usable this morning whether or not anyone has photographed it yet.
+   * Null means "no photo": the tile shows an icon until the CMS has an upload.
    */
   image_url?: string | null;
   unit: string;
@@ -236,7 +234,7 @@ export type AttendanceStatus = {
   operating_date: string;
   has_clocked_in: boolean;
   clocked_in_at: string | null;
-  staff_window_open: boolean;
+  staff_window_open?: boolean;
   can_clock_in: boolean;
   can_open_staff_window: boolean;
   /** Ready-to-display copy for a disabled button; null when nothing is blocking. */

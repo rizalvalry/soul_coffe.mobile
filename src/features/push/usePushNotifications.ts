@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/features/auth/store';
 import { invalidateRefillData } from '@/features/refill/queries';
+import { showcaseKeys } from '@/features/showcase/queries';
 import { claimEvent } from '@/features/realtime/seen';
 import { settlementRoute, settlementTarget } from '@/features/settlements/navigation';
 import { invalidateSettlementData } from '@/features/settlements/queries';
@@ -114,6 +115,9 @@ export function usePushNotifications() {
       const refillId = Number(data?.['refill_request_id']);
 
       invalidateRefillData(client, Number.isFinite(refillId) && refillId > 0 ? refillId : undefined);
+      if (data?.['type'] === 'StaffAttendanceWindowOpened' || data?.['type'] === 'AttendanceClockedIn') {
+        void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
+      }
       if (data?.['type'] === 'SettlementVarianceFlagged' &&
         (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT')) {
         invalidateSettlementData(client, settlementTarget(data).cartId);

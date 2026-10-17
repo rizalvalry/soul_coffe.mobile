@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { ApiError, request, uuidv4 } from '@/lib/api';
-import type { Sale } from '@/domain/types';
+import { DAY_NOT_OPEN_MESSAGE, RIDER_ABSEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
+import type { AttendanceStatus, Sale } from '@/domain/types';
 import type { RecordSaleInput } from './queries';
 import { useAuth } from '@/features/auth/store';
 
@@ -25,9 +26,9 @@ import { useAuth } from '@/features/auth/store';
  * WHAT HAPPENS TO A QUEUED SALE THE SERVER GENUINELY REJECTS
  * --------------------------------------------------------------
  * A transport failure (no connection at all) leaves an entry queued for the next attempt. A real
- * rejection — the absen window closed, the cart's assignment changed, the stock no longer covers
- * it — is different: replaying it forever would never succeed. A rejected entry stays in the
- * owner's local record with the server's message, but is skipped by automatic replay.
+ * rejection such as an assignment change or insufficient stock stays in the owner's local record
+ * with the server's reason and is skipped on replay. A closed day or missing attendance is
+ * temporary: the entry stays pending until the Rider can transact again.
  */
 
 const LEGACY_STORAGE_KEY = 'soul.sales.offline_queue.v1';
@@ -55,6 +56,8 @@ export type QueuedSale = {
 export type FlushResult = {
   synced: Sale[];
   failed: { entry: QueuedSale; message: string }[];
+  /** A closed day or missing attendance is temporary; keep the sale pending. */
+  waitingForGate: string | null;
   /** True when a transport failure stopped the flush early — there was still no connection. */
   stillOffline: boolean;
 };
@@ -126,7 +129,7 @@ export async function legacyQueuedSaleCount(): Promise<number> {
 /** Appends one sale to the queue and persists it. Returns the entry, so the caller can show it. */
 export async function enqueueSale(ownerId: string, input: RecordSaleInput): Promise<QueuedSale> {
   if (!isCurrentOwner(ownerId)) throw new Error('Sesi berubah. Penjualan belum disimpan; masuk kembali.');
-  const entry: QueuedSale = { uuid: uuidv4(), queuedAt: new Date().toISOString(), input };
+  const entry: QueuedSale = { uuid: input.uuid ?? uuidv4(), queuedAt: new Date().toISOString(), input };
 
   await updateQueue(ownerId, (queue) => {
     if (!isCurrentOwner(ownerId)) throw new Error('Sesi berubah. Penjualan belum disimpan; masuk kembali.');
@@ -155,6 +158,7 @@ export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
   const synced: Sale[] = [];
   const failed: { entry: QueuedSale; message: string }[] = [];
   let stillOffline = false;
+  let waitingForGate: string | null = null;
 
   const syncedIds = new Set<string>();
   const rejected = new Map<string, string>();
@@ -175,12 +179,31 @@ export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
       synced.push(sale);
       syncedIds.add(entry.uuid);
     } catch (e) {
-      // A revoked session is not a rejected sale. Keep it for this account's next login.
+      // Never query another account's attendance after a sign-out during this request.
       if (!isCurrentOwner(ownerId) || (e instanceof ApiError && (e.isOffline || e.status === 401))) {
         stillOffline = true;
         break;
       }
-
+      if (isDayNotOpen(e)) {
+        waitingForGate = DAY_NOT_OPEN_MESSAGE;
+        break;
+      }
+      if (e instanceof ApiError && e.status === 422) {
+        try {
+          // The attendance refusal has no stable error code. Check current server status before
+          // treating any 422 as permanent, so a stale cached shift cannot strand an offline sale.
+          const status = await request<AttendanceStatus>('/absen/status');
+          const gate = riderDayGate(status);
+          if (gate === 'closed' || gate === 'attendance' || (gate === 'legacy' && !status.has_clocked_in)) {
+            waitingForGate = riderGateMessage(gate) ?? RIDER_ABSEN_MESSAGE;
+            break;
+          }
+        } catch {
+          // If status cannot be checked, keeping the sale is safer than losing its retry path.
+          waitingForGate = e.message;
+          break;
+        }
+      }
       // Preserve the rejected transaction and its reason for this account after the screen
       // unmounts or the phone changes hands. It is no longer retried automatically.
       const message = e instanceof ApiError ? e.message : 'Gagal mengirim transaksi.';
@@ -195,5 +218,5 @@ export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
       ? { ...entry, rejection: rejected.get(entry.uuid) }
       : entry));
 
-  return { synced, failed, stillOffline };
+  return { synced, failed, stillOffline, waitingForGate };
 }

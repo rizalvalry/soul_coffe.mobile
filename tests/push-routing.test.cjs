@@ -30,6 +30,7 @@ const { routeFor } = loadTs('src/features/push/usePushNotifications.ts', {
   '@tanstack/react-query': {},
   '@/features/auth/store': {},
   '@/features/refill/queries': {},
+  '@/features/showcase/queries': {},
   '@/features/realtime/seen': {},
   '@/features/settlements/navigation': navigation,
   '@/features/settlements/queries': {},
@@ -68,6 +69,7 @@ function mountPushHook(role, response) {
   const effects = [];
   const pushes = [];
   const settlementRefreshes = [];
+  const attendanceRefreshes = [];
   let received;
   let cleared = 0;
   const notifications = {
@@ -85,9 +87,13 @@ function mountPushHook(role, response) {
     'react-native': { AppState: { addEventListener: () => ({ remove() {} }) } },
     'expo-router': { useRouter: () => ({ push: (target) => pushes.push(target) }) },
     'expo-notifications': notifications,
-    '@tanstack/react-query': { useQueryClient: () => ({}) },
+    '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: ({ queryKey }) => {
+      attendanceRefreshes.push(queryKey.join('/'));
+      return Promise.resolve();
+    } }) },
     '@/features/auth/store': { useAuth: (selector) => selector({ session: { user: { role } } }) },
     '@/features/refill/queries': { invalidateRefillData() {} },
+    '@/features/showcase/queries': { showcaseKeys: { absenStatus: ['absen', 'status'] } },
     '@/features/realtime/seen': { claimEvent: () => true },
     '@/features/settlements/navigation': navigation,
     '@/features/settlements/queries': { invalidateSettlementData: (_client, cartId) => settlementRefreshes.push(cartId) },
@@ -95,8 +101,14 @@ function mountPushHook(role, response) {
   });
   usePushNotifications();
   effects.forEach((effect) => effect());
-  return { pushes, settlementRefreshes, received: (notification) => received(notification), cleared: () => cleared };
+  return { pushes, settlementRefreshes, attendanceRefreshes, received: (notification) => received(notification), cleared: () => cleared };
 }
+
+test('foreground attendance push refreshes Rider day gate without Pusher', () => {
+  const staff = mountPushHook('STAFF', null);
+  staff.received({ request: { content: { data: { type: 'StaffAttendanceWindowOpened' } } } });
+  assert.deepEqual(staff.attendanceRefreshes, ['absen/status']);
+});
 
 test('a variance tap that launched the app routes after Finance signs in and clears the response', () => {
   const response = { notification: { request: { content: { data: {

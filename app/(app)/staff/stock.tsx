@@ -1,4 +1,4 @@
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, Image, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { Screen } from '@/components/ui/Screen';
@@ -6,14 +6,17 @@ import { Text } from '@/components/ui/Text';
 import { Button, IconButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
-import { useMyStock } from '@/features/refill/queries';
+import { useMyStock, useProducts } from '@/features/refill/queries';
+import { productImageSource } from '@/domain/productImages';
 import { brand, radius, semantic, shadow, space } from '@/theme';
 import type { CartStockRow } from '@/domain/types';
 
 export default function StaffStockScreen() {
   const router = useRouter();
   const stockQuery = useMyStock();
+  const productsQuery = useProducts();
   const rows = stockQuery.data ?? [];
+  const productById = new Map((productsQuery.data ?? []).map((product) => [product.id, product]));
 
   return (
     <Screen scroll={false}>
@@ -42,28 +45,36 @@ export default function StaffStockScreen() {
             data={rows}
             keyExtractor={(item) => String(item.product_id)}
             contentContainerStyle={styles.listContent}
-            refreshing={stockQuery.isRefetching}
-            onRefresh={() => void stockQuery.refetch()}
-            renderItem={({ item }: { item: CartStockRow }) => (
-              <View style={styles.row}>
-                <View style={styles.rowIcon}>
-                  <Text variant="micro" color={brand[700]}>
-                    {item.product_name.slice(0, 1).toUpperCase()}
+            refreshing={stockQuery.isRefetching || productsQuery.isRefetching}
+            onRefresh={() => {
+              void stockQuery.refetch();
+              void productsQuery.refetch();
+            }}
+            renderItem={({ item }: { item: CartStockRow }) => {
+              const image = productImageSource(productById.get(item.product_id) ?? {});
+              return (
+                <View style={styles.row}>
+                  <View style={styles.rowIcon}>
+                    {image ? <Image source={image} style={styles.rowImage} /> : (
+                      <Text variant="micro" color={brand[700]}>
+                        {item.product_name.slice(0, 1).toUpperCase()}
+                      </Text>
+                    )}
+                  </View>
+                  <Text variant="body" style={styles.colName} numberOfLines={1}>
+                    {item.product_name}
                   </Text>
+                  <View style={styles.qtyPill}>
+                    <Text variant="bodyStrong" color={brand[700]}>
+                      {item.on_hand}
+                    </Text>
+                    <Text variant="caption" color={semantic.textMuted}>
+                      {item.unit}
+                    </Text>
+                  </View>
                 </View>
-                <Text variant="body" style={styles.colName} numberOfLines={1}>
-                  {item.product_name}
-                </Text>
-                <View style={styles.qtyPill}>
-                  <Text variant="bodyStrong" color={brand[700]}>
-                    {item.on_hand}
-                  </Text>
-                  <Text variant="caption" color={semantic.textMuted}>
-                    {item.unit}
-                  </Text>
-                </View>
-              </View>
-            )}
+              );
+            }}
             ListEmptyComponent={
               <EmptyState icon="cup-outline" title="Belum ada stok tercatat" subtitle="Stok akan muncul setelah alokasi atau refill pertama diterima." />
             }
@@ -92,6 +103,7 @@ const styles = StyleSheet.create({
     ...shadow.card,
   },
   rowIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: brand[50], alignItems: 'center', justifyContent: 'center' },
+  rowImage: { width: 36, height: 36, borderRadius: radius.md },
   colName: { flex: 1 },
   qtyPill: {
     flexDirection: 'row',

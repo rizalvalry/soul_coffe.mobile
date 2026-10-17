@@ -17,6 +17,8 @@ import { enter } from '@/components/ui/Motion';
 import { RefillTimeline } from '@/components/refill/RefillTimeline';
 import { formatRupiah } from '@/components/refill/RefillCard';
 import { useCancelRefill, useRefill } from '@/features/refill/queries';
+import { useAttendanceStatus } from '@/features/showcase/queries';
+import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { ApiError } from '@/lib/api';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
@@ -27,17 +29,25 @@ export default function StaffRequestDetailScreen() {
   const refillId = Number(id);
 
   const refillQuery = useRefill(refillId);
+  const attendance = useAttendanceStatus();
   const cancelRefill = useCancelRefill();
   const [actionError, setActionError] = useState<string | null>(null);
+  const dayGate = riderDayGate(attendance.data);
+  const gateMessage = riderGateMessage(dayGate);
 
   const doCancel = useCallback(async () => {
     setActionError(null);
+    if (gateMessage) {
+      setActionError(gateMessage);
+      return;
+    }
     try {
       await cancelRefill.mutateAsync({ id: refillId });
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : 'Gagal membatalkan permintaan. Coba lagi.');
+      setActionError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e instanceof ApiError ? e.message : 'Gagal membatalkan permintaan. Coba lagi.');
+      if (isDayNotOpen(e)) void attendance.refetch();
     }
-  }, [cancelRefill, refillId]);
+  }, [cancelRefill, refillId, gateMessage, attendance]);
 
   const onCancelPress = useCallback(() => {
     Alert.alert('Batalkan permintaan?', 'Permintaan yang dibatalkan tidak dapat diproses kembali.', [
@@ -51,6 +61,9 @@ export default function StaffRequestDetailScreen() {
       <View style={styles.top}>
         <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
       </View>
+
+      {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
+      {dayGate === 'attendance' ? <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} /> : null}
 
       {!Number.isFinite(refillId) || refillId <= 0 ? (
         <Card>
@@ -72,6 +85,7 @@ export default function StaffRequestDetailScreen() {
           onCancel={onCancelPress}
           cancelPending={cancelRefill.isPending}
           actionError={actionError}
+          gateMessage={gateMessage}
         />
       )}
     </Screen>
@@ -83,11 +97,13 @@ function RequestDetail({
   onCancel,
   cancelPending,
   actionError,
+  gateMessage,
 }: {
   refill: RefillRequest;
   onCancel: () => void;
   cancelPending: boolean;
   actionError: string | null;
+  gateMessage: string | null;
 }) {
   return (
     <>
@@ -219,7 +235,7 @@ function RequestDetail({
             variant="danger"
             onPress={onCancel}
             loading={cancelPending}
-            disabled={cancelPending}
+            disabled={cancelPending || !!gateMessage}
           />
         </Animated.View>
       ) : null}
