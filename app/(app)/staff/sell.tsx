@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated from 'react-native-reanimated';
@@ -22,7 +22,7 @@ import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useMyStock } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
-import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
+import { DAY_NOT_OPEN_MESSAGE, NO_CART_TODAY_MESSAGE, isDayNotOpen, isNoCartToday, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { useRecordSale, useTodaySales, useVoidSale } from '@/features/sales/queries';
 import type { QueuedSale } from '@/features/sales/offlineQueue';
 import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
@@ -278,6 +278,13 @@ function PendingSaleRow({
 export default function SellScreen() {
   const router = useRouter();
   const user = useAuth((s) => s.session?.user);
+  const refreshUser = useAuth((s) => s.refreshUser);
+  const cartRefreshStatus = useAuth((s) => s.cartRefreshStatus);
+  const cartRefreshError = useAuth((s) => s.cartRefreshError);
+
+  useFocusEffect(useCallback(() => {
+    void refreshUser().catch(() => {});
+  }, [refreshUser]));
 
   const absen = useAttendanceStatus();
   const productsQuery = useProducts();
@@ -404,13 +411,14 @@ export default function SellScreen() {
         // Kopi Susu hanya 3 cup." — which is more useful than anything this screen could invent.
         setFormError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e.message);
         if (isDayNotOpen(e)) void absen.refetch();
+        if (isNoCartToday(e)) void refreshUser().catch(() => {});
       } else {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen]);
+  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen, refreshUser]);
 
-  if (!user?.cartId) {
+  if (!user?.cartId || cartRefreshStatus !== 'idle') {
     return (
       <Screen>
         <View style={styles.top}>
@@ -419,10 +427,14 @@ export default function SellScreen() {
         <Card>
           <EmptyState
             icon="moped-off"
-            title="Anda tidak bertugas di gerobak hari ini"
-            subtitle="Hubungi Produksi atau Administrator untuk penugasan gerobak hari ini."
+            title={cartRefreshStatus === 'error' ? 'Gerobak belum bisa dicek'
+              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak' : 'Gerobak belum dapat stok'}
+            subtitle={cartRefreshStatus === 'error'
+              ? (cartRefreshError ?? 'Coba cek gerobak lagi ya.')
+              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak kamu...' : NO_CART_TODAY_MESSAGE}
             tone="neutral"
           />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
         </Card>
       </Screen>
     );

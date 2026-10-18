@@ -19,7 +19,81 @@ function loadTs(path, modules, globals = {}) {
   return module.exports;
 }
 
-function setup({ saleError, saleRequest, deleteFails = false, markerFails = false } = {}) {
+function renderRiderForm(path, useAuth) {
+  const component = (name) => name;
+  const ui = new Proxy({}, { get: (_target, name) => component(String(name)) });
+  const color = new Proxy({}, { get: () => '#000' });
+  const number = new Proxy({}, { get: () => 8 });
+  const query = { data: [], isPending: false, isLoading: false, isRefetching: false,
+    refetch: async () => {}, mutateAsync: async () => ({}), isError: false };
+  const modules = {
+    react: {
+      useCallback: (callback) => callback,
+      useEffect() {},
+      useMemo: (callback) => callback(),
+      useState: (initial) => [initial, () => {}],
+    },
+    'react/jsx-runtime': {
+      jsx: (type, props) => ({ type, props }),
+      jsxs: (type, props) => ({ type, props }),
+    },
+    'react-native': { View: 'View', Image: 'Image', StyleSheet: { create: (styles) => styles } },
+    'expo-router': { useRouter: () => ({ back() {}, replace() {} }), useFocusEffect() {} },
+    'expo-location': { LocationAccuracy: { Balanced: 1 } },
+    'expo-image-picker': {},
+    'expo-status-bar': { StatusBar: 'StatusBar' },
+    '@expo/vector-icons/MaterialCommunityIcons': 'Icon',
+    'react-native-reanimated': { View: 'AnimatedView' },
+    '@/features/auth/store': { useAuth },
+    '@/features/refill/queries': {
+      useProducts: () => query, useMyStock: () => query,
+      useSubmitRefill: () => query, useUploadEvidence: () => query,
+    },
+    '@/features/showcase/queries': { useAttendanceStatus: () => ({
+      ...query, data: { has_clocked_in: true, staff_window_open: true },
+    }) },
+    '@/features/showcase/riderDayGate': {
+      DAY_NOT_OPEN_MESSAGE: 'Belum buka',
+      NO_CART_TODAY_MESSAGE: 'Produksi belum kasih stok ke gerobak kamu hari ini. Minta Produksi Add Stock dulu ya.',
+      isDayNotOpen: () => false, isNoCartToday: () => false,
+      riderDayGate: () => 'ready', riderGateMessage: () => null,
+    },
+    '@/features/sales/queries': {
+      useRecordSale: () => query, useTodaySales: () => query, useVoidSale: () => query,
+    },
+    '@/features/sales/useOfflineSalesQueue': { useOfflineSalesQueue: () => ({
+      ...query, queue: [], rejected: [], hasQueued: false, legacyCount: 0,
+      flushing: false, clearLastFailure() {}, flushNow() {},
+    }) },
+    '@/lib/api': { ApiError: class ApiError extends Error {}, uuidv4: () => 'test-uuid' },
+    '@/domain/types': { PAYMENT_METHODS: ['cash', 'qris', 'transfer'] },
+    '@/theme': {
+      brand: color, neutral: color, semantic: color, feedback: color,
+      radius: number, space: number, shadow: new Proxy({}, { get: () => ({}) }),
+    },
+  };
+  for (const name of ['Screen', 'Text', 'Button', 'Card', 'Badge', 'Banner', 'EmptyState',
+    'Input', 'Skeleton', 'AnimatedNumber', 'Section', 'Touchable', 'Motion', 'ProductPickerCard']) {
+    modules[`@/components/ui/${name}`] = ui;
+  }
+  modules['@/components/refill/ProductPickerCard'] = ui;
+  modules['@/components/ui/Motion'] = { enter: () => ({}) };
+  const tree = loadTs(path, modules).default();
+  const strings = [];
+  const walk = (value) => {
+    if (typeof value === 'string') { strings.push(value); return; }
+    if (Array.isArray(value)) { value.forEach(walk); return; }
+    if (value && typeof value === 'object') {
+      for (const [key, child] of Object.entries(value)) {
+        if (key !== 'type') walk(child);
+      }
+    }
+  };
+  walk(tree);
+  return strings.join(' ');
+}
+
+function setup({ saleError, saleRequest, currentUserRequest, deleteFails = false, markerFails = false } = {}) {
   const disk = new Map();
   const secure = new Map();
   const calls = [];
@@ -38,6 +112,7 @@ function setup({ saleError, saleRequest, deleteFails = false, markerFails = fals
     A: { token: 'token-A', user: { id: 'A', role: 'STAFF', name: 'Rider A' } },
     B: { token: 'token-B', user: { id: 'B', role: 'STAFF', name: 'Rider B' } },
   };
+  const meUsers = new Map();
   const storage = {
     getItem: async (key) => disk.get(key) ?? null,
     setItem: async (key, value) => {
@@ -73,6 +148,8 @@ function setup({ saleError, saleRequest, deleteFails = false, markerFails = fals
       login: async ({ phone }) => users[phone],
       loginWithPin: async (phone) => users[phone],
       loginAsDemoRole: async () => users.A,
+      fetchCurrentUser: async (token) => currentUserRequest
+        ? currentUserRequest(token) : meUsers.get(token) ?? users.A.user,
       revokeToken: async (token) => { calls.push(`revoke:${token}`); },
     },
   }).useAuth;
@@ -101,8 +178,142 @@ function setup({ saleError, saleRequest, deleteFails = false, markerFails = fals
       riderGateMessage: () => null,
     },
   });
-  return { useAuth, queue, getQueryClient: queryModule.getQueryClient, disk, secure, calls };
+  return { useAuth, queue, getQueryClient: queryModule.getQueryClient, disk, secure, calls, meUsers };
 }
+
+test('refreshing /me replaces a login-time empty cart and ignores old account responses', async () => {
+  const { useAuth, meUsers } = setup();
+  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
+  assert.equal(useAuth.getState().session.user.cartId, undefined);
+  meUsers.set('token-A', { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' });
+  await useAuth.getState().refreshUser();
+  assert.equal(useAuth.getState().session.user.cartId, 4);
+  assert.equal(useAuth.getState().session.user.cartCode, '0004');
+
+  await useAuth.getState().signOut();
+  await useAuth.getState().signIn({ phone: 'B', password: 'test' });
+  await useAuth.getState().refreshUser();
+  assert.equal(useAuth.getState().session.user.id, 'B');
+  assert.equal(useAuth.getState().session.user.cartId, undefined);
+});
+
+test('a failed newer /me request does not discard an earlier successful cart response', async () => {
+  const pending = [];
+  const { useAuth } = setup({ currentUserRequest: () => new Promise((resolve, reject) => {
+    pending.push({ resolve, reject });
+  }) });
+  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
+  const first = useAuth.getState().refreshUser();
+  const second = useAuth.getState().refreshUser();
+  pending[1].reject(new Error('Jaringan putus. Coba lagi ya.'));
+  await assert.rejects(second);
+  assert.equal(useAuth.getState().cartRefreshStatus, 'error');
+  pending[0].resolve({ id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' });
+  await first;
+  assert.equal(useAuth.getState().session.user.cartId, 4);
+  assert.equal(useAuth.getState().cartRefreshStatus, 'idle');
+  assert.equal(useAuth.getState().cartRefreshError, null);
+});
+
+test('a failed cart refresh stays visible until Coba lagi succeeds', async () => {
+  let fail = true;
+  const { useAuth } = setup({ currentUserRequest: async () => {
+    if (fail) throw new Error('Gerobak belum bisa dicek. Coba lagi ya.');
+    return { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' };
+  } });
+  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
+  await assert.rejects(useAuth.getState().refreshUser());
+  assert.equal(useAuth.getState().cartRefreshStatus, 'error');
+  assert.match(useAuth.getState().cartRefreshError, /Coba lagi/);
+  fail = false;
+  await useAuth.getState().refreshUser();
+  assert.equal(useAuth.getState().cartRefreshStatus, 'idle');
+  assert.equal(useAuth.getState().session.user.cartId, 4);
+});
+
+test('login before Add Stock then assignment event and foreground refresh both Rider form cart data', async () => {
+  let currentUser = { id: 'A', role: 'STAFF', name: 'Rider A' };
+  let hold = null;
+  const { useAuth } = setup({ currentUserRequest: async () => {
+    if (hold) await hold.promise;
+    return currentUser;
+  } });
+  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
+  const effects = [];
+  const channels = [];
+  let appStateChange;
+  class Echo {
+    connector = { pusher: { connection: { bind() {} } } };
+    private() { return { listen: (_event, callback) => channels.push(callback) }; }
+    leave() {}
+    disconnect() {}
+  }
+  const provider = loadTs('src/features/realtime/RealtimeProvider.tsx', {
+    react: {
+      createContext: () => ({ Provider: () => null }),
+      useContext: () => null,
+      useEffect: (effect) => effects.push(effect),
+      useRef: (value) => ({ current: value }),
+      useState: (value) => [value, () => {}],
+    },
+    'react/jsx-runtime': { jsx: () => null },
+    'react-native': { AppState: { currentState: 'active', addEventListener: (_name, callback) => {
+      appStateChange = callback;
+      return { remove() {} };
+    } } },
+    'expo-constants': { expoConfig: { extra: { pusherKey: 'test', pusherCluster: 'test' } } },
+    'laravel-echo': Echo,
+    'pusher-js': class Pusher {},
+    '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: async () => {} }) },
+    '@/features/auth/store': { useAuth },
+    '@/lib/api': { apiBaseUrl: () => 'http://localhost' },
+    '@/features/refill/queries': { invalidateRefillData() {}, qk: {
+      myStock: ['me', 'stock'], kitchenStock: ['kitchen', 'stock'], allocationsToday: ['allocations', 'today'],
+    } },
+    '@/features/showcase/queries': { showcaseKeys: {
+      absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'], staff: ['showcase', 'staff'],
+    } },
+    '@/features/settlements/queries': { invalidateSettlementData() {} },
+    './seen': { claimEvent() {} },
+  }, { setTimeout: () => 1, clearTimeout: () => {} });
+  provider.RealtimeProvider({ children: null });
+  const cleanups = effects.map((effect) => effect());
+  assert.equal(useAuth.getState().session.user.cartId, undefined);
+  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+    assert.match(renderRiderForm(screen, useAuth), /Produksi belum kasih stok/);
+  }
+  currentUser = { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' };
+  channels[0]({ event_id: 'handover-1', type: 'CartAssignmentChanged', cart_id: 4 });
+  await new Promise(setImmediate);
+  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+    assert.match(renderRiderForm(screen, useAuth), /0004/);
+    assert.equal(useAuth.getState().session.user.cartId, 4);
+    assert.equal(useAuth.getState().session.user.cartCode, '0004');
+  }
+  currentUser = { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 5, cartCode: '0005' };
+  hold = {};
+  hold.promise = new Promise((resolve) => { hold.resolve = resolve; });
+  appStateChange('inactive');
+  appStateChange('active');
+  assert.equal(useAuth.getState().cartRefreshStatus, 'loading');
+  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+    const rendered = renderRiderForm(screen, useAuth);
+    assert.match(rendered, /Lagi cek gerobak/);
+    assert.doesNotMatch(rendered, /0004/);
+  }
+  hold.resolve();
+  hold = null;
+  await new Promise(setImmediate);
+  assert.equal(useAuth.getState().session.user.cartId, 5);
+  assert.equal(useAuth.getState().session.user.cartCode, '0005');
+  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+    assert.match(renderRiderForm(screen, useAuth), /0005/);
+  }
+  const stableSession = useAuth.getState().session;
+  await useAuth.getState().refreshUser();
+  assert.equal(useAuth.getState().session, stableSession, 'unchanged /me must not reconnect Pusher');
+  cleanups.forEach((cleanup) => cleanup?.());
+});
 
 function loadApi(useAuth, fetch) {
   return loadTs('src/lib/api.ts', {

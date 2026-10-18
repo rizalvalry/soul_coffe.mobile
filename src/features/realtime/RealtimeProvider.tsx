@@ -80,6 +80,7 @@ const RealtimeContext = createContext<RealtimeContextValue>({ state: 'disconnect
 export function RealtimeProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const session = useAuth((s) => s.session);
+  const refreshUser = useAuth((s) => s.refreshUser);
   const [state, setState] = useState<ConnectionState>('connecting');
 
   const echoRef = useRef<Echo<'pusher'> | null>(null);
@@ -153,6 +154,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       setState('connected');
       // One catch-up refresh per connection. Pusher does not replay events missed offline.
       void client.invalidateQueries();
+      if (session.user.role === 'STAFF') void refreshUser().catch(() => {});
     });
     connection?.bind('connecting', () => { if (active) setState('connecting'); });
     connection?.bind('disconnected', () => { if (active) setState('disconnected'); });
@@ -192,6 +194,16 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         void client.invalidateQueries({ queryKey: ['showcase', 'allowance'] });
         void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
       }
+      if (session.user.role === 'STAFF' &&
+        (event.type === 'CartAssignmentChanged' || event.type === 'CartStockHandedOver')) {
+        if (event.type === 'CartAssignmentChanged') {
+          void client.invalidateQueries({ queryKey: refillKeys.myStock });
+          if (session.user.cartId && event.cart_id !== session.user.cartId) {
+            echo?.leave(`cart.${session.user.cartId}`);
+          }
+        }
+        void refreshUser().catch(() => {});
+      }
       const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
       const existingEvent = ['CartClosedOut', 'SaleVoided', 'SaleFlaggedSuspect'].includes(event.type);
       const queueEvent = ['SaleRecorded', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
@@ -219,7 +231,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       echo?.disconnect();
       echoRef.current = null;
     };
-  }, [session, client]);
+  }, [session, client, refreshUser]);
 
   // React Query's window-focus signal is not reliable on native. Refresh active queries when
   // the app returns, including events missed while the socket was disconnected.
@@ -227,11 +239,14 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     if (!session) return;
     let previous: AppStateStatus = AppState.currentState;
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
-      if (next === 'active' && previous !== 'active') void client.invalidateQueries();
+      if (next === 'active' && previous !== 'active') {
+        void client.invalidateQueries();
+        if (session.user.role === 'STAFF') void refreshUser().catch(() => {});
+      }
       previous = next;
     });
     return () => subscription.remove();
-  }, [session, client]);
+  }, [session, client, refreshUser]);
 
   // A window opened yesterday is closed at the server's next operating-day boundary, even if
   // the phone stays foregrounded with a healthy socket (no event is emitted for that rollover).
@@ -248,12 +263,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       const nextWib = (Math.floor((now + wibOffset) / day) + 1) * day - wibOffset;
       timer = setTimeout(() => {
         void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
+        void refreshUser().catch(() => {});
         schedule();
       }, Math.min(nextUtc, nextWib) - now + 1000);
     };
     schedule();
     return () => clearTimeout(timer);
-  }, [session?.user.role, client]);
+  }, [session?.user.role, client, refreshUser]);
 
   return <RealtimeContext.Provider value={{ state, isRealtime: state === 'connected' }}>{children}</RealtimeContext.Provider>;
 }

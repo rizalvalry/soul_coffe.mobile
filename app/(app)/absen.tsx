@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as Location from 'expo-location';
 import Animated from 'react-native-reanimated';
@@ -7,7 +8,7 @@ import Animated from 'react-native-reanimated';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+import { Button, IconButton } from '@/components/ui/Button';
 import { Chip } from '@/components/ui/Badge';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -33,8 +34,7 @@ import { brand, feedback, radius, semantic, space } from '@/theme';
  * lives in one place on the server; a second copy in the app would be a second place for it to
  * be wrong, and the two would drift the first time the rule changed.
  *
- * The status query polls, because a rider's button unlocks from somebody ELSE's action —
- * without that they would sit looking at a disabled button with no way to know it had changed.
+ * The status query is refreshed by the realtime provider when Produksi opens the Rider window.
  */
 function clockTime(iso: string | null): string {
   if (!iso) return '—';
@@ -57,6 +57,7 @@ function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: n
 }
 
 export default function AbsenScreen() {
+  const router = useRouter();
   const role = useAuth((s) => s.session?.user.role);
   const statusQuery = useAttendanceStatus();
   const rollQuery = useAttendanceRoll();
@@ -134,6 +135,7 @@ export default function AbsenScreen() {
   if (statusQuery.isLoading) {
     return (
       <Screen>
+        <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
         <SkeletonList count={2} lines={2} />
       </Screen>
     );
@@ -142,6 +144,7 @@ export default function AbsenScreen() {
   if (statusQuery.isError || !status) {
     return (
       <Screen>
+        <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
         <Card style={styles.stateCard}>
           <EmptyState
             icon="wifi-off"
@@ -162,6 +165,7 @@ export default function AbsenScreen() {
 
   return (
     <Screen refreshing={statusQuery.isRefetching} onRefresh={refresh}>
+      <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
       <Text variant="h2">Absen</Text>
       <Text variant="caption" color={semantic.textMuted}>
         {status.operating_date}

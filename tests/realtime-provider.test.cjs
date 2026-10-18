@@ -23,6 +23,7 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   let nextTimerId = 0;
   let appStateCallback;
   let refillInvalidations = 0;
+  let cartRefreshes = 0;
   const client = { invalidateQueries: (filter) => { calls.push(filter?.queryKey ?? 'all'); return Promise.resolve(); } };
   const session = { token: 'test-token', user: { id: '7', role, cartId: 1 } };
   const react = {
@@ -49,7 +50,7 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
     'laravel-echo': Echo,
     'pusher-js': class Pusher {},
     '@tanstack/react-query': { useQueryClient: () => client },
-    '@/features/auth/store': { useAuth: (selector) => selector({ session }) },
+    '@/features/auth/store': { useAuth: (selector) => selector({ session, refreshUser: async () => { cartRefreshes++; } }) },
     '@/lib/api': { apiBaseUrl: () => 'http://localhost' },
     '@/features/refill/queries': {
       invalidateRefillData: () => { refillInvalidations++; },
@@ -81,6 +82,7 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
     disconnects: () => disconnects,
     appState: (state) => appStateCallback(state),
     refillInvalidations: () => refillInvalidations,
+    cartRefreshes: () => cartRefreshes,
     nextBoundaryDelay: () => timers.values().next().value?.delay,
     runBoundary: () => {
       const [id, timer] = timers.entries().next().value;
@@ -120,14 +122,26 @@ test('push-first event still refreshes Absen and duplicate socket channels do no
 test('connection and foreground transitions refresh once without an interval', () => {
   const app = mountRealtimeProvider();
   app.connectionCallbacks.get('connected')();
+  assert.equal(app.cartRefreshes(), 1);
   assert.deepEqual(app.calls, ['all']);
   app.appState('active');
+  assert.equal(app.cartRefreshes(), 1);
   assert.deepEqual(app.calls, ['all']);
   app.appState('inactive');
   app.appState('active');
   assert.deepEqual(app.calls, ['all', 'all']);
+  assert.equal(app.cartRefreshes(), 2);
   app.appState('active');
   assert.deepEqual(app.calls, ['all', 'all']);
+});
+
+test('Rider assignment event refreshes current cart even if push arrived first', () => {
+  const app = mountRealtimeProvider(() => false);
+  app.channelCallbacks[0]({ event_id: 'new-cart', type: 'CartAssignmentChanged', cart_id: 4 });
+  assert.equal(app.cartRefreshes(), 1);
+  assert.ok(app.leftChannels.includes('cart.1'), 'displaced Rider must leave old cart immediately');
+  app.channelCallbacks[1]({ event_id: 'new-cart', type: 'CartAssignmentChanged', cart_id: 4 });
+  assert.equal(app.cartRefreshes(), 1);
 });
 
 test('a continuously foregrounded Rider refreshes attendance at the operating-day boundary', () => {

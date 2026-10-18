@@ -53,6 +53,12 @@ function rupiah(amount: number): string {
   return `Rp ${amount.toLocaleString('id-ID')}`;
 }
 
+function saleAttribution(row: SettlementQueueRow): string | null {
+  const names = row.sale_staff_names ?? [];
+  if (names.length === 0 || (names.length === 1 && names[0] === row.staff_name)) return null;
+  return `Penjualan oleh ${names.join(', ')}`;
+}
+
 /** Digits only. A money field that accepts "50.000,00" is a money field that will be typed wrong. */
 function toAmount(text: string): number {
   const digits = text.replace(/\D/g, '');
@@ -207,8 +213,9 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
         <View>
           <Text variant="h3">{settlementId ? 'Cups Sisa' : 'Terima Setoran'}</Text>
           <Text variant="caption" color={semantic.textMuted}>
-            Gerobak {row.cart_code} · {row.staff_name ?? '-'}
+            Gerobak {row.cart_code} · Penanggung jawab: {row.staff_name ?? '-'}
           </Text>
+          {saleAttribution(row) ? <Text variant="caption" color={semantic.textMuted}>{saleAttribution(row)}</Text> : null}
         </View>
         <IconButton icon="close" label="Tutup" onPress={onClose} />
       </View>
@@ -500,8 +507,13 @@ export default function FinanceSettlementsScreen() {
 
                 <View style={styles.queueText}>
                   <Text variant="bodyStrong" numberOfLines={1}>
-                    {row.cart_code} · {row.staff_name ?? '-'}
+                    {row.cart_code} · Penanggung jawab: {row.staff_name ?? '-'}
                   </Text>
+                  {saleAttribution(row) ? (
+                    <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
+                      {saleAttribution(row)}
+                    </Text>
+                  ) : null}
                   <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
                     {row.cups_sold} cups terjual · sisa {row.cups_remaining} · {rupiah(row.expected_total_minor ?? row.expected_total ?? 0)}
                   </Text>

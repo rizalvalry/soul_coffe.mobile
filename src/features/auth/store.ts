@@ -8,6 +8,7 @@ import { resetSeenEvents } from '@/features/realtime/seen';
 import { resetQueryClient } from '@/lib/queryClient';
 import {
   AuthError,
+  fetchCurrentUser,
   login,
   loginAsDemoRole,
   loginWithPin,
@@ -38,6 +39,8 @@ type AuthState = {
   session: Session | null;
   error: string | null;
   submitting: boolean;
+  cartRefreshStatus: 'idle' | 'loading' | 'error';
+  cartRefreshError: string | null;
 
   /**
    * The phone of the last account to sign in on this device, and whether it had a PIN.
@@ -53,6 +56,7 @@ type AuthState = {
   signIn: (credentials: Credentials) => Promise<SignInOutcome>;
   signInWithPin: (phone: string, pin: string) => Promise<SignInOutcome>;
   signInAsDemo: (role: Role) => Promise<boolean>;
+  refreshUser: () => Promise<void>;
   signOut: () => Promise<void>;
   /** Records that the signed-in user now does (or no longer does) have a PIN. */
   setPinAvailable: (available: boolean) => Promise<void>;
@@ -68,6 +72,8 @@ type AuthState = {
 const HINT_KEY = 'soul.signin.hint.v1';
 const LOGOUT_PENDING_KEY = 'soul.logout.pending.v1';
 let endingSession: Promise<void> | null = null;
+let userRefreshId = 0;
+let appliedUserRefreshId = 0;
 
 async function persistLoggedOut(): Promise<void> {
   let markerWritten = false;
@@ -148,8 +154,39 @@ export const useAuth = create<AuthState>((set) => ({
   session: null,
   error: null,
   submitting: false,
+  cartRefreshStatus: 'idle',
+  cartRefreshError: null,
   lastPhone: null,
   pinAvailable: false,
+
+  refreshUser: async () => {
+    const session = useAuth.getState().session;
+    if (!session) return;
+    const requestId = ++userRefreshId;
+    set({ cartRefreshStatus: 'loading', cartRefreshError: null });
+    try {
+      const user = await fetchCurrentUser(session.token, session.user.role);
+      const current = useAuth.getState().session;
+      if (!current || current.token !== session.token || current.user.id !== user.id ||
+        requestId < appliedUserRefreshId) return;
+      appliedUserRefreshId = requestId;
+      set({
+        ...(JSON.stringify(current.user) === JSON.stringify(user)
+          ? {} : { session: { ...current, user } }),
+        cartRefreshStatus: 'idle',
+        cartRefreshError: null,
+      });
+    } catch (error) {
+      if (useAuth.getState().session?.token === session.token &&
+        requestId === userRefreshId && requestId > appliedUserRefreshId) {
+        set({
+          cartRefreshStatus: 'error',
+          cartRefreshError: error instanceof Error ? error.message : 'Gerobak belum bisa dicek. Coba lagi ya.',
+        });
+      }
+      throw error;
+    }
+  },
 
   restore: async () => {
     // A previous logout interrupted during SecureStore deletion must never restore that token.
@@ -210,7 +247,7 @@ export const useAuth = create<AuthState>((set) => ({
 
     if (session) {
       await clearAccountState();
-      set({ session, status: 'authenticated' });
+      set({ session, status: 'authenticated', cartRefreshStatus: 'idle', cartRefreshError: null });
       return;
     }
 
@@ -236,6 +273,8 @@ export const useAuth = create<AuthState>((set) => ({
         submitting: false,
         lastPhone: credentials.phone,
         pinAvailable: hasPin,
+        cartRefreshStatus: 'idle',
+        cartRefreshError: null,
       });
 
       // Fire and forget: a phone that cannot register for push must still be able to sign in.
@@ -278,6 +317,8 @@ export const useAuth = create<AuthState>((set) => ({
         submitting: false,
         lastPhone: phone,
         pinAvailable: true,
+        cartRefreshStatus: 'idle',
+        cartRefreshError: null,
       });
 
       void syncRegistration(session.token);
@@ -320,7 +361,8 @@ export const useAuth = create<AuthState>((set) => ({
       await persist(session);
       await clearLogoutMarker();
       await clearAccountState();
-      set({ session, status: 'authenticated', submitting: false });
+      set({ session, status: 'authenticated', submitting: false,
+        cartRefreshStatus: 'idle', cartRefreshError: null });
       return true;
     } catch (e) {
       const message = e instanceof AuthError ? e.message : 'Mode demo gagal.';
@@ -336,6 +378,7 @@ export const useAuth = create<AuthState>((set) => ({
     // Remove the authenticated tree now. It owns the socket, push listeners, and screen-local
     // state; leaving it mounted during network cleanup could repopulate the old query cache.
     set({ session: null, status: 'restoring', error: null, submitting: false,
+      cartRefreshStatus: 'idle', cartRefreshError: null,
       lastPhone: null, pinAvailable: false });
 
     // Order matters: the push registration is deleted through an authenticated call, so it has to
@@ -366,6 +409,7 @@ export const useAuth = create<AuthState>((set) => ({
     // same person is about to sign back in on this same phone with their new PIN.
     const clearedNotifications = clearAccountState();
     set({ session: null, status: 'restoring', error: null,
+      cartRefreshStatus: 'idle', cartRefreshError: null,
       lastPhone: null, pinAvailable: false });
     const cleanup = (async () => {
       let localError: Error | null = null;

@@ -19,6 +19,7 @@ import { NewsSlider } from '@/components/news/NewsSlider';
 import { useAuth } from '@/features/auth/store';
 import { useBadges } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
+import { attendanceTileSubtitle } from '@/features/showcase/attendanceTile';
 import { riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { menuByRole, menuItemsWithScreens, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
@@ -73,7 +74,7 @@ export default function MenuScreen() {
   const [refreshing, setRefreshing] = useState(false);
 
   const user = session?.user;
-  const attendance = useAttendanceStatus(user?.role === 'STAFF');
+  const attendance = useAttendanceStatus(user?.role === 'STAFF' || user?.role === 'BARISTA');
   const dayGate = user?.role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
   const gateMessage = riderGateMessage(dayGate);
   const items = useMemo(() => (user ? menuItemsWithScreens(menuByRole[user.role], sitemap) : []), [user, sitemap]);
@@ -103,6 +104,10 @@ export default function MenuScreen() {
   };
   const isGatedTransaction = (item: MenuItem) =>
     !!gateMessage && (item.id === 'staff-sell' || item.id === 'staff-refill-new');
+  const tileSubtitle = (item: MenuItem) => {
+    if (item.id !== 'staff-absen' && item.id !== 'barista-absen') return item.sublabel;
+    return attendanceTileSubtitle(user.role, attendance.data);
+  };
 
   return (
     // The menu owns no query of its own, so its pull-to-refresh drops every cached read instead.
@@ -202,7 +207,7 @@ export default function MenuScreen() {
                 {item.label}
               </Text>
               <Text variant="caption" color={brand[100]}>
-                {isGatedTransaction(item) ? gateMessage : item.sublabel}
+                {isGatedTransaction(item) ? gateMessage : tileSubtitle(item)}
               </Text>
             </View>
             {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
@@ -242,7 +247,7 @@ export default function MenuScreen() {
                 {item.label}
               </Text>
               <Text variant="caption" color={semantic.textMuted}>
-                {isGatedTransaction(item) ? gateMessage : item.sublabel}
+                {isGatedTransaction(item) ? gateMessage : tileSubtitle(item)}
               </Text>
             </Touchable>
           </Animated.View>
