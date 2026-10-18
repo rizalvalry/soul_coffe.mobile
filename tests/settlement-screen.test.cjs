@@ -115,6 +115,15 @@ const baseDraft = {
   expected_qris_minor: 30000, expected_transfer_minor: 10000, lines: [],
 };
 
+test('finance sees the sales Rider when the cart custodian changed', () => {
+  const row = { ...baseRow, staff_name: 'Rider Baru', sale_staff_names: ['Rider Lama'] };
+  const app = mountScreen({ row, draft: baseDraft, settlement: { id: 7, variance: 0 } });
+  const labels = app.nodes.filter((node) => node.type === 'Text').map((node) =>
+    Array.isArray(node.props.children) ? node.props.children.flat(Infinity).join('') : node.props.children);
+  assert.ok(labels.some((value) => typeof value === 'string' && value.includes('Penanggung jawab: Rider Baru')));
+  assert.ok(labels.includes('Penjualan oleh Rider Lama'));
+});
+
 test('queue keeps API order and form shows per-method values with an enabled zero-money submit', async () => {
   const app = mountScreen({ row: baseRow, draft: baseDraft,
     settlement: { id: 7, variance: -80000 },

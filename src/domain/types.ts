@@ -354,6 +354,8 @@ export type SettlementQueueRow = {
   cart_code: string | null;
   staff_id: number | null;
   staff_name: string | null;
+  /** Riders who recorded the cart's non-void sales; may differ from its current custodian. */
+  sale_staff_names?: string[];
   area: string | null;
   transactions: number;
   cups_sold: number;

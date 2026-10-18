@@ -85,20 +85,10 @@ export default function BaristaAddStockScreen() {
   const allowanceChanged =
     allowanceQuery.data !== undefined && allowanceAmount !== allowanceQuery.data.amount_minor;
 
-  /**
-   * R11: one gerobak per rider per day. The picker already shows an existing placement, so this
-   * is caught before the barista types anything rather than after.
-   */
-  const staffConflict =
-    selectedStaff?.assigned_cart_id != null && selectedStaff.assigned_cart_id !== cartId
-      ? `${selectedStaff.name} sudah bertugas di gerobak ${selectedStaff.assigned_cart_code} hari ini.`
-      : null;
-
   const canSubmit =
     cartId !== null &&
     staffId !== null &&
     totalCups > 0 &&
-    !staffConflict &&
     Number.isFinite(allowanceAmount) &&
     allowanceAmount >= 0;
 
@@ -238,8 +228,8 @@ export default function BaristaAddStockScreen() {
               <View style={styles.pickList}>
                 {staffList.map((staff, index) => {
                   const active = staff.id === staffId;
-                  // Already on ANOTHER gerobak today — shown, but flagged, so the barista sees
-                  // the clash before typing rather than after submitting.
+                  // Another cart today is allowed: Add Stock replaces the active pairing and
+                  // preserves the previous one in the server audit history.
                   const elsewhere =
                     staff.assigned_cart_id != null && staff.assigned_cart_id !== cartId;
                   return (
@@ -270,7 +260,7 @@ export default function BaristaAddStockScreen() {
                               : 'Belum ada penugasan hari ini'}
                           </Text>
                         </View>
-                        {elsewhere ? <Chip tone="amber" label="TERPAKAI" /> : null}
+                        {elsewhere ? <Chip tone="amber" label="PINDAH" /> : null}
                         <MaterialCommunityIcons
                           name={active ? 'check-circle' : 'chevron-right'}
                           size={active ? 22 : 20}
@@ -291,7 +281,9 @@ export default function BaristaAddStockScreen() {
         <Animated.View entering={enter('below')}>
           <SectionTitle title="3. Jumlah cups & uang harian" icon="cup-outline" />
           <Card style={styles.card}>
-            {staffConflict ? <Banner tone="warning" message={staffConflict} /> : null}
+            {selectedStaff?.assigned_cart_id != null && selectedStaff.assigned_cart_id !== cartId ? (
+              <Banner tone="warning" message={`${selectedStaff.name} sekarang di gerobak ${selectedStaff.assigned_cart_code}. Add Stock ini bakal memindahkan rider dan menyimpan riwayatnya.`} />
+            ) : null}
 
             <View style={styles.lines}>
               {products.map((p) => {

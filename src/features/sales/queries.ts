@@ -29,6 +29,8 @@ export function useTodaySales() {
 export type RecordSaleInput = {
   /** Shared by the first HTTP attempt and its offline replay if the response is lost. */
   uuid?: string;
+  /** The cart at the moment this sale was recorded, never the cart at replay time. */
+  cartId: number;
   lines: { product_id: number; qty: number }[];
   paymentMethod: PaymentMethod;
   gps: { lat: number; lng: number } | null;

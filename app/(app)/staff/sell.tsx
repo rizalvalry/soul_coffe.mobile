@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated from 'react-native-reanimated';
@@ -22,7 +22,7 @@ import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useMyStock } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
-import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
+import { DAY_NOT_OPEN_MESSAGE, NO_CART_TODAY_MESSAGE, isDayNotOpen, isNoCartToday, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { useRecordSale, useTodaySales, useVoidSale } from '@/features/sales/queries';
 import type { QueuedSale } from '@/features/sales/offlineQueue';
 import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
@@ -278,6 +278,13 @@ function PendingSaleRow({
 export default function SellScreen() {
   const router = useRouter();
   const user = useAuth((s) => s.session?.user);
+  const refreshUser = useAuth((s) => s.refreshUser);
+  const cartRefreshStatus = useAuth((s) => s.cartRefreshStatus);
+  const cartRefreshError = useAuth((s) => s.cartRefreshError);
+
+  useFocusEffect(useCallback(() => {
+    void refreshUser().catch(() => {});
+  }, [refreshUser]));
 
   const absen = useAttendanceStatus();
   const productsQuery = useProducts();
@@ -372,13 +379,19 @@ export default function SellScreen() {
       return;
     }
 
+    const cartId = user?.cartId;
+    if (!cartId) {
+      setFormError(NO_CART_TODAY_MESSAGE);
+      return;
+    }
+
     const lines = Object.entries(qty)
       .map(([productId, sold]) => ({ product_id: Number(productId), qty: sold }))
       .filter((line) => line.qty > 0);
     const uuid = uuidv4();
 
     try {
-      const sale = await recordSale.mutateAsync({ uuid, lines, paymentMethod: payment, gps });
+      const sale = await recordSale.mutateAsync({ uuid, cartId, lines, paymentMethod: payment, gps });
 
       // The form empties itself: the next customer is already waiting, and a screen that keeps
       // the last order on it is a screen that will eventually record it twice.
@@ -390,7 +403,7 @@ export default function SellScreen() {
       // on a bar of signal that happens to be missing at this exact moment.
       if (e instanceof ApiError && e.isOffline) {
         try {
-          await offlineQueue.enqueue({ uuid, lines, paymentMethod: payment, gps });
+          await offlineQueue.enqueue({ uuid, cartId, lines, paymentMethod: payment, gps });
           setQty({});
           setQueuedOffline(true);
         } catch {
@@ -404,11 +417,12 @@ export default function SellScreen() {
         // Kopi Susu hanya 3 cup." — which is more useful than anything this screen could invent.
         setFormError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e.message);
         if (isDayNotOpen(e)) void absen.refetch();
+        if (isNoCartToday(e)) void refreshUser().catch(() => {});
       } else {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen]);
+  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen, refreshUser, user?.cartId]);
 
   if (!user?.cartId) {
     return (
@@ -419,11 +433,45 @@ export default function SellScreen() {
         <Card>
           <EmptyState
             icon="moped-off"
-            title="Anda tidak bertugas di gerobak hari ini"
-            subtitle="Hubungi Produksi atau Administrator untuk penugasan gerobak hari ini."
+            title={cartRefreshStatus === 'error' ? 'Gerobak belum bisa dicek'
+              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak' : 'Gerobak belum dapat stok'}
+            subtitle={cartRefreshStatus === 'error'
+              ? (cartRefreshError ?? 'Coba cek gerobak lagi ya.')
+              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak kamu...' : NO_CART_TODAY_MESSAGE}
             tone="neutral"
           />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
         </Card>
+        {offlineQueue.queue.length > 0 || offlineQueue.rejected.length > 0 ? (
+          <Card style={styles.queueCard}>
+            <Banner
+              tone="warning"
+              message="Transaksi dari gerobak sebelumnya tetap tersimpan di HP ini. Cek bareng Administrator ya."
+            />
+            {[...offlineQueue.queue, ...offlineQueue.rejected].map((entry, index) => (
+              <PendingSaleRow key={entry.uuid} entry={entry} productName={productName} isFirst={index === 0} />
+            ))}
+          </Card>
+        ) : null}
+        {offlineQueue.legacyCount > 0 ? (
+          <Banner
+            tone="warning"
+            message="Ada transaksi offline dari versi sebelumnya yang belum diketahui pemiliknya. Data tetap tersimpan di perangkat. Cek bareng Administrator ya."
+          />
+        ) : null}
+        {(salesQuery.data ?? []).length > 0 ? (
+          <Card style={styles.historyCard}>
+            {(salesQuery.data ?? []).map((sale, index) => (
+              <SaleHistoryRow
+                key={sale.uuid}
+                sale={sale}
+                gateMessage={gateMessage}
+                onDayClosed={() => void absen.refetch()}
+                isFirst={index === 0}
+              />
+            ))}
+          </Card>
+        ) : null}
       </Screen>
     );
   }
@@ -451,6 +499,13 @@ export default function SellScreen() {
           Gerobak {user.cartCode ?? '-'} · stok berkurang otomatis
         </Text>
       </View>
+
+      {cartRefreshStatus === 'error' ? (
+        <Card>
+          <Banner tone="warning" message={cartRefreshError ?? 'Gerobak belum bisa dicek. Kamu masih bisa catat penjualan di gerobak terakhir.'} />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
+        </Card>
+      ) : null}
 
       {offlineQueue.hasQueued ? (
         <Card style={styles.queueCard}>

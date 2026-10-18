@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -22,7 +22,7 @@ import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
-import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
+import { DAY_NOT_OPEN_MESSAGE, NO_CART_TODAY_MESSAGE, isDayNotOpen, isNoCartToday, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { ApiError } from '@/lib/api';
 import { brand, neutral, radius, semantic, shadow, space } from '@/theme';
 
@@ -56,6 +56,13 @@ type GpsStatus = 'checking' | 'granted' | 'unavailable';
 export default function NewRefillScreen() {
   const router = useRouter();
   const user = useAuth((s) => s.session?.user);
+  const refreshUser = useAuth((s) => s.refreshUser);
+  const cartRefreshStatus = useAuth((s) => s.cartRefreshStatus);
+  const cartRefreshError = useAuth((s) => s.cartRefreshError);
+
+  useFocusEffect(useCallback(() => {
+    void refreshUser().catch(() => {});
+  }, [refreshUser]));
 
   const productsQuery = useProducts();
   const attendance = useAttendanceStatus();
@@ -159,7 +166,7 @@ export default function NewRefillScreen() {
     }
 
     if (!user?.cartId) {
-      setFormError('Anda tidak bertugas di gerobak ini hari ini.');
+      setFormError(NO_CART_TODAY_MESSAGE);
       return;
     }
     if (totalCups <= 0) {
@@ -196,7 +203,8 @@ export default function NewRefillScreen() {
         } else if (e.isConflict) {
           setFormError('Masih ada request yang belum selesai untuk gerobak ini.');
         } else if (e.isForbidden) {
-          setFormError('Anda tidak bertugas di gerobak ini hari ini.');
+          setFormError(e.message);
+          if (isNoCartToday(e)) void refreshUser().catch(() => {});
         } else {
           setFormError(e.message);
         }
@@ -204,7 +212,7 @@ export default function NewRefillScreen() {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [user, totalCups, photo, qty, gps, uploadEvidence, submitRefill, router, gateMessage, attendance]);
+  }, [user, totalCups, photo, qty, gps, uploadEvidence, submitRefill, router, gateMessage, attendance, refreshUser]);
 
   if (!user?.cartId) {
     return (
@@ -215,10 +223,14 @@ export default function NewRefillScreen() {
         <Card>
           <EmptyState
             icon="moped-off"
-            title="Anda tidak bertugas di gerobak ini hari ini"
-            subtitle="Hubungi Produksi atau Administrator untuk penugasan gerobak hari ini."
+            title={cartRefreshStatus === 'error' ? 'Gerobak belum bisa dicek'
+              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak' : 'Gerobak belum dapat stok'}
+            subtitle={cartRefreshStatus === 'error'
+              ? (cartRefreshError ?? 'Coba cek gerobak lagi ya.')
+              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak kamu...' : NO_CART_TODAY_MESSAGE}
             tone="neutral"
           />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
         </Card>
       </Screen>
     );
@@ -268,6 +280,13 @@ export default function NewRefillScreen() {
           </Text>
         </View>
       </View>
+
+      {cartRefreshStatus === 'error' ? (
+        <Card>
+          <Banner tone="warning" message={cartRefreshError ?? 'Gerobak belum bisa dicek. Kamu masih bisa pakai gerobak terakhir.'} />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
+        </Card>
+      ) : null}
 
       {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
       {dayGate === 'attendance' ? (

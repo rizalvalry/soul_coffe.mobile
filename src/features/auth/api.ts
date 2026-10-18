@@ -11,6 +11,7 @@ export type AuthUser = {
   /** Present for STAFF — today's assigned cart. */
   cartCode?: string;
   cartId?: number;
+  todayCart?: { id: number; code: string; assignedAt: string | null } | null;
   /** Present for BARISTA — the kitchen they belong to. */
   kitchenName?: string;
   kitchenId?: number;
@@ -29,16 +30,39 @@ function optionalNumber(value: unknown): number | undefined {
 function toSessionUser(user: Record<string, unknown>): AuthUser {
   if (!isRole(user['role'])) throw new AuthError('Respons server tidak valid.', 'server');
 
+  const todayCart = user['today_cart'] && typeof user['today_cart'] === 'object'
+    ? user['today_cart'] as Record<string, unknown> : null;
+  const cartId = Object.hasOwn(user, 'today_cart') ? optionalNumber(todayCart?.['id']) : optionalNumber(user['cart_id']);
+  const cartCode = Object.hasOwn(user, 'today_cart')
+    ? (todayCart?.['code'] ? String(todayCart['code']) : undefined)
+    : (user['cart_code'] ? String(user['cart_code']) : undefined);
+
   return {
     id: String(user['id']),
     name: String(user['name']),
     role: user['role'],
-    cartCode: user['cart_code'] ? String(user['cart_code']) : undefined,
-    cartId: optionalNumber(user['cart_id']),
+    cartCode,
+    cartId,
+    todayCart: todayCart && cartId && cartCode
+      ? { id: cartId, code: cartCode, assignedAt: typeof todayCart['assigned_at'] === 'string' ? todayCart['assigned_at'] : null }
+      : null,
     kitchenName: user['kitchen_name'] ? String(user['kitchen_name']) : undefined,
     kitchenId: optionalNumber(user['kitchen_id']),
     hasLoginPin: user['has_login_pin'] === true,
   };
+}
+
+/** Fetch the server's current cart after login, reconnect, foreground return, or form focus. */
+export async function fetchCurrentUser(token: string, role: Role): Promise<AuthUser> {
+  if (isDemoMode()) return toAuthUser(getUserByRole(role));
+
+  const response = await fetch(`${apiBaseUrl()}/me`, {
+    headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) throw new AuthError(`Gagal memuat gerobak (${response.status}). Coba lagi.`, 'server');
+  const raw = await response.json() as { data?: Record<string, unknown> };
+  if (!raw.data) throw new AuthError('Respons server tidak valid.', 'server');
+  return toSessionUser(raw.data);
 }
 
 export type Session = {
