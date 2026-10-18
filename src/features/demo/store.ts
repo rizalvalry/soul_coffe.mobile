@@ -443,7 +443,7 @@ export function submitRefill(actor: Actor, input: SubmitRefillInput): DemoRefill
 
   const assignment = assignedCartToday(actor.id);
   if (!assignment || assignment.cartId !== input.cartId) {
-    throw new DemoError('Anda tidak bertugas di gerobak ini hari ini.', 403);
+    throw new DemoError('Anda tidak bertugas di Coffee Bike ini hari ini.', 403);
   }
 
   const lines = input.lines.filter((l) => l.qtyRequested > 0);
@@ -462,7 +462,7 @@ export function submitRefill(actor: Actor, input: SubmitRefillInput): DemoRefill
     (r) => r.cartId === input.cartId && OPEN_STATUSES.includes(r.status),
   );
   if (openForCart) {
-    throw new DemoError('Masih ada request yang belum selesai untuk gerobak ini.', 409);
+    throw new DemoError('Masih ada request yang belum selesai untuk Coffee Bike ini.', 409);
   }
 
   const cart = getCart(input.cartId);
@@ -517,13 +517,13 @@ export function submitRefill(actor: Actor, input: SubmitRefillInput): DemoRefill
   notify([{ role: 'FINANCE' }], {
     type: 'RefillRequestSubmitted',
     title: 'Permintaan refill baru',
-    body: `${refill.code} · Gerobak ${cart?.code ?? '-'} menunggu approval`,
+    body: `${refill.code} · Coffee Bike ${cart?.code ?? '-'} menunggu approval`,
     refillRequestId: refill.id,
   });
   notify([{ role: 'BARISTA' }], {
     type: 'RefillRequestSubmitted',
     title: 'Permintaan masuk (menunggu Finance)',
-    body: `${refill.code} · Gerobak ${cart?.code ?? '-'}`,
+    body: `${refill.code} · Coffee Bike ${cart?.code ?? '-'}`,
     refillRequestId: refill.id,
   });
 
@@ -570,7 +570,7 @@ export function approveRefill(actor: Actor, id: number, input: ApproveRefillInpu
   notify([{ role: 'BARISTA' }], {
     type: 'RefillRequestApproved',
     title: 'Permintaan disetujui Finance',
-    body: `${refill.code} · Gerobak ${cart?.code ?? '-'} siap disiapkan`,
+    body: `${refill.code} · Coffee Bike ${cart?.code ?? '-'} siap disiapkan`,
     refillRequestId: refill.id,
   });
   notify([{ userId: refill.staffId }], {
@@ -831,7 +831,7 @@ export function createAllocation(actor: Actor, input: CreateAllocationInput): De
     (a) => a.cartId === input.cartId && a.operatingDate === input.operatingDate,
   );
   if (existing.length > 0 && !(input.correctionReason ?? '').trim()) {
-    throw new DemoError('Gerobak ini sudah memiliki alokasi hari ini.', 409);
+    throw new DemoError('Coffee Bike ini sudah memiliki alokasi hari ini.', 409);
   }
 
   for (const line of input.lines) {
@@ -896,7 +896,7 @@ export function createAllocation(actor: Actor, input: CreateAllocationInput): De
     notify([{ role: 'FINANCE' }, { role: 'ADMINISTRATOR' }], {
       type: 'AllocationOverTarget',
       title: 'Alokasi melebihi target',
-      body: `Gerobak ${getCart(input.cartId)?.code ?? '-'} · +${overPct}% dari target`,
+      body: `Coffee Bike ${getCart(input.cartId)?.code ?? '-'} · +${overPct}% dari target`,
       refillRequestId: null,
     });
   }

@@ -59,7 +59,7 @@ export async function fetchCurrentUser(token: string, role: Role): Promise<AuthU
   const response = await fetch(`${apiBaseUrl()}/me`, {
     headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
   });
-  if (!response.ok) throw new AuthError(`Gagal memuat gerobak (${response.status}). Coba lagi.`, 'server');
+  if (!response.ok) throw new AuthError(`Gagal memuat Coffee Bike (${response.status}). Coba lagi.`, 'server');
   const raw = await response.json() as { data?: Record<string, unknown> };
   if (!raw.data) throw new AuthError('Respons server tidak valid.', 'server');
   return toSessionUser(raw.data);

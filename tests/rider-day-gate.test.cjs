@@ -278,5 +278,5 @@ test('older owned queue entry without origin cart stays visible and is never rep
   const result = await queue.flushSalesQueue('rider-1');
   assert.equal(sent, 0);
   assert.equal(result.failed.length, 1);
-  assert.match((await queue.loadQueuedSales('rider-1'))[0].rejection, /Gerobak asal/);
+  assert.match((await queue.loadQueuedSales('rider-1'))[0].rejection, /Coffee Bike asal/);
 });

@@ -68,7 +68,7 @@ export function AppSplash({ message = 'Menyiapkan aplikasi...' }: { message?: st
           </Text>
 
           <Text variant="body" center style={styles.tagline}>
-            Operasional gerobak yang rapi,{'\n'}dari request sampai serah terima.
+            Operasional Coffee Bike yang rapi,{'\n'}dari request sampai serah terima.
           </Text>
         </Animated.View>
       </View>

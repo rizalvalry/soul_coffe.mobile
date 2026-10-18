@@ -201,7 +201,7 @@ export default function NewRefillScreen() {
           setFormError(DAY_NOT_OPEN_MESSAGE);
           void attendance.refetch();
         } else if (e.isConflict) {
-          setFormError('Masih ada request yang belum selesai untuk gerobak ini.');
+          setFormError('Masih ada request yang belum selesai untuk Coffee Bike ini.');
         } else if (e.isForbidden) {
           setFormError(e.message);
           if (isNoCartToday(e)) void refreshUser().catch(() => {});
@@ -223,11 +223,11 @@ export default function NewRefillScreen() {
         <Card>
           <EmptyState
             icon="moped-off"
-            title={cartRefreshStatus === 'error' ? 'Gerobak belum bisa dicek'
-              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak' : 'Gerobak belum dapat stok'}
+            title={cartRefreshStatus === 'error' ? 'Coffee Bike belum bisa dicek'
+              : cartRefreshStatus === 'loading' ? 'Lagi cek Coffee Bike' : 'Coffee Bike belum dapat stok'}
             subtitle={cartRefreshStatus === 'error'
-              ? (cartRefreshError ?? 'Coba cek gerobak lagi ya.')
-              : cartRefreshStatus === 'loading' ? 'Lagi cek gerobak kamu...' : NO_CART_TODAY_MESSAGE}
+              ? (cartRefreshError ?? 'Coba cek Coffee Bike lagi ya.')
+              : cartRefreshStatus === 'loading' ? 'Lagi cek Coffee Bike kamu...' : NO_CART_TODAY_MESSAGE}
             tone="neutral"
           />
           <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
@@ -257,7 +257,7 @@ export default function NewRefillScreen() {
           Request Refill
         </Text>
         <Text variant="caption" color={LIGHT_MUTED}>
-          Gerobak {user.cartCode ?? '-'}
+          Coffee Bike {user.cartCode ?? '-'}
         </Text>
 
         {/* The address a coordinate pair alone cannot tell a reviewer — reverse-geocoded from the
@@ -283,7 +283,7 @@ export default function NewRefillScreen() {
 
       {cartRefreshStatus === 'error' ? (
         <Card>
-          <Banner tone="warning" message={cartRefreshError ?? 'Gerobak belum bisa dicek. Kamu masih bisa pakai gerobak terakhir.'} />
+          <Banner tone="warning" message={cartRefreshError ?? 'Coffee Bike belum bisa dicek. Kamu masih bisa pakai Coffee Bike terakhir.'} />
           <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
         </Card>
       ) : null}
@@ -341,7 +341,7 @@ export default function NewRefillScreen() {
 
       <Animated.View entering={enter('below')}>
         <Card style={styles.evidenceCard}>
-          <Text variant="bodyStrong">Foto Bukti Frozen Gerobak</Text>
+          <Text variant="bodyStrong">Foto Bukti Frozen Coffee Bike</Text>
           <Text variant="caption" color={semantic.textMuted}>
             Wajib diambil langsung dari kamera saat ini juga.
           </Text>

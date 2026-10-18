@@ -42,7 +42,9 @@ test('both Rider forms refresh /me on focus and offer the new no-cart copy and r
   for (const path of ['app/(app)/staff/sell.tsx', 'app/(app)/staff/refill/new.tsx']) {
     const file = source(path);
     assert.match(file, /useFocusEffect\(useCallback\(\(\) => \{\s*void refreshUser\(\)/);
-    assert.match(file, /cartRefreshStatus === 'loading' \? 'Lagi cek gerobak kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
+    assert.match(file, path.includes('/sell.tsx')
+      ? /cartRefreshStatus === 'loading' \? 'Lagi cek gerobak kamu\.\.\.' : NO_CART_TODAY_MESSAGE/
+      : /cartRefreshStatus === 'loading' \? 'Lagi cek Coffee Bike kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
     assert.match(file, /cartRefreshStatus === 'error'/);
     assert.match(file, /label="Coba lagi"[^\r\n]*refreshUser\(\)/);
     assert.match(file, /user\?\.cartId/);

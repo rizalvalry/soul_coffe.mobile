@@ -171,7 +171,7 @@ export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
     if (!Number.isSafeInteger(entry.input.cartId) || entry.input.cartId <= 0) {
       // Entries saved by an older APK have no origin cart. Guessing from today's session
       // could subtract stock from a different cart after a reassignment.
-      const message = 'Gerobak asal transaksi ini belum tercatat. Cek bareng Administrator ya.';
+      const message = 'Coffee Bike asal transaksi ini belum tercatat. Cek bareng Administrator ya.';
       failed.push({ entry, message });
       rejected.set(entry.uuid, message);
       continue;

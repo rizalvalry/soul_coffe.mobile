@@ -181,7 +181,7 @@ export const useAuth = create<AuthState>((set) => ({
         requestId === userRefreshId && requestId > appliedUserRefreshId) {
         set({
           cartRefreshStatus: 'error',
-          cartRefreshError: error instanceof Error ? error.message : 'Gerobak belum bisa dicek. Coba lagi ya.',
+          cartRefreshError: error instanceof Error ? error.message : 'Coffee Bike belum bisa dicek. Coba lagi ya.',
         });
       }
       throw error;

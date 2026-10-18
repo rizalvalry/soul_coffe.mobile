@@ -115,7 +115,7 @@ function RequestDetail({
             <View style={styles.headerText}>
               <Text variant="h2">{refill.code}</Text>
               <Text variant="caption" color={semantic.textMuted}>
-                Gerobak {refill.cart_code} · {refill.staff_name}
+                Coffee Bike {refill.cart_code} · {refill.staff_name}
               </Text>
             </View>
             <StatusBadge status={refill.status} />
