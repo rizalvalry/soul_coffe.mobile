@@ -19,7 +19,7 @@ export type RealtimeEvent = {
   event_id: string;
   type: string;
   refill_request_id: number | null;
-  status: RefillStatus | null;
+  status: RefillStatus | 'ARRIVED' | 'DEPARTED' | null;
   title: string;
   body: string;
   at: string;
@@ -194,7 +194,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       }
       const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
       const existingEvent = ['CartClosedOut', 'SaleVoided', 'SaleFlaggedSuspect'].includes(event.type);
-      const queueEvent = ['SaleRecorded', 'SettlementRecorded', 'SettlementApproved',
+      const queueEvent = ['SaleRecorded', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
         'SettlementExpectedStale', 'SettlementVarianceFlagged'].includes(event.type);
       if ((isFinanceOrManagement && (existingEvent || queueEvent)) ||
         (session.user.role === 'ADMINISTRATOR' && existingEvent)) {

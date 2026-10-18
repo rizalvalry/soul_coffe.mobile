@@ -157,7 +157,7 @@ test('existing stock and sale events refresh their affected query families', () 
 });
 
 test('Finance and Management refresh queue, list, and only the affected cart draft for settlement events', () => {
-  const types = ['SaleRecorded', 'SaleVoided', 'SettlementRecorded', 'SettlementApproved',
+  const types = ['SaleRecorded', 'SaleVoided', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
     'SettlementExpectedStale', 'SettlementVarianceFlagged'];
   for (const role of ['FINANCE', 'MANAGEMENT']) {
     const app = mountRealtimeProvider(() => false, role);
