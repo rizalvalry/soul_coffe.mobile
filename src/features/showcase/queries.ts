@@ -196,6 +196,21 @@ export type CloseOutInput = {
   rejected: { product_id: number; qty: number }[];
 };
 
+export type CloseOutDraft = {
+  cart_id: number;
+  closing_id: number | null;
+  lines: { product_id: number; qty_remaining: number; qty_wasted: number; qty_to_return: number }[];
+};
+
+export function useCloseOutDraft(cartId: number | null) {
+  return useQuery({
+    queryKey: ['showcase', 'close-out', 'draft', cartId] as const,
+    queryFn: () => request<CloseOutDraft>('/showcase/close-out/draft/' + cartId),
+    enabled: cartId !== null,
+    staleTime: 0,
+  });
+}
+
 export function useCloseOutCart() {
   const client = useQueryClient();
   return useMutation({
@@ -216,6 +231,7 @@ export function useCloseOutCart() {
       void client.invalidateQueries({ queryKey: showcaseKeys.stock });
       void client.invalidateQueries({ queryKey: refillKeys.kitchenStock });
       void client.invalidateQueries({ queryKey: refillKeys.myStock });
+      void client.invalidateQueries({ queryKey: ['showcase', 'close-out', 'draft'] });
     },
   });
 }

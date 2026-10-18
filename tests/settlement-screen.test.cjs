@@ -131,7 +131,7 @@ test('queue keeps API order and form shows per-method values with an enabled zer
   });
   const queue = app.nodes.filter((node) => node.type === 'Touchable');
   assert.deepEqual(queue.map((node) => node.props.accessibilityLabel), [
-    'Setoran gerobak 0018', 'Setoran gerobak 0019',
+    'Setoran Coffee Bike 0018', 'Setoran Coffee Bike 0019',
   ]);
   const text = app.nodes.filter((node) => node.type === 'Text').map((node) =>
     Array.isArray(node.props.children) ? node.props.children.flat(Infinity).join('') : node.props.children);

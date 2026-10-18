@@ -240,16 +240,14 @@ const roleMenus: Record<Role, MenuItem[]> = {
   ],
 
   STAFF: [
-    // First and primary: this is the thing a staff member does dozens of times a day, and
-    // everything else on this menu happens once or twice. Requesting a refill was primary until
-    // selling existed, which is exactly backwards for a screen you open between customers.
+    // One end-of-day entry after Rider sells from the cart.
     {
-      id: 'staff-sell',
-      label: 'Catat Penjualan',
-      sublabel: 'Cups terjual — stok gerobak berkurang otomatis',
-      icon: 'cash-register',
-      route: '/staff/sell',
-      requirement: 'Penjualan gerobak — input transaksi staff',
+      id: 'staff-closing',
+      label: 'Closing',
+      sublabel: 'Isi sisa cups pas mau balik ke dapur',
+      icon: 'clipboard-check-outline',
+      route: '/staff/closing',
+      requirement: 'Closing Cups — sisa, rusak, QRIS, transfer',
       primary: true,
     },
     {

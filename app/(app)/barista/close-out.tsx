@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated from 'react-native-reanimated';
@@ -16,12 +16,12 @@ import { MetaRow, SectionTitle } from '@/components/ui/Section';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { enter } from '@/components/ui/Motion';
 import { useProducts } from '@/features/refill/queries';
-import { useCarts, useCloseOutCart, useShowcaseStaff } from '@/features/showcase/queries';
+import { useCarts, useCloseOutCart, useCloseOutDraft, useShowcaseStaff } from '@/features/showcase/queries';
 import { ApiError } from '@/lib/api';
 import { brand, feedback, pressScale, radius, semantic, space } from '@/theme';
 
 /**
- * Tutup Gerobak — sorting what came back off a cart at the end of the day.
+ * Tutup Coffee Bike — sorting what came back off a cart at the end of the day.
  *
  * Two buckets, because they mean different things to the numbers: cups going back into the
  * showcase get sold tomorrow, cups marked reject are gone. Both leave the cart either way, which
@@ -37,9 +37,15 @@ export default function BaristaCloseOutScreen() {
   const closeOut = useCloseOutCart();
 
   const [cartId, setCartId] = useState<number | null>(null);
+  const closingDraft = useCloseOutDraft(cartId);
   const [returned, setReturned] = useState<Record<number, number>>({});
   const [rejected, setRejected] = useState<Record<number, number>>({});
   const [banner, setBanner] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!closingDraft.data) return;
+    setReturned(Object.fromEntries(closingDraft.data.lines.map((line) => [line.product_id, line.qty_to_return])));
+  }, [closingDraft.data]);
 
   const carts = useMemo(
     () => (cartsQuery.data ?? []).filter((cart) => cart.status === 'active'),
@@ -61,7 +67,7 @@ export default function BaristaCloseOutScreen() {
 
   const totalReturned = Object.values(returned).reduce((sum, n) => sum + n, 0);
   const totalRejected = Object.values(rejected).reduce((sum, n) => sum + n, 0);
-  const canSubmit = cartId !== null && totalReturned + totalRejected > 0;
+  const canSubmit = cartId !== null && (totalReturned + totalRejected > 0 || !!closingDraft.data?.closing_id);
 
   const reset = () => {
     setReturned({});
@@ -81,8 +87,8 @@ export default function BaristaCloseOutScreen() {
 
       reset();
       Alert.alert(
-        'Tutup gerobak tercatat',
-        `Gerobak ${result.cart_code}: ${totalReturned} cups masuk showcase, ${totalRejected} cups reject.`,
+        'Tutup Coffee Bike tercatat',
+        `Coffee Bike ${result.cart_code}: ${totalReturned} cups masuk showcase, ${totalRejected} cups reject.`,
       );
     } catch (e) {
       setBanner(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
@@ -106,22 +112,22 @@ export default function BaristaCloseOutScreen() {
 
   return (
     <Screen refreshing={cartsQuery.isRefetching || staffQuery.isRefetching} onRefresh={refresh}>
-      <Text variant="h2">Tutup Gerobak</Text>
+      <Text variant="h2">Tutup Coffee Bike</Text>
       <Text variant="caption" color={semantic.textMuted}>
         Catat sisa cups: masuk showcase untuk dijual besok, atau reject.
       </Text>
 
       <SectionTitle
-        title="Pilih gerobak"
-        caption={`${cartsOnShift.length} gerobak bertugas hari ini`}
+        title="Pilih Coffee Bike"
+        caption={`${cartsOnShift.length} Coffee Bike bertugas hari ini`}
         icon="moped-outline"
       />
       <Card style={styles.card}>
         {cartsOnShift.length === 0 ? (
           <EmptyState
             icon="moped-outline"
-            title="Belum ada gerobak bertugas"
-            subtitle="Gerobak masuk daftar ini setelah menerima stock hari ini."
+            title="Belum ada Coffee Bike bertugas"
+            subtitle="Coffee Bike masuk daftar ini setelah menerima stok hari ini."
             tone="neutral"
           />
         ) : (
@@ -138,7 +144,7 @@ export default function BaristaCloseOutScreen() {
                     }}
                     scaleTo={pressScale.surface}
                     accessibilityRole="button"
-                    accessibilityLabel={`Pilih gerobak ${cart.code}`}
+                    accessibilityLabel={`Pilih Coffee Bike ${cart.code}`}
                     accessibilityState={{ selected: active }}
                     style={[styles.pickRow, active && styles.pickRowActive]}
                   >
@@ -150,7 +156,7 @@ export default function BaristaCloseOutScreen() {
                       />
                     </View>
                     <View style={styles.pickText}>
-                      <Text variant="bodyStrong">Gerobak {cart.code}</Text>
+                      <Text variant="bodyStrong">Coffee Bike {cart.code}</Text>
                       <Text variant="caption" color={semantic.textMuted}>
                         {staffOn(cart.id) ?? 'Tanpa rider'}
                       </Text>
@@ -170,6 +176,9 @@ export default function BaristaCloseOutScreen() {
 
       {cartId !== null ? (
         <Animated.View entering={enter('below')}>
+          {closingDraft.data?.closing_id ? (
+            <Banner tone="info" message="Sisa dari Closing Rider sudah terisi. Kalau hitungan Produksi beda, selisihnya tetap dicatat dan terlihat di Finance ya." />
+          ) : <Banner tone="warning" message="Rider belum Closing. Hitung sisa Coffee Bike dulu ya; Finance masih menunggu Closing Rider." />}
           <SectionTitle title="Masuk showcase" caption="Dijual lagi besok" icon="fridge-outline" />
           <Card style={styles.card}>
             <View style={styles.lines}>
@@ -221,12 +230,16 @@ export default function BaristaCloseOutScreen() {
           {banner ? <Banner tone="danger" message={banner} /> : null}
 
           <Card style={styles.card}>
+            {closingDraft.data?.lines.some((line) =>
+              (returned[line.product_id] ?? 0) + (rejected[line.product_id] ?? 0) !== line.qty_remaining) ? (
+                <Banner tone="warning" message="Hitungan Produksi beda dari Closing Rider. Selisih akan ditandai, bukan ditolak." />
+              ) : null}
             <Banner
               tone="info"
-              message="Server menolak bila total sisa + reject melebihi stok gerobak — angka gerobak tidak bisa jadi minus."
+              message="Sisa + reject nggak boleh lebih dari stok Coffee Bike, ya."
             />
             <Button
-              label="Simpan Tutup Gerobak"
+              label="Simpan Tutup Coffee Bike"
               icon="content-save-outline"
               onPress={() => void submit()}
               loading={closeOut.isPending}

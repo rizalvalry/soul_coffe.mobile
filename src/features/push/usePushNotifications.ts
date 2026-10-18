@@ -45,7 +45,13 @@ Notifications.setNotificationHandler({
  */
 export function routeFor(data: Record<string, unknown>, role: Role): string | null {
   const type = typeof data['type'] === 'string' ? data['type'] : '';
-  if (type === 'SettlementVarianceFlagged') {
+  if (type === 'SettlementVarianceFlagged' || type === 'CartCloseOutVarianceFlagged') {
+    return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
+      ? settlementRoute(data) : null;
+  }
+  if (type === 'RiderClosingRecorded' || type === 'RiderClosingCorrected') {
+    // A stored notification may be tapped after its operating date; today's draft is not that result.
+    if (role === 'STAFF') return '/menu';
     return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
       ? settlementRoute(data) : null;
   }
@@ -140,9 +146,9 @@ export function usePushNotifications() {
       if (data?.['type'] === 'StaffAttendanceWindowOpened' || data?.['type'] === 'AttendanceClockedIn') {
         void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
       }
-      if (data?.['type'] === 'SettlementVarianceFlagged' &&
-        (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT')) {
-        invalidateSettlementData(client, settlementTarget(data).cartId);
+      if (['SettlementVarianceFlagged', 'CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected'].includes(String(data?.['type'])) &&
+        (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT' || session.user.role === 'ADMINISTRATOR')) {
+        invalidateSettlementData(client, settlementTarget(data ?? {}).cartId);
       }
     });
 

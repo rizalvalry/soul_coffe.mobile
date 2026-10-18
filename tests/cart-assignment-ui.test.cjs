@@ -38,17 +38,20 @@ test('/me today_cart overrides a stale login cart and null removes it', async ()
   assert.equal(after.todayCart.assignedAt, todayCart.assigned_at);
 });
 
-test('both Rider forms refresh /me on focus and offer the new no-cart copy and retry', () => {
-  for (const path of ['app/(app)/staff/sell.tsx', 'app/(app)/staff/refill/new.tsx']) {
+test('refill form refreshes /me on focus and offers the new no-cart copy and retry', () => {
+  for (const path of ['app/(app)/staff/refill/new.tsx']) {
     const file = source(path);
     assert.match(file, /useFocusEffect\(useCallback\(\(\) => \{\s*void refreshUser\(\)/);
-    assert.match(file, path.includes('/sell.tsx')
-      ? /cartRefreshStatus === 'loading' \? 'Lagi cek gerobak kamu\.\.\.' : NO_CART_TODAY_MESSAGE/
-      : /cartRefreshStatus === 'loading' \? 'Lagi cek Coffee Bike kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
+    assert.match(file, /cartRefreshStatus === 'loading' \? 'Lagi cek Coffee Bike kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
     assert.match(file, /cartRefreshStatus === 'error'/);
     assert.match(file, /label="Coba lagi"[^\r\n]*refreshUser\(\)/);
     assert.match(file, /user\?\.cartId/);
   }
+});
+
+test('Closing reads the current cart from its server draft', () => {
+  assert.match(source('app/(app)/staff/closing.tsx'), /useClosingDraft\(\)/);
+  assert.match(source('src/features/closing/queries.ts'), /request<ClosingDraft>\('\/me\/closing\/draft'\)/);
 });
 
 test('Absen has a back button for read-only, loading, error, and ready states', () => {

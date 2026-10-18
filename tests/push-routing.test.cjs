@@ -41,6 +41,20 @@ const { routeFor } = loadTs('src/features/push/usePushNotifications.ts', {
 test('variance push and inbox notifications open Finance settlements', () => {
   assert.equal(routeFor({ type: 'SettlementVarianceFlagged' }, 'FINANCE'), '/finance/settlements');
   assert.equal(routeFor({ type: 'SettlementVarianceFlagged', refill_request_id: 3 }, 'MANAGEMENT'), '/finance/settlements');
+  assert.equal(routeFor({ type: 'CartCloseOutVarianceFlagged' }, 'FINANCE'), '/finance/settlements');
+  assert.equal(routeFor({ type: 'CartCloseOutVarianceFlagged' }, 'ADMINISTRATOR'), '/finance/settlements');
+  assert.equal(routeFor({ type: 'CartCloseOutVarianceFlagged' }, 'STAFF'), null);
+});
+
+test('Closing notifications open the safe Rider menu or role-appropriate settlement queue', () => {
+  for (const type of ['RiderClosingRecorded', 'RiderClosingCorrected']) {
+    assert.equal(routeFor({ type }, 'STAFF'), '/menu');
+    for (const role of ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR']) {
+      assert.equal(routeFor({ type }, role), '/finance/settlements');
+    }
+    assert.equal(routeFor({ type }, 'BARISTA'), null);
+    assert.equal(routeFor({ type }, 'RIDER'), null);
+  }
 });
 
 test('variance links preserve a valid operating date and cart for the settlement screen', () => {
@@ -176,4 +190,15 @@ test('a foreground variance push refreshes Finance settlement data when the sock
   const staff = mountPushHook('STAFF', null);
   staff.received({ request: { content: { data: { type: 'SettlementVarianceFlagged', cart_id: '18' } } } });
   assert.deepEqual(staff.settlementRefreshes, []);
+});
+
+test('a physical count variance push refreshes Finance and Administrator queues', () => {
+  for (const role of ['FINANCE', 'ADMINISTRATOR']) {
+    const app = mountPushHook(role, null);
+    app.received({ request: { content: { data: { type: 'CartCloseOutVarianceFlagged', cart_id: '18' } } } });
+    assert.deepEqual(app.settlementRefreshes, [18]);
+  }
+  const rider = mountPushHook('STAFF', null);
+  rider.received({ request: { content: { data: { type: 'CartCloseOutVarianceFlagged', cart_id: '18' } } } });
+  assert.deepEqual(rider.settlementRefreshes, []);
 });

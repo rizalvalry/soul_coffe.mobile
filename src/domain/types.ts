@@ -360,6 +360,12 @@ export type SettlementQueueRow = {
   area: string | null;
   transactions: number;
   cups_sold: number;
+  closing_id?: number | null;
+  closing_status?: 'Sudah closing' | 'Menunggu closing Rider' | 'Legacy';
+  closing_required?: boolean;
+  carry_warning?: boolean;
+  closeout_variance_count?: number;
+  cups_live_remaining?: number;
   /** Whole rupiah, from the transactions themselves. */
   expected_total?: number;
   expected_total_minor?: number;
@@ -368,6 +374,9 @@ export type SettlementQueueRow = {
   expected_transfer_minor?: number;
   arrived_at?: string | null;
   variance_minor?: number | null;
+  cash_minor?: number | null;
+  qris_minor?: number | null;
+  transfer_minor?: number | null;
   expected_stale?: boolean;
   cups_remaining: number;
   settlement_id: number | null;
@@ -380,6 +389,9 @@ export type SettlementDraftLine = {
   unit: string;
   qty_issued: number;
   qty_sold: number;
+  qty_carry?: number;
+  qty_closing_remaining?: number;
+  qty_wasted?: number;
   /** Live cart stock, not a snapshot — this is what the disposition is measured against. */
   qty_remaining: number;
 };
@@ -398,6 +410,9 @@ export type SettlementDraft = {
   staff_id: number | null;
   staff_name: string | null;
   area: string | null;
+  closing_id?: number;
+  closing_status?: string;
+  carry_warning?: boolean;
   expected_total?: number;
   expected_total_minor?: number;
   expected_cash_minor?: number;

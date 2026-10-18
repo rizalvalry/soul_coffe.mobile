@@ -80,12 +80,12 @@ test('other roles get a read-only attendance screen; Rider-only forms scope the 
   assert.match(absen, /if \(!canAttend\) \{/);
   assert.match(absen, /<Text variant="h2">Daftar Hadir<\/Text>/);
   assert.match(absen, /if \(canAttend\) void locate\(\)/);
-  for (const path of ['app/(app)/staff/sell.tsx', 'app/(app)/staff/refill/new.tsx']) {
+  for (const path of ['app/(app)/staff/refill/new.tsx']) {
     const file = source(path);
     assert.match(file, /useAttendanceStatus\(user\?\.role === 'STAFF'\)/);
     assert.match(file, /user\?\.role === 'STAFF' \? riderDayGate\(.*?\.data\) : 'legacy'/);
   }
-  assert.match(source('app/(app)/staff/sell.tsx'), /user\?\.role !== 'STAFF' \|\| absen\.isLoading \|\| canSell/);
+  assert.match(source('app/(app)/staff/closing.tsx'), /useClosingDraft\(\)/);
 });
 
 test('only Produksi and Rider have an Absen menu entry', () => {
