@@ -205,8 +205,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         void refreshUser().catch(() => {});
       }
       const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
-      const existingEvent = ['CartClosedOut', 'SaleVoided', 'SaleFlaggedSuspect'].includes(event.type);
-      const queueEvent = ['SaleRecorded', 'RiderClosingRecorded', 'RiderClosingCorrected', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
+      const existingEvent = ['CartClosedOut', 'CartCloseOutVarianceFlagged', 'SaleVoided', 'SaleFlaggedSuspect',
+        'RiderClosingRecorded', 'RiderClosingCorrected'].includes(event.type);
+      const queueEvent = ['SaleRecorded', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
         'SettlementExpectedStale', 'SettlementVarianceFlagged'].includes(event.type);
       if ((isFinanceOrManagement && (existingEvent || queueEvent)) ||
         (session.user.role === 'ADMINISTRATOR' && existingEvent)) {

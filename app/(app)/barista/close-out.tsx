@@ -127,7 +127,7 @@ export default function BaristaCloseOutScreen() {
           <EmptyState
             icon="moped-outline"
             title="Belum ada Coffee Bike bertugas"
-            subtitle="Coffee Bike masuk daftar ini setelah menerima stock hari ini."
+            subtitle="Coffee Bike masuk daftar ini setelah menerima stok hari ini."
             tone="neutral"
           />
         ) : (
@@ -236,7 +236,7 @@ export default function BaristaCloseOutScreen() {
               ) : null}
             <Banner
               tone="info"
-              message="Server menolak bila total sisa + reject melebihi stok Coffee Bike — angka Coffee Bike tidak bisa jadi minus."
+              message="Sisa + reject nggak boleh lebih dari stok Coffee Bike, ya."
             />
             <Button
               label="Simpan Tutup Coffee Bike"

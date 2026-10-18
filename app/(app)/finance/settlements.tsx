@@ -392,7 +392,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     <EmptyState
                       icon="cup-off-outline"
                       title="Tidak ada cups sisa"
-                      subtitle="Coffee Bike ini habis terjual, atau sudah ditutup Produksi. Tinggal selesaikan setorannya."
+                      subtitle="Stok Coffee Bike ini habis atau Produksi sudah menutupnya. Tinggal selesaikan setorannya."
                       tone="neutral"
                     />
                   </Card>
@@ -486,12 +486,12 @@ export default function FinanceSettlementsScreen() {
       <View style={styles.headerBlock}>
         <Text variant="h2">Setoran</Text>
         <Text variant="caption" color={semantic.textMuted}>
-          {waiting > 0 ? `${waiting} Coffee Bike belum menyetor` : 'Semua Coffee Bike sudah menyetor'}
+          {waiting > 0 ? `${waiting} setoran Coffee Bike belum selesai` : 'Semua setoran Coffee Bike sudah selesai'}
         </Text>
       </View>
 
       {rows.some((row) => row.closing_required !== false && row.closing_id === null) ? (
-        <Banner tone="info" message="Coffee Bike yang belum Closing Rider masih menunggu. Form setoran baru bisa dibuka setelah Closing masuk." />
+        <Banner tone="info" message="Setoran Coffee Bike menunggu Rider Closing dulu. Form baru bisa dibuka setelah Closing masuk." />
       ) : null}
 
       {queueQuery.isLoading ? (
