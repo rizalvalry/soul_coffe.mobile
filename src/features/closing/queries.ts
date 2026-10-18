@@ -27,6 +27,16 @@ export type ClosingDraft = {
   transfer_minor: number;
   cash_minor: number;
   lines: ClosingLine[];
+  commission: {
+    has_closing: boolean;
+    cups_sold: number;
+    commission_minor: number;
+    tier_min_cups: number | null;
+    amount_per_cup_minor: number;
+    next_tier_min_cups: number | null;
+    cups_to_next_tier: number | null;
+    locked: boolean;
+  };
 };
 
 export const closingKeys = { draft: ['me', 'closing', 'draft'] as const };
