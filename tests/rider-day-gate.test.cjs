@@ -136,7 +136,7 @@ test('DAY_NOT_OPEN leaves an offline sale pending with the same retry UUID', asy
     '@/features/showcase/riderDayGate': gate,
     '@/features/auth/store': { useAuth },
   });
-  await queue.enqueueSale('rider-1', { lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'cash' });
+  await queue.enqueueSale('rider-1', { cartId: 4, lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'cash' });
   const first = await queue.flushSalesQueue('rider-1');
   assert.equal(first.waitingForGate, gate.DAY_NOT_OPEN_MESSAGE);
   assert.equal(first.failed.length, 0);
@@ -172,7 +172,7 @@ test('open window without Rider attendance keeps an offline sale pending until c
     '@/features/showcase/riderDayGate': gate,
     '@/features/auth/store': { useAuth },
   });
-  await queue.enqueueSale('rider-1', { lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'cash' });
+  await queue.enqueueSale('rider-1', { cartId: 4, lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'cash' });
   const first = await queue.flushSalesQueue('rider-1');
   assert.equal(first.waitingForGate, gate.RIDER_ABSEN_MESSAGE);
   assert.equal(first.failed.length, 0);
@@ -208,7 +208,7 @@ test('lost online response and queued replay use one UUID and one server sale', 
     '@/features/showcase/queries': { showcaseKeys: {} },
     './offlineQueue': { buildSaleBody: (uuid, input) => ({ uuid, lines: input.lines }) },
   });
-  const input = { uuid: 'one-sale-uuid', lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'cash', gps: null };
+  const input = { uuid: 'one-sale-uuid', cartId: 4, lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'cash', gps: null };
   await assert.rejects(online.useRecordSale().mutationFn(input), /response lost/);
   const useAuth = { getState: () => ({ session: { user: { id: 'rider-1' } } }) };
   const queue = loadTs('src/features/sales/offlineQueue.ts', {
@@ -222,4 +222,61 @@ test('lost online response and queued replay use one UUID and one server sale', 
   assert.equal(replay.synced[0].id, serverSale.id);
   assert.deepEqual(sent, ['one-sale-uuid', 'one-sale-uuid']);
   assert.equal(stockMovements, 1);
+});
+
+test('offline replay keeps its original cart and CART_CHANGED stays rejected on the phone', async () => {
+  const disk = new Map();
+  const storage = {
+    getItem: async (key) => disk.get(key) ?? null,
+    setItem: async (key, value) => { disk.set(key, value); },
+  };
+  const sent = [];
+  const useAuth = { getState: () => ({ session: { user: { id: 'rider-1', cartId: 5 } } }) };
+  const queue = loadTs('src/features/sales/offlineQueue.ts', {
+    '@react-native-async-storage/async-storage': storage,
+    '@/lib/api': {
+      ApiError,
+      uuidv4: () => 'old-cart-sale',
+      request: async (path, options) => {
+        assert.equal(path, '/sales');
+        sent.push(options);
+        throw new ApiError('Gerobak kamu sudah berubah. Cek transaksi ini bareng Administrator ya.', 422, { code: 'CART_CHANGED' });
+      },
+    },
+    '@/features/showcase/riderDayGate': gate,
+    '@/features/auth/store': { useAuth },
+  });
+  await queue.enqueueSale('rider-1', {
+    cartId: 4, lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'cash', gps: null,
+  });
+  const result = await queue.flushSalesQueue('rider-1');
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].body.cart_id, 4);
+  assert.equal(sent[0].idempotencyKey, 'old-cart-sale');
+  assert.equal(result.failed.length, 1);
+  assert.match((await queue.loadQueuedSales('rider-1'))[0].rejection, /Gerobak kamu sudah berubah/);
+  await queue.flushSalesQueue('rider-1');
+  assert.equal(sent.length, 1);
+});
+
+test('older owned queue entry without origin cart stays visible and is never replayed', async () => {
+  const disk = new Map();
+  const useAuth = { getState: () => ({ session: { user: { id: 'rider-1', cartId: 5 } } }) };
+  let sent = 0;
+  const queue = loadTs('src/features/sales/offlineQueue.ts', {
+    '@react-native-async-storage/async-storage': {
+      getItem: async (key) => disk.get(key) ?? null,
+      setItem: async (key, value) => { disk.set(key, value); },
+    },
+    '@/lib/api': { ApiError, uuidv4: () => 'legacy-owned', request: async () => { sent++; } },
+    '@/features/showcase/riderDayGate': gate,
+    '@/features/auth/store': { useAuth },
+  });
+  await queue.enqueueSale('rider-1', {
+    lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'cash', gps: null,
+  });
+  const result = await queue.flushSalesQueue('rider-1');
+  assert.equal(sent, 0);
+  assert.equal(result.failed.length, 1);
+  assert.match((await queue.loadQueuedSales('rider-1'))[0].rejection, /Gerobak asal/);
 });

@@ -19,7 +19,7 @@ function loadTs(path, modules, globals = {}) {
   return module.exports;
 }
 
-function renderRiderForm(path, useAuth) {
+function renderRiderForm(path, useAuth, offlineEntries = {}) {
   const component = (name) => name;
   const ui = new Proxy({}, { get: (_target, name) => component(String(name)) });
   const color = new Proxy({}, { get: () => '#000' });
@@ -64,6 +64,7 @@ function renderRiderForm(path, useAuth) {
     '@/features/sales/useOfflineSalesQueue': { useOfflineSalesQueue: () => ({
       ...query, queue: [], rejected: [], hasQueued: false, legacyCount: 0,
       flushing: false, clearLastFailure() {}, flushNow() {},
+      ...offlineEntries,
     }) },
     '@/lib/api': { ApiError: class ApiError extends Error {}, uuidv4: () => 'test-uuid' },
     '@/domain/types': { PAYMENT_METHODS: ['cash', 'qris', 'transfer'] },
@@ -84,6 +85,7 @@ function renderRiderForm(path, useAuth) {
     if (typeof value === 'string') { strings.push(value); return; }
     if (Array.isArray(value)) { value.forEach(walk); return; }
     if (value && typeof value === 'object') {
+      if (typeof value.type === 'function') { walk(value.type(value.props)); return; }
       for (const [key, child] of Object.entries(value)) {
         if (key !== 'type') walk(child);
       }
@@ -298,8 +300,8 @@ test('login before Add Stock then assignment event and foreground refresh both R
   assert.equal(useAuth.getState().cartRefreshStatus, 'loading');
   for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
     const rendered = renderRiderForm(screen, useAuth);
-    assert.match(rendered, /Lagi cek gerobak/);
-    assert.doesNotMatch(rendered, /0004/);
+    assert.match(rendered, /Gerobak\s+0004/);
+    assert.match(rendered, screen.includes('/sell.tsx') ? /Simpan Transaksi/ : /Kirim Request/);
   }
   hold.resolve();
   hold = null;
@@ -313,6 +315,41 @@ test('login before Add Stock then assignment event and foreground refresh both R
   await useAuth.getState().refreshUser();
   assert.equal(useAuth.getState().session, stableSession, 'unchanged /me must not reconnect Pusher');
   cleanups.forEach((cleanup) => cleanup?.());
+});
+
+test('failed cart refresh keeps both Rider forms available with a retry banner', async () => {
+  let fail = false;
+  const { useAuth } = setup({ currentUserRequest: async () => {
+    if (fail) throw new Error('Jaringan putus. Coba lagi ya.');
+    return { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' };
+  } });
+  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
+  await useAuth.getState().refreshUser();
+  fail = true;
+  await assert.rejects(useAuth.getState().refreshUser());
+  for (const screen of ['app/(app)/staff/sell.tsx', 'app/(app)/staff/refill/new.tsx']) {
+    const rendered = renderRiderForm(screen, useAuth);
+    assert.match(rendered, /Gerobak\s+0004/);
+    assert.match(rendered, /Gerobak belum bisa dicek/);
+    assert.match(rendered, /Coba lagi/);
+    assert.match(rendered, screen.includes('/sell.tsx') ? /Simpan Transaksi/ : /Kirim Request/);
+  }
+});
+
+test('displaced Rider still sees rejected offline sale when no cart is active', async () => {
+  const { useAuth } = setup();
+  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
+  const entry = {
+    uuid: 'old-cart-sale', queuedAt: '2026-10-18T12:00:00Z',
+    input: { cartId: 4, lines: [{ product_id: 1, qty: 2 }] },
+    rejection: 'Gerobak kamu sudah berubah. Cek transaksi ini bareng Administrator ya.',
+  };
+  const rendered = renderRiderForm('app/(app)/staff/sell.tsx', useAuth, { rejected: [entry] });
+  assert.match(rendered, /Produksi belum kasih stok/);
+  assert.match(rendered, /Ditolak server/);
+  assert.match(rendered, /Gerobak kamu sudah berubah/);
+  assert.match(rendered, /Administrator/);
+  assert.doesNotMatch(rendered, /Simpan Transaksi/);
 });
 
 function loadApi(useAuth, fetch) {
@@ -354,7 +391,7 @@ test('login A, cache A, logout, login B leaves no A query or mutation data', asy
 test('pending sales remain under A and never replay with B credentials', async () => {
   const { useAuth, queue, disk, calls } = setup();
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });
-  await queue.enqueueSale('A', { lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'CASH' });
+  await queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'CASH' });
   assert.equal((await queue.loadQueuedSales('A')).length, 1);
   await useAuth.getState().signOut();
   await useAuth.getState().signIn({ phone: 'B', password: 'test' });
@@ -379,7 +416,7 @@ test('unowned legacy sales remain intact and are reported without automatic repl
 test('a 401 during replay keeps the old account sale queued', async () => {
   const { useAuth, queue } = setup({ saleError: 401 });
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });
-  await queue.enqueueSale('A', { lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'CASH' });
+  await queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 1, qty: 2 }], paymentMethod: 'CASH' });
   const result = await queue.flushSalesQueue('A');
   assert.equal(result.stillOffline, true);
   assert.equal((await queue.loadQueuedSales('A')).length, 1);
@@ -392,10 +429,10 @@ test('flush completion cannot overwrite a newly queued sale for the same account
   const gate = new Promise((resolve) => { resume = resolve; });
   const { useAuth, queue } = setup({ saleRequest: async () => { started(); await gate; return {}; } });
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });
-  const first = await queue.enqueueSale('A', { lines: [{ product_id: 1, qty: 1 }], paymentMethod: 'CASH' });
+  const first = await queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 1, qty: 1 }], paymentMethod: 'CASH' });
   const flushing = queue.flushSalesQueue('A');
   await requestStarted;
-  const second = await queue.enqueueSale('A', { lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'CASH' });
+  const second = await queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'CASH' });
   resume();
   await flushing;
   const remaining = await queue.loadQueuedSales('A');
@@ -408,8 +445,8 @@ test('concurrent enqueues both survive serialized local writes', async () => {
   const { useAuth, queue } = setup();
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });
   await Promise.all([
-    queue.enqueueSale('A', { lines: [{ product_id: 1, qty: 1 }], paymentMethod: 'CASH' }),
-    queue.enqueueSale('A', { lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'CASH' }),
+    queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 1, qty: 1 }], paymentMethod: 'CASH' }),
+    queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 2, qty: 1 }], paymentMethod: 'CASH' }),
   ]);
   assert.equal((await queue.loadQueuedSales('A')).length, 2);
 });
@@ -417,7 +454,7 @@ test('concurrent enqueues both survive serialized local writes', async () => {
 test('a 422 rejection remains stored for A after logout and is not retried automatically', async () => {
   const { useAuth, queue, calls } = setup({ saleError: 422 });
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });
-  await queue.enqueueSale('A', { lines: [{ product_id: 1, qty: 1 }], paymentMethod: 'CASH' });
+  await queue.enqueueSale('A', { cartId: 4, lines: [{ product_id: 1, qty: 1 }], paymentMethod: 'CASH' });
   await queue.flushSalesQueue('A');
   await useAuth.getState().signOut();
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });

@@ -214,7 +214,7 @@ export default function NewRefillScreen() {
     }
   }, [user, totalCups, photo, qty, gps, uploadEvidence, submitRefill, router, gateMessage, attendance, refreshUser]);
 
-  if (!user?.cartId || cartRefreshStatus !== 'idle') {
+  if (!user?.cartId) {
     return (
       <Screen>
         <View style={styles.top}>
@@ -280,6 +280,13 @@ export default function NewRefillScreen() {
           </Text>
         </View>
       </View>
+
+      {cartRefreshStatus === 'error' ? (
+        <Card>
+          <Banner tone="warning" message={cartRefreshError ?? 'Gerobak belum bisa dicek. Kamu masih bisa pakai gerobak terakhir.'} />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
+        </Card>
+      ) : null}
 
       {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
       {dayGate === 'attendance' ? (

@@ -67,6 +67,7 @@ export type FlushResult = {
 export function buildSaleBody(uuid: string, input: RecordSaleInput): Record<string, unknown> {
   return {
     uuid,
+    cart_id: input.cartId,
     lines: input.lines.filter((line) => line.qty > 0),
     payment_method: input.paymentMethod,
     ...(input.gps
@@ -167,6 +168,14 @@ export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
     if (entry.rejection) continue;
     // A queued sale must never be sent using the next person's bearer token.
     if (!isCurrentOwner(ownerId)) break;
+    if (!Number.isSafeInteger(entry.input.cartId) || entry.input.cartId <= 0) {
+      // Entries saved by an older APK have no origin cart. Guessing from today's session
+      // could subtract stock from a different cart after a reassignment.
+      const message = 'Gerobak asal transaksi ini belum tercatat. Cek bareng Administrator ya.';
+      failed.push({ entry, message });
+      rejected.set(entry.uuid, message);
+      continue;
+    }
     try {
       const sale = await request<Sale>('/sales', {
         method: 'POST',
@@ -187,6 +196,14 @@ export async function flushSalesQueue(ownerId: string): Promise<FlushResult> {
       if (isDayNotOpen(e)) {
         waitingForGate = DAY_NOT_OPEN_MESSAGE;
         break;
+      }
+      if (e instanceof ApiError && e.status === 422 && e.body && typeof e.body === 'object' &&
+        (e.body as { code?: unknown }).code === 'CART_CHANGED') {
+        // Reassignment is permanent for this recorded cart. Keep the entry visible and
+        // never auto-send it to the replacement cart.
+        failed.push({ entry, message: e.message });
+        rejected.set(entry.uuid, e.message);
+        continue;
       }
       if (e instanceof ApiError && e.status === 422) {
         try {

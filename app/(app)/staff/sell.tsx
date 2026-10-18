@@ -379,13 +379,19 @@ export default function SellScreen() {
       return;
     }
 
+    const cartId = user?.cartId;
+    if (!cartId) {
+      setFormError(NO_CART_TODAY_MESSAGE);
+      return;
+    }
+
     const lines = Object.entries(qty)
       .map(([productId, sold]) => ({ product_id: Number(productId), qty: sold }))
       .filter((line) => line.qty > 0);
     const uuid = uuidv4();
 
     try {
-      const sale = await recordSale.mutateAsync({ uuid, lines, paymentMethod: payment, gps });
+      const sale = await recordSale.mutateAsync({ uuid, cartId, lines, paymentMethod: payment, gps });
 
       // The form empties itself: the next customer is already waiting, and a screen that keeps
       // the last order on it is a screen that will eventually record it twice.
@@ -397,7 +403,7 @@ export default function SellScreen() {
       // on a bar of signal that happens to be missing at this exact moment.
       if (e instanceof ApiError && e.isOffline) {
         try {
-          await offlineQueue.enqueue({ uuid, lines, paymentMethod: payment, gps });
+          await offlineQueue.enqueue({ uuid, cartId, lines, paymentMethod: payment, gps });
           setQty({});
           setQueuedOffline(true);
         } catch {
@@ -416,9 +422,9 @@ export default function SellScreen() {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen, refreshUser]);
+  }, [totalCups, qty, payment, gps, recordSale, offlineQueue, gateMessage, absen, refreshUser, user?.cartId]);
 
-  if (!user?.cartId || cartRefreshStatus !== 'idle') {
+  if (!user?.cartId) {
     return (
       <Screen>
         <View style={styles.top}>
@@ -436,6 +442,36 @@ export default function SellScreen() {
           />
           <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
         </Card>
+        {offlineQueue.queue.length > 0 || offlineQueue.rejected.length > 0 ? (
+          <Card style={styles.queueCard}>
+            <Banner
+              tone="warning"
+              message="Transaksi dari gerobak sebelumnya tetap tersimpan di HP ini. Cek bareng Administrator ya."
+            />
+            {[...offlineQueue.queue, ...offlineQueue.rejected].map((entry, index) => (
+              <PendingSaleRow key={entry.uuid} entry={entry} productName={productName} isFirst={index === 0} />
+            ))}
+          </Card>
+        ) : null}
+        {offlineQueue.legacyCount > 0 ? (
+          <Banner
+            tone="warning"
+            message="Ada transaksi offline dari versi sebelumnya yang belum diketahui pemiliknya. Data tetap tersimpan di perangkat. Cek bareng Administrator ya."
+          />
+        ) : null}
+        {(salesQuery.data ?? []).length > 0 ? (
+          <Card style={styles.historyCard}>
+            {(salesQuery.data ?? []).map((sale, index) => (
+              <SaleHistoryRow
+                key={sale.uuid}
+                sale={sale}
+                gateMessage={gateMessage}
+                onDayClosed={() => void absen.refetch()}
+                isFirst={index === 0}
+              />
+            ))}
+          </Card>
+        ) : null}
       </Screen>
     );
   }
@@ -463,6 +499,13 @@ export default function SellScreen() {
           Gerobak {user.cartCode ?? '-'} · stok berkurang otomatis
         </Text>
       </View>
+
+      {cartRefreshStatus === 'error' ? (
+        <Card>
+          <Banner tone="warning" message={cartRefreshError ?? 'Gerobak belum bisa dicek. Kamu masih bisa catat penjualan di gerobak terakhir.'} />
+          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
+        </Card>
+      ) : null}
 
       {offlineQueue.hasQueued ? (
         <Card style={styles.queueCard}>

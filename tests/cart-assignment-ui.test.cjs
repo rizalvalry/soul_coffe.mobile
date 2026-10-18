@@ -54,6 +54,13 @@ test('Absen has a back button for loading, error, and ready states', () => {
   assert.equal((file.match(/<IconButton icon="chevron-left" label="Kembali"/g) ?? []).length, 3);
 });
 
+test('Add Stock lets Produksi move a Rider to another cart with a visible warning', () => {
+  const file = source('app/(app)/barista/add-stock.tsx');
+  assert.match(file, /selectedStaff\.assigned_cart_id !== cartId/);
+  assert.match(file, /Add Stock ini bakal memindahkan rider/);
+  assert.doesNotMatch(file, /!staffConflict/);
+});
+
 test('Absen tile subtitles track Rider and Produksi attendance status', () => {
   const { attendanceTileSubtitle: subtitle } = loadTs('src/features/showcase/attendanceTile.ts', {});
   assert.equal(subtitle('STAFF', { has_clocked_in: false, staff_window_open: true }), 'Absen sudah dibuka, yuk absen');
