@@ -100,8 +100,8 @@ ok('Hermes/JS bundle present', !!bundle, 'release bundle missing from APK');
 //
 // These are checked because shrinkResources decides what to keep by scanning for references it
 // can see statically, and a JS `require()` is not one of those. If it ever guesses wrong, the app
-// installs and launches perfectly and simply has no logo and no product photos — a failure that
-// looks like a design change rather than a build fault.
+// installs and launches perfectly and simply has no logo — a failure that looks like a design
+// change rather than a build fault. Product photos now come from CMS image_url at runtime.
 const pngDims = entries
   .filter((e) => e.name.endsWith('.png'))
   .map((e) => { try { return pngSize(read(e)); } catch { return null; } })
@@ -117,8 +117,8 @@ ok('brand lockup (563x1024) present', countOf(563, 1024) >= 1,
   'shrinkResources stripped assets/logo-lockup.png');
 ok('splash wave (1080x420) present', countOf(1080, 420) >= 1,
   'shrinkResources stripped assets/splash-wave.png — the splash loses its lower band');
-ok('9 product tiles (360x360) present', countOf(360, 360) >= 9,
-  `expected 9 drink photos for the request grid, found ${countOf(360, 360)}`);
+ok('old bundled product tiles absent', countOf(360, 360) === 0,
+  `found ${countOf(360, 360)} old 360x360 drink photos in the APK`);
 
 ok('dex present', entries.some((e) => /^classes\d*\.dex$/.test(e.name)), 'no dex in APK');
 
