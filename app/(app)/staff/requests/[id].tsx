@@ -17,6 +17,7 @@ import { enter } from '@/components/ui/Motion';
 import { RefillTimeline } from '@/components/refill/RefillTimeline';
 import { formatRupiah } from '@/components/refill/RefillCard';
 import { useCancelRefill, useRefill } from '@/features/refill/queries';
+import { useAuth } from '@/features/auth/store';
 import { useAttendanceStatus } from '@/features/showcase/queries';
 import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { ApiError } from '@/lib/api';
@@ -27,13 +28,14 @@ export default function StaffRequestDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const refillId = Number(id);
+  const role = useAuth((s) => s.session?.user.role);
 
   const refillQuery = useRefill(refillId);
-  const attendance = useAttendanceStatus();
+  const attendance = useAttendanceStatus(role === 'STAFF');
   const cancelRefill = useCancelRefill();
   const [actionError, setActionError] = useState<string | null>(null);
-  const dayGate = riderDayGate(attendance.data);
-  const gateMessage = riderGateMessage(dayGate);
+  const dayGate = role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
+  const gateMessage = role === 'STAFF' ? riderGateMessage(dayGate) : null;
 
   const doCancel = useCallback(async () => {
     setActionError(null);
@@ -45,9 +47,9 @@ export default function StaffRequestDetailScreen() {
       await cancelRefill.mutateAsync({ id: refillId });
     } catch (e) {
       setActionError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e instanceof ApiError ? e.message : 'Gagal membatalkan permintaan. Coba lagi.');
-      if (isDayNotOpen(e)) void attendance.refetch();
+      if (role === 'STAFF' && isDayNotOpen(e)) void attendance.refetch();
     }
-  }, [cancelRefill, refillId, gateMessage, attendance]);
+  }, [cancelRefill, refillId, gateMessage, attendance, role]);
 
   const onCancelPress = useCallback(() => {
     Alert.alert('Batalkan permintaan?', 'Permintaan yang dibatalkan tidak dapat diproses kembali.', [
@@ -63,7 +65,7 @@ export default function StaffRequestDetailScreen() {
       </View>
 
       {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
-      {dayGate === 'attendance' ? <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} /> : null}
+      {role === 'STAFF' && dayGate === 'attendance' ? <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} /> : null}
 
       {!Number.isFinite(refillId) || refillId <= 0 ? (
         <Card>

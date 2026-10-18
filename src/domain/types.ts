@@ -145,6 +145,7 @@ export type AppNotification = {
   title: string;
   body: string;
   refill_request_id: number | null;
+  status: string | null;
   read_at: string | null;
   created_at: string;
 };

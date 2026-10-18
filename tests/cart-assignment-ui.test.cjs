@@ -49,9 +49,9 @@ test('both Rider forms refresh /me on focus and offer the new no-cart copy and r
   }
 });
 
-test('Absen has a back button for loading, error, and ready states', () => {
+test('Absen has a back button for read-only, loading, error, and ready states', () => {
   const file = source('app/(app)/absen.tsx');
-  assert.equal((file.match(/<IconButton icon="chevron-left" label="Kembali"/g) ?? []).length, 3);
+  assert.equal((file.match(/<IconButton icon="chevron-left" label="Kembali"/g) ?? []).length, 4);
 });
 
 test('Add Stock lets Produksi move a Rider to another cart with a visible warning', () => {

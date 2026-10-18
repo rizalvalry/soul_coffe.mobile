@@ -5,6 +5,7 @@ import * as Notifications from 'expo-notifications';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { useAuth } from '@/features/auth/store';
+import type { Role } from '@/domain/roles';
 import { invalidateRefillData } from '@/features/refill/queries';
 import { showcaseKeys } from '@/features/showcase/queries';
 import { claimEvent } from '@/features/realtime/seen';
@@ -42,21 +43,42 @@ Notifications.setNotificationHandler({
  * tapped row to the same place a tapped push notification would — one routing decision instead
  * of two that could quietly drift apart.
  */
-export function routeFor(data: Record<string, unknown>): string | null {
+export function routeFor(data: Record<string, unknown>, role: Role): string | null {
   const type = typeof data['type'] === 'string' ? data['type'] : '';
   if (type === 'SettlementVarianceFlagged') {
-    return settlementRoute(data);
+    return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
+      ? settlementRoute(data) : null;
   }
 
-  const refillId = data['refill_request_id'];
-  if (refillId !== null && refillId !== undefined && `${refillId}` !== '') {
-    return `/staff/requests/${refillId}`;
+  const refillId = Number(data['refill_request_id']);
+  if (Number.isSafeInteger(refillId) && refillId > 0) {
+    const status = typeof data['status'] === 'string' ? data['status'] : '';
+    switch (role) {
+      case 'FINANCE':
+      case 'MANAGEMENT':
+        return status === 'SUBMITTED' || type === 'RefillRequestSubmitted'
+          ? '/finance/approvals' : '/finance/history';
+      case 'BARISTA':
+        if (status === 'PREPARING' || type === 'RefillPreparingStarted') return '/barista/preparing';
+        if (['READY_TO_PICK', 'PICKED_UP', 'DELIVERED', 'CLOSED'].includes(status)) return '/barista/history';
+        if (['REJECTED', 'CANCELLED', 'EXPIRED'].includes(status)) return `/staff/requests/${refillId}`;
+        return '/barista/requests';
+      case 'RIDER':
+        if (status === 'PICKED_UP' || ['RefillPickedUp', 'DeliveryIncidentReported', 'DeliveryIncidentPartial'].includes(type)) return '/rider/active';
+        if (['DELIVERED', 'CLOSED'].includes(status)) return '/rider/history';
+        if (['CANCELLED', 'EXPIRED'].includes(status)) return `/staff/requests/${refillId}`;
+        return '/rider/available';
+      case 'STAFF':
+        return `/staff/requests/${refillId}`;
+      default:
+        return '/menu';
+    }
   }
 
   switch (type) {
     case 'AttendanceClockedIn':
     case 'StaffAttendanceWindowOpened':
-      return '/absen';
+      return role === 'STAFF' || role === 'BARISTA' ? '/absen' : '/menu';
     case 'NewsPostPublished':
       return '/news';
     case 'PinResetRequested':
@@ -133,12 +155,8 @@ export function usePushNotifications() {
   useEffect(() => {
     if (!session || !lastResponse) return;
     const data = (lastResponse.notification.request.content.data ?? {}) as Record<string, unknown>;
-    const allowedVarianceViewer = session.user.role === 'FINANCE' ||
-      session.user.role === 'MANAGEMENT' || session.user.role === 'ADMINISTRATOR';
-    if (data['type'] !== 'SettlementVarianceFlagged' || allowedVarianceViewer) {
-      const target = routeFor(data);
-      if (target) routerRef.current.push(target as never);
-    }
+    const target = routeFor(data, session.user.role);
+    if (target) routerRef.current.push(target as never);
     Notifications.clearLastNotificationResponse();
   }, [session, lastResponse]);
 }
