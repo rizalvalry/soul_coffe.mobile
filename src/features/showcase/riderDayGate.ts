@@ -3,7 +3,7 @@ import { ApiError } from '@/lib/api';
 
 export const DAY_NOT_OPEN_MESSAGE = 'Produksi belum membuka absen hari ini. Fitur transaksi belum bisa dipakai.';
 export const RIDER_ABSEN_MESSAGE = 'Absen dulu sebelum memakai fitur transaksi. Buka Absen untuk melanjutkan.';
-export const NO_CART_TODAY_MESSAGE = 'Produksi belum kasih stok ke gerobak kamu hari ini. Minta Produksi Add Stock dulu ya.';
+export const NO_CART_TODAY_MESSAGE = 'Produksi belum kasih stok ke Coffee Bike kamu hari ini. Minta Produksi Add Stock dulu ya.';
 
 export type RiderDayGate = 'legacy' | 'closed' | 'attendance' | 'ready';
 

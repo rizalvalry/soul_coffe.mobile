@@ -61,7 +61,7 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "Soul Coffeemate memerlukan kamera untuk mengambil foto bukti kondisi frozen gerobak saat request refill.",
+          "cameraPermission": "Soul Coffeemate perlu kamera buat foto bukti kondisi frozen Coffee Bike saat request refill.",
           "photosPermission": false
         }
       ],

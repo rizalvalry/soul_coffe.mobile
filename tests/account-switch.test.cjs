@@ -54,7 +54,7 @@ function renderRiderForm(path, useAuth, offlineEntries = {}) {
     }) },
     '@/features/showcase/riderDayGate': {
       DAY_NOT_OPEN_MESSAGE: 'Belum buka',
-      NO_CART_TODAY_MESSAGE: 'Produksi belum kasih stok ke gerobak kamu hari ini. Minta Produksi Add Stock dulu ya.',
+      NO_CART_TODAY_MESSAGE: 'Produksi belum kasih stok ke Coffee Bike kamu hari ini. Minta Produksi Add Stock dulu ya.',
       isDayNotOpen: () => false, isNoCartToday: () => false,
       riderDayGate: () => 'ready', riderGateMessage: () => null,
     },
@@ -220,7 +220,7 @@ test('a failed newer /me request does not discard an earlier successful cart res
 test('a failed cart refresh stays visible until Coba lagi succeeds', async () => {
   let fail = true;
   const { useAuth } = setup({ currentUserRequest: async () => {
-    if (fail) throw new Error('Gerobak belum bisa dicek. Coba lagi ya.');
+    if (fail) throw new Error('Coffee Bike belum bisa dicek. Coba lagi ya.');
     return { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' };
   } });
   await useAuth.getState().signIn({ phone: 'A', password: 'test' });
@@ -300,7 +300,7 @@ test('login before Add Stock then assignment event and foreground refresh both R
   assert.equal(useAuth.getState().cartRefreshStatus, 'loading');
   for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
     const rendered = renderRiderForm(screen, useAuth);
-    assert.match(rendered, /Gerobak\s+0004/);
+    assert.match(rendered, screen.includes('/sell.tsx') ? /Gerobak\s+0004/ : /Coffee Bike\s+0004/);
     assert.match(rendered, screen.includes('/sell.tsx') ? /Simpan Transaksi/ : /Kirim Request/);
   }
   hold.resolve();
@@ -329,8 +329,8 @@ test('failed cart refresh keeps both Rider forms available with a retry banner',
   await assert.rejects(useAuth.getState().refreshUser());
   for (const screen of ['app/(app)/staff/sell.tsx', 'app/(app)/staff/refill/new.tsx']) {
     const rendered = renderRiderForm(screen, useAuth);
-    assert.match(rendered, /Gerobak\s+0004/);
-    assert.match(rendered, /Gerobak belum bisa dicek/);
+    assert.match(rendered, screen.includes('/sell.tsx') ? /Gerobak\s+0004/ : /Coffee Bike\s+0004/);
+    assert.match(rendered, /Coffee Bike belum bisa dicek/);
     assert.match(rendered, /Coba lagi/);
     assert.match(rendered, screen.includes('/sell.tsx') ? /Simpan Transaksi/ : /Kirim Request/);
   }

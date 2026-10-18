@@ -113,7 +113,7 @@ export function RefillCard({ refill, onPress, showCost = false, index = 0 }: Ref
         onPress={onPress}
         scaleTo={pressScale.surface}
         accessibilityRole="button"
-        accessibilityLabel={`Permintaan ${refill.code}, gerobak ${refill.cart_code}`}
+        accessibilityLabel={`Permintaan ${refill.code}, Coffee Bike ${refill.cart_code}`}
         style={styles.card}
       >
         {body}

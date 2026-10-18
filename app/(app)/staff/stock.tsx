@@ -23,7 +23,7 @@ export default function StaffStockScreen() {
       <View style={styles.page}>
         <View style={styles.header}>
           <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
-          <Text variant="h2">Stok Gerobak</Text>
+          <Text variant="h2">Stok Coffee Bike</Text>
           <Text variant="caption" color={semantic.textMuted}>
             Sisa cups per produk saat ini
           </Text>

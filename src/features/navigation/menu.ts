@@ -60,7 +60,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     },
     {
       id: 'admin-carts',
-      label: 'Gerobak',
+      label: 'Coffee Bike',
       sublabel: 'Kode sepeda, plat, status unit',
       icon: 'moped-outline',
       route: '/admin/carts',
@@ -85,7 +85,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'admin-assignments',
       label: 'Penugasan Rider',
-      sublabel: 'Rider ↔ gerobak ↔ lokasi per hari',
+      sublabel: 'Rider ↔ Coffee Bike ↔ lokasi per hari',
       icon: 'account-switch-outline',
       route: '/admin/assignments',
       requirement: 'R11',
@@ -133,7 +133,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
       sublabel: 'Terima uang harian & pisahkan cups sisa',
       icon: 'cash-register',
       route: '/finance/settlements',
-      requirement: 'Flow C — setoran harian per gerobak',
+      requirement: 'Flow C — setoran harian per Coffee Bike',
     },
     {
       id: 'finance-reports',
@@ -153,7 +153,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'barista-add-stock',
       label: 'Add Stock',
-      sublabel: 'Pindahkan cups showcase → gerobak + uang harian',
+      sublabel: 'Pindahkan cups showcase → Coffee Bike + uang harian',
       icon: 'plus-circle-outline',
       route: '/barista/add-stock',
       requirement: 'Showcase — centralize stock',
@@ -169,7 +169,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     },
     {
       id: 'barista-close-out',
-      label: 'Tutup Gerobak',
+      label: 'Tutup Coffee Bike',
       sublabel: 'Sisa cups: masuk showcase atau reject',
       icon: 'clipboard-check-outline',
       route: '/barista/close-out',
@@ -255,7 +255,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'staff-refill-new',
       label: 'Request Refill',
-      sublabel: 'Isi jumlah cups + foto bukti frozen gerobak',
+      sublabel: 'Isi jumlah cups + foto bukti frozen Coffee Bike',
       icon: 'plus-box-outline',
       route: '/staff/refill/new',
       requirement: 'req 2, R3',
@@ -281,7 +281,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     },
     {
       id: 'staff-stock',
-      label: 'Stok Gerobak',
+      label: 'Stok Coffee Bike',
       sublabel: 'Sisa cups per produk saat ini',
       icon: 'cup-outline',
       route: '/staff/stock',
