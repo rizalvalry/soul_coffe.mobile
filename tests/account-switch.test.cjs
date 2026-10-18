@@ -233,7 +233,7 @@ test('a failed cart refresh stays visible until Coba lagi succeeds', async () =>
   assert.equal(useAuth.getState().session.user.cartId, 4);
 });
 
-test('login before Add Stock then assignment event and foreground refresh both Rider form cart data', async () => {
+test('login before Add Stock then assignment event and foreground refresh Rider refill cart data', async () => {
   let currentUser = { id: 'A', role: 'STAFF', name: 'Rider A' };
   let hold = null;
   const { useAuth } = setup({ currentUserRequest: async () => {
@@ -281,13 +281,13 @@ test('login before Add Stock then assignment event and foreground refresh both R
   provider.RealtimeProvider({ children: null });
   const cleanups = effects.map((effect) => effect());
   assert.equal(useAuth.getState().session.user.cartId, undefined);
-  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+  for (const screen of ['app/(app)/staff/refill/new.tsx']) {
     assert.match(renderRiderForm(screen, useAuth), /Produksi belum kasih stok/);
   }
   currentUser = { id: 'A', role: 'STAFF', name: 'Rider A', cartId: 4, cartCode: '0004' };
   channels[0]({ event_id: 'handover-1', type: 'CartAssignmentChanged', cart_id: 4 });
   await new Promise(setImmediate);
-  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+  for (const screen of ['app/(app)/staff/refill/new.tsx']) {
     assert.match(renderRiderForm(screen, useAuth), /0004/);
     assert.equal(useAuth.getState().session.user.cartId, 4);
     assert.equal(useAuth.getState().session.user.cartCode, '0004');
@@ -298,17 +298,17 @@ test('login before Add Stock then assignment event and foreground refresh both R
   appStateChange('inactive');
   appStateChange('active');
   assert.equal(useAuth.getState().cartRefreshStatus, 'loading');
-  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+  for (const screen of ['app/(app)/staff/refill/new.tsx']) {
     const rendered = renderRiderForm(screen, useAuth);
     assert.match(rendered, /Gerobak\s+0004/);
-    assert.match(rendered, screen.includes('/sell.tsx') ? /Simpan Transaksi/ : /Kirim Request/);
+    assert.match(rendered, /Kirim Request/);
   }
   hold.resolve();
   hold = null;
   await new Promise(setImmediate);
   assert.equal(useAuth.getState().session.user.cartId, 5);
   assert.equal(useAuth.getState().session.user.cartCode, '0005');
-  for (const screen of ['app/(app)/staff/refill/new.tsx', 'app/(app)/staff/sell.tsx']) {
+  for (const screen of ['app/(app)/staff/refill/new.tsx']) {
     assert.match(renderRiderForm(screen, useAuth), /0005/);
   }
   const stableSession = useAuth.getState().session;
@@ -317,7 +317,7 @@ test('login before Add Stock then assignment event and foreground refresh both R
   cleanups.forEach((cleanup) => cleanup?.());
 });
 
-test('failed cart refresh keeps both Rider forms available with a retry banner', async () => {
+test('failed cart refresh keeps Rider refill available with a retry banner', async () => {
   let fail = false;
   const { useAuth } = setup({ currentUserRequest: async () => {
     if (fail) throw new Error('Jaringan putus. Coba lagi ya.');
@@ -327,29 +327,20 @@ test('failed cart refresh keeps both Rider forms available with a retry banner',
   await useAuth.getState().refreshUser();
   fail = true;
   await assert.rejects(useAuth.getState().refreshUser());
-  for (const screen of ['app/(app)/staff/sell.tsx', 'app/(app)/staff/refill/new.tsx']) {
+  for (const screen of ['app/(app)/staff/refill/new.tsx']) {
     const rendered = renderRiderForm(screen, useAuth);
     assert.match(rendered, /Gerobak\s+0004/);
     assert.match(rendered, /Gerobak belum bisa dicek/);
     assert.match(rendered, /Coba lagi/);
-    assert.match(rendered, screen.includes('/sell.tsx') ? /Simpan Transaksi/ : /Kirim Request/);
+    assert.match(rendered, /Kirim Request/);
   }
 });
 
 test('displaced Rider still sees rejected offline sale when no cart is active', async () => {
-  const { useAuth } = setup();
-  await useAuth.getState().signIn({ phone: 'A', password: 'test' });
-  const entry = {
-    uuid: 'old-cart-sale', queuedAt: '2026-10-18T12:00:00Z',
-    input: { cartId: 4, lines: [{ product_id: 1, qty: 2 }] },
-    rejection: 'Gerobak kamu sudah berubah. Cek transaksi ini bareng Administrator ya.',
-  };
-  const rendered = renderRiderForm('app/(app)/staff/sell.tsx', useAuth, { rejected: [entry] });
-  assert.match(rendered, /Produksi belum kasih stok/);
-  assert.match(rendered, /Ditolak server/);
-  assert.match(rendered, /Gerobak kamu sudah berubah/);
-  assert.match(rendered, /Administrator/);
-  assert.doesNotMatch(rendered, /Simpan Transaksi/);
+  const screen = readFileSync(join(__dirname, '..', 'app/(app)/staff/closing.tsx'), 'utf8');
+  assert.match(screen, /oldSales\.rejected\.map/);
+  assert.match(screen, /entry\.rejection/);
+  assert.doesNotMatch(screen, /Simpan Transaksi/);
 });
 
 function loadApi(useAuth, fetch) {

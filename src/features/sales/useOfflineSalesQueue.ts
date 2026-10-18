@@ -201,6 +201,16 @@ export function useOfflineSalesQueue() {
     [flush, ownerId],
   );
 
+  const syncBeforeClosing = useCallback(async (): Promise<{ ready: boolean; hadPending: boolean }> => {
+    if (!ownerId) return { ready: false, hadPending: false };
+    const before = await loadQueuedSales(ownerId);
+    const hadPending = before.some((entry) => !entry.rejection);
+    if (hadPending) await flush(true);
+    const after = await loadQueuedSales(ownerId);
+    setQueueState({ ownerId, entries: after });
+    return { ready: !after.some((entry) => !entry.rejection), hadPending };
+  }, [ownerId, flush]);
+
   return {
     /** Sales still waiting to leave this phone. */
     queue,
@@ -214,5 +224,6 @@ export function useOfflineSalesQueue() {
     clearLastFailure: () => setLastFailure(null),
     enqueue,
     flushNow: () => flush(true),
+    syncBeforeClosing,
   };
 }

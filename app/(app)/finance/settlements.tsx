@@ -87,6 +87,8 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
 
   // Set once the money is in; the screen then switches to the cups.
   const [settlementId, setSettlementId] = useState<number | null>(row.settlement_id);
+  const [reRecord, setReRecord] = useState(false);
+  const [staleCleared, setStaleCleared] = useState(false);
   const [returned, setReturned] = useState<Record<number, number>>({});
   const [rejected, setRejected] = useState<Record<number, number>>({});
 
@@ -161,6 +163,8 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
       attempt.current = null;
       setDraftLocked(false);
       setSettlementId(settlement.id);
+      setReRecord(false);
+      setStaleCleared(true);
       setRecordedVariance(settlement.variance);
       if (settlement.variance !== 0) {
         Alert.alert(
@@ -184,6 +188,24 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
       setError('Draft belum bisa dibatalkan. Coba lagi ya.');
     }
   }, [ownerId, row.cart_id, date]);
+
+  const reopenMoney = useCallback(async () => {
+    setError(null);
+    try {
+      const fresh = await draftQuery.refetch();
+      if (!fresh.isSuccess || !fresh.data) {
+        setError('Angka Closing terbaru belum bisa dibuka. Coba lagi ya.');
+        return;
+      }
+      setCash(String(row.cash_minor ?? toAmount(cash)));
+      setQris(String(row.qris_minor ?? toAmount(qris)));
+      setTransfer(String(row.transfer_minor ?? toAmount(transfer)));
+      setReason('');
+      setReRecord(true);
+    } catch {
+      setError('Angka Closing terbaru belum bisa dibuka. Coba lagi ya.');
+    }
+  }, [draftQuery, row.cash_minor, row.qris_minor, row.transfer_minor, cash, qris, transfer]);
 
   const submitCups = useCallback(async () => {
     setError(null);
@@ -211,7 +233,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
     <View style={styles.sheetRoot}>
       <View style={styles.sheetHeader}>
         <View>
-          <Text variant="h3">{settlementId ? 'Cups Sisa' : 'Terima Setoran'}</Text>
+          <Text variant="h3">{settlementId && !reRecord ? 'Cups Sisa' : 'Terima Setoran'}</Text>
           <Text variant="caption" color={semantic.textMuted}>
             Gerobak {row.cart_code} · Penanggung jawab: {row.staff_name ?? '-'}
           </Text>
@@ -250,6 +272,11 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   <Text variant="h3">{rupiah(expected)}</Text>
                 </View>
               </View>
+              {draft?.closing_id ? draft.lines.map((line) => (
+                <Text key={line.product_id} variant="caption" color={semantic.textMuted}>
+                  {line.product_name}: {line.qty_sold} terjual · {line.qty_wasted ?? 0} rusak · {line.qty_closing_remaining ?? 0} sisa
+                </Text>
+              )) : null}
               {expectations.cash !== null && expectations.qris !== null && expectations.transfer !== null ? (
                 <View style={styles.expectedMethods}>
                   <View style={styles.totalRow}>
@@ -272,7 +299,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
               )}
             </Card>
 
-            {!settlementId ? (
+            {!settlementId || reRecord ? (
               <>
                 <Card style={styles.card}>
                   <Text variant="bodyStrong">Uang yang diterima</Text>
@@ -337,7 +364,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                 ) : null}
 
                 <Button
-                  label="Terima Setoran"
+                  label={reRecord ? 'Catat ulang setoran' : 'Terima Setoran'}
                   icon="cash-check"
                   onPress={() => void submitMoney()}
                   loading={record.isPending}
@@ -352,12 +379,13 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     ? 'Setoran dengan selisih tercatat dan dilaporkan ke Administrator & Finance. Sekarang pisahkan cups sisa.'
                     : 'Uang sudah tercatat. Sekarang pisahkan cups yang masih layak dari yang harus dibuang.'}
                 />
-                {row.expected_stale ? (
+                {row.expected_stale && !staleCleared ? (
                   <Banner
                     tone="warning"
                     message="Ekspektasi berubah setelah setoran dicatat. Periksa kembali nilainya sebelum menyelesaikan."
                   />
                 ) : null}
+                <Button label="Catat ulang setoran" variant="secondary" onPress={() => void reopenMoney()} />
 
                 {remainingLines.length === 0 ? (
                   <Card style={styles.card}>
@@ -446,7 +474,7 @@ export default function FinanceSettlementsScreen() {
   useEffect(() => setOpenCartId(cartId), [cartId, date]);
 
   const rows = queueQuery.data ?? [];
-  const open = rows.find((row) => row.cart_id === openCartId) ?? null;
+  const open = rows.find((row) => row.cart_id === openCartId && (row.closing_required === false || row.closing_id !== null)) ?? null;
   const waiting = rows.filter((row) => row.settlement_id === null).length;
 
   return (
@@ -461,6 +489,10 @@ export default function FinanceSettlementsScreen() {
           {waiting > 0 ? `${waiting} gerobak belum menyetor` : 'Semua gerobak sudah menyetor'}
         </Text>
       </View>
+
+      {rows.some((row) => row.closing_required !== false && row.closing_id === null) ? (
+        <Banner tone="info" message="Gerobak yang belum Closing Rider masih menunggu. Form setoran baru bisa dibuka setelah Closing masuk." />
+      ) : null}
 
       {queueQuery.isLoading ? (
         <SkeletonList count={4} lines={2} />
@@ -484,6 +516,7 @@ export default function FinanceSettlementsScreen() {
 
           {rows.map((row, index) => {
             const done = row.settlement_id !== null;
+            const waitingClosing = row.closing_required !== false && row.closing_id === null;
             const arrivalDate = row.arrived_at ? new Date(row.arrived_at) : null;
             const arrivedTime = arrivalDate && !Number.isNaN(arrivalDate.getTime())
               ? arrivalDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
@@ -492,10 +525,11 @@ export default function FinanceSettlementsScreen() {
             return (
               <Touchable
                 key={row.cart_id}
-                onPress={() => setOpenCartId(row.cart_id)}
+                onPress={() => { if (!waitingClosing) setOpenCartId(row.cart_id); }}
                 accessibilityRole="button"
                 accessibilityLabel={`Setoran gerobak ${row.cart_code}`}
-                style={[styles.queueRow, done && styles.queueRowDone]}
+                accessibilityState={{ disabled: waitingClosing }}
+                style={[styles.queueRow, (done || waitingClosing) && styles.queueRowDone]}
               >
                 <View style={styles.queueIcon}>
                   <MaterialCommunityIcons
@@ -517,6 +551,11 @@ export default function FinanceSettlementsScreen() {
                   <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
                     {row.cups_sold} cups terjual · sisa {row.cups_remaining} · {rupiah(row.expected_total_minor ?? row.expected_total ?? 0)}
                   </Text>
+                  <Text variant="caption" color={semantic.textMuted}>
+                    {row.closing_status ?? 'Menunggu closing Rider'}
+                    {row.carry_warning ? ' · Sisa kemarin' : ''}
+                    {(row.closeout_variance_count ?? 0) > 0 ? ' · Selisih Tutup Gerobak' : ''}
+                  </Text>
                   <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
                     Urutan {index + 1} · {row.arrived_at === undefined
                       ? 'Status kedatangan belum tersedia'
@@ -529,7 +568,7 @@ export default function FinanceSettlementsScreen() {
                 <Chip
                   tone={done || row.arrived_at ? 'brand' : 'neutral'}
                   label={done ? (row.settlement_status === 'RECONCILED' ? 'Selesai' : 'Uang masuk')
-                    : row.arrived_at ? 'Tiba' : 'Menunggu'}
+                    : waitingClosing ? 'Menunggu closing Rider' : row.arrived_at ? 'Tiba' : 'Siap setor'}
                 />
               </Touchable>
             );

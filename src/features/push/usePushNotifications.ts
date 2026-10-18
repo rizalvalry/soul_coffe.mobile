@@ -118,9 +118,9 @@ export function usePushNotifications() {
       if (data?.['type'] === 'StaffAttendanceWindowOpened' || data?.['type'] === 'AttendanceClockedIn') {
         void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
       }
-      if (data?.['type'] === 'SettlementVarianceFlagged' &&
+      if (['SettlementVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected'].includes(String(data?.['type'])) &&
         (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT')) {
-        invalidateSettlementData(client, settlementTarget(data).cartId);
+        invalidateSettlementData(client, settlementTarget(data ?? {}).cartId);
       }
     });
 

@@ -103,7 +103,7 @@ export default function MenuScreen() {
     router.push(item.route as Href);
   };
   const isGatedTransaction = (item: MenuItem) =>
-    !!gateMessage && (item.id === 'staff-sell' || item.id === 'staff-refill-new');
+    !!gateMessage && (item.id === 'staff-closing' || item.id === 'staff-refill-new');
   const tileSubtitle = (item: MenuItem) => {
     if (item.id !== 'staff-absen' && item.id !== 'barista-absen') return item.sublabel;
     return attendanceTileSubtitle(user.role, attendance.data);
