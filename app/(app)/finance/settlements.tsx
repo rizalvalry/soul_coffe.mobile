@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
@@ -20,9 +20,12 @@ import {
   useRecordSettlement,
   useSettlementDraft,
   useSettlementQueue,
+  type RecordSettlementInput,
 } from '@/features/settlements/queries';
 import { settlementExpectations } from '@/features/settlements/expectations';
 import { settlementTarget } from '@/features/settlements/navigation';
+import { clearSettlementAttempt, loadOrCreateSettlementAttempt, readSettlementAttempt } from '@/features/settlements/draftAttempt';
+import { useAuth } from '@/features/auth/store';
 import { ApiError } from '@/lib/api';
 import type { SettlementQueueRow } from '@/domain/types';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
@@ -62,6 +65,7 @@ function moneyDigits(text: string): string {
 }
 
 function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: string; onClose: () => void }) {
+  const ownerId = useAuth((s) => s.session?.user.id ?? null);
   const draftQuery = useSettlementDraft(row.cart_id, date);
   const record = useRecordSettlement();
   const approve = useApproveSettlement();
@@ -72,6 +76,8 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [recordedVariance, setRecordedVariance] = useState<number | null>(null);
+  const [draftLocked, setDraftLocked] = useState(false);
+  const attempt = useRef<Promise<RecordSettlementInput> | null>(null);
 
   // Set once the money is in; the screen then switches to the cups.
   const [settlementId, setSettlementId] = useState<number | null>(row.settlement_id);
@@ -79,8 +85,32 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
   const [rejected, setRejected] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    if (row.settlement_id !== null) setSettlementId(row.settlement_id);
-  }, [row.settlement_id]);
+    if (row.settlement_id !== null) {
+      setSettlementId(row.settlement_id);
+      if (ownerId) void clearSettlementAttempt(ownerId, row.cart_id, date).catch(() => {});
+    }
+  }, [row.settlement_id, row.cart_id, date, ownerId]);
+
+  useEffect(() => {
+    if (!ownerId || row.settlement_id !== null) return;
+    let active = true;
+    void readSettlementAttempt(ownerId, row.cart_id, date).then((stored) => {
+      if (!active || !stored || attempt.current) return;
+      attempt.current = Promise.resolve(stored);
+      setCash(String(stored.cash));
+      setQris(String(stored.qris));
+      setTransfer(String(stored.transfer));
+      setReason(stored.varianceReason ?? '');
+      setDraftLocked(true);
+      setError('Setoran tadi belum pasti masuk. Coba lagi pakai data yang sama ya.');
+    }).catch(() => {
+      if (active) {
+        setDraftLocked(true);
+        setError('Draft setoran belum bisa dibaca. Batalkan draft buat mulai lagi ya.');
+      }
+    });
+    return () => { active = false; };
+  }, [ownerId, row.cart_id, row.settlement_id, date]);
 
   const draft = draftQuery.data;
   const declared = toAmount(cash) + toAmount(qris) + toAmount(transfer);
@@ -98,15 +128,32 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
     setError(null);
 
     try {
-      const settlement = await record.mutateAsync({
-        cartId: row.cart_id,
-        date,
-        cash: toAmount(cash),
-        qris: toAmount(qris),
-        transfer: toAmount(transfer),
-        varianceReason: reason.trim() || undefined,
-      });
+      if (!ownerId) throw new Error('Sesi Finance belum siap. Coba masuk lagi ya.');
+      // Keep the key and exact body together: the server rejects a reused key with changed data.
+      if (!attempt.current) {
+        attempt.current = loadOrCreateSettlementAttempt(ownerId, {
+          cartId: row.cart_id, date,
+          cash: toAmount(cash), qris: toAmount(qris), transfer: toAmount(transfer),
+          varianceReason: reason.trim() || undefined,
+        });
+      }
+      let saved: RecordSettlementInput;
+      try {
+        saved = await attempt.current;
+      } catch (e) {
+        attempt.current = null;
+        throw e;
+      }
+      setCash(String(saved.cash));
+      setQris(String(saved.qris));
+      setTransfer(String(saved.transfer));
+      setReason(saved.varianceReason ?? '');
+      setDraftLocked(true);
+      const settlement = await record.mutateAsync(saved);
 
+      await clearSettlementAttempt(ownerId, row.cart_id, date);
+      attempt.current = null;
+      setDraftLocked(false);
       setSettlementId(settlement.id);
       setRecordedVariance(settlement.variance);
       if (settlement.variance !== 0) {
@@ -116,9 +163,21 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
         );
       }
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
+      setError(e instanceof ApiError ? e.message : 'Setoran belum bisa dikirim. Coba lagi ya.');
     }
-  }, [row.cart_id, date, cash, qris, transfer, reason, record]);
+  }, [ownerId, row.cart_id, date, cash, qris, transfer, reason, record]);
+
+  const cancelDraft = useCallback(async () => {
+    if (!ownerId) return;
+    try {
+      await clearSettlementAttempt(ownerId, row.cart_id, date);
+      attempt.current = null;
+      setDraftLocked(false);
+      setError(null);
+    } catch {
+      setError('Draft belum bisa dibatalkan. Coba lagi ya.');
+    }
+  }, [ownerId, row.cart_id, date]);
 
   const submitCups = useCallback(async () => {
     setError(null);
@@ -213,6 +272,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   <Input
                     label="Tunai / Cash"
                     value={cash}
+                    editable={!draftLocked}
                     onChangeText={(t) => setCash(moneyDigits(t))}
                     keyboardType="number-pad"
                     placeholder="0"
@@ -220,6 +280,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   <Input
                     label="QRIS / Online"
                     value={qris}
+                    editable={!draftLocked}
                     onChangeText={(t) => setQris(moneyDigits(t))}
                     keyboardType="number-pad"
                     placeholder="0"
@@ -227,6 +288,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   <Input
                     label="Transfer"
                     value={transfer}
+                    editable={!draftLocked}
                     onChangeText={(t) => setTransfer(moneyDigits(t))}
                     keyboardType="number-pad"
                     placeholder="0"
@@ -253,6 +315,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     <Input
                       label="Alasan selisih (opsional)"
                       value={reason}
+                      editable={!draftLocked}
                       onChangeText={setReason}
                       placeholder="Mis. uang kembalian kurang, rider ganti besok"
                       multiline
@@ -262,6 +325,9 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                 </Card>
 
                 {error ? <Banner tone="danger" message={error} /> : null}
+                {error && draftLocked ? (
+                  <Button label="Batalkan draft buat ubah angka" variant="secondary" onPress={() => void cancelDraft()} />
+                ) : null}
 
                 <Button
                   label="Terima Setoran"

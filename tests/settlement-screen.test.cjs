@@ -15,10 +15,11 @@ vm.runInNewContext(compile('src/features/settlements/expectations.ts', false), {
   module: expectationModule, exports: expectationModule.exports,
 });
 
-function mountScreen({ row, draft, settlement, queueRows = [row] }) {
+function mountScreen({ row, draft, settlement, queueRows = [row], recordFailures = 0, attempts = new Map() }) {
   const alerts = [];
   const records = [];
   const stateUpdates = [];
+  let keyCount = 0;
   const jsx = (type, props) => ({ type, props: props ?? {} });
   const sessionRows = queueRows;
   const modules = {
@@ -26,6 +27,7 @@ function mountScreen({ row, draft, settlement, queueRows = [row] }) {
       useCallback: (fn) => fn,
       useEffect: () => {},
       useMemo: (fn) => fn(),
+      useRef: (initial) => ({ current: initial }),
       useState: (initial) => [initial, (next) => stateUpdates.push(next)],
     },
     'react/jsx-runtime': { jsx, jsxs: jsx },
@@ -56,12 +58,23 @@ function mountScreen({ row, draft, settlement, queueRows = [row] }) {
       useSettlementDraft: () => ({ data: draft, isLoading: false }),
       useRecordSettlement: () => ({ isPending: false, mutateAsync: async (input) => {
         records.push(input);
+        if (records.length <= recordFailures) throw new Error('timeout');
         return settlement;
       } }),
       useApproveSettlement: () => ({ isPending: false }),
     },
     '@/features/settlements/expectations': expectationModule.exports,
     '@/features/settlements/navigation': { settlementTarget: () => ({ cartId: row.cart_id }) },
+    '@/features/auth/store': { useAuth: (select) => select({ session: { user: { id: 'finance-1' } } }) },
+    '@/features/settlements/draftAttempt': {
+      readSettlementAttempt: async (_owner, cartId, date) => attempts.get(`${cartId}:${date ?? 'today'}`) ?? null,
+      loadOrCreateSettlementAttempt: async (_owner, input) => {
+        const key = `${input.cartId}:${input.date ?? 'today'}`;
+        if (!attempts.has(key)) attempts.set(key, { ...input, idempotencyKey: `draft-key-${++keyCount}` });
+        return attempts.get(key);
+      },
+      clearSettlementAttempt: async (_owner, cartId, date) => { attempts.delete(`${cartId}:${date ?? 'today'}`); },
+    },
     '@/lib/api': { ApiError: class ApiError extends Error {} },
     '@/theme': {
       brand: { 600: '#123' }, feedback: { dangerFg: '#f00' }, neutral: { 0: '#fff' },
@@ -88,7 +101,7 @@ function mountScreen({ row, draft, settlement, queueRows = [row] }) {
     visit(value.props.children);
   }
   visit(sandboxModule.exports.default());
-  return { nodes, alerts, records, stateUpdates };
+  return { nodes, alerts, records, stateUpdates, attempts };
 }
 
 const baseRow = {
@@ -136,4 +149,39 @@ test('a stale recorded settlement warns Finance before cup disposition', () => {
     draft: baseDraft, settlement: { id: 7, variance: 0 } });
   assert.ok(app.nodes.some((node) => node.type === 'Banner' &&
     node.props.message?.includes('Ekspektasi berubah setelah setoran dicatat')));
+});
+
+test('timeout retry keeps one key and payload until success, then clears the draft key', async () => {
+  const app = mountScreen({ row: baseRow, draft: baseDraft,
+    settlement: { id: 7, variance: 0 }, recordFailures: 1 });
+  const submit = app.nodes.find((node) => node.type === 'Button' && node.props.label === 'Terima Setoran');
+  submit.props.onPress();
+  await new Promise(setImmediate);
+  submit.props.onPress();
+  await new Promise(setImmediate);
+
+  assert.equal(app.records.length, 2);
+  assert.equal(app.records[0].idempotencyKey, 'draft-key-1');
+  assert.deepEqual(app.records[1], app.records[0]);
+
+  submit.props.onPress();
+  await new Promise(setImmediate);
+  assert.equal(app.records[2].idempotencyKey, 'draft-key-2');
+});
+
+test('closing and reopening after timeout retains the saved key and request body', async () => {
+  const attempts = new Map();
+  const app = mountScreen({ row: baseRow, draft: baseDraft,
+    settlement: { id: 7, variance: 0 }, recordFailures: 1, attempts });
+  const submit = app.nodes.find((node) => node.type === 'Button' && node.props.label === 'Terima Setoran');
+  const close = app.nodes.find((node) => node.type === 'IconButton' && node.props.label === 'Tutup');
+  submit.props.onPress();
+  await new Promise(setImmediate);
+  close.props.onPress();
+  const reopened = mountScreen({ row: baseRow, draft: baseDraft,
+    settlement: { id: 7, variance: 0 }, attempts });
+  reopened.nodes.find((node) => node.type === 'Button' && node.props.label === 'Terima Setoran').props.onPress();
+  await new Promise(setImmediate);
+  assert.equal(app.records[0].idempotencyKey, 'draft-key-1');
+  assert.deepEqual(reopened.records[0], app.records[0]);
 });

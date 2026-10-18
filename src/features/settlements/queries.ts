@@ -54,6 +54,7 @@ export function useSettlements(date?: string) {
 }
 
 export type RecordSettlementInput = {
+  idempotencyKey: string;
   cartId: number;
   date?: string;
   /** Whole rupiah (R9) — no decimals anywhere near money. */
@@ -71,7 +72,7 @@ export function useRecordSettlement() {
     mutationFn: (input: RecordSettlementInput) =>
       request<Settlement>(`/settlements${input.date ? `?date=${input.date}` : ''}`, {
         method: 'POST',
-        idempotencyKey: uuidv4(),
+        idempotencyKey: input.idempotencyKey,
         body: {
           cart_id: input.cartId,
           cash: input.cash,

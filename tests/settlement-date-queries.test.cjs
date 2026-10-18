@@ -52,7 +52,7 @@ test('linked operating date scopes the draft query and the record request to the
   assert.equal(requests.at(-1).path, '/settlements/draft/18?date=2026-10-16');
 
   const record = useRecordSettlement();
-  await record.mutationFn({ cartId: 18, date: '2026-10-16', cash: 12000, qris: 0, transfer: 0 });
+  await record.mutationFn({ idempotencyKey: 'test-key', cartId: 18, date: '2026-10-16', cash: 12000, qris: 0, transfer: 0 });
   assert.equal(requests.at(-1).path, '/settlements?date=2026-10-16');
   assert.equal(requests.at(-1).options.idempotencyKey, 'test-key');
   assert.equal(requests.at(-1).options.body.cart_id, 18);
@@ -64,13 +64,13 @@ test('ordinary settlement requests keep the current-day endpoint', async () => {
   assert.equal(requests.at(-1).path, '/settlements/draft/18');
 
   const record = useRecordSettlement();
-  await record.mutationFn({ cartId: 18, cash: 12000, qris: 0, transfer: 0 });
+  await record.mutationFn({ idempotencyKey: 'test-key', cartId: 18, cash: 12000, qris: 0, transfer: 0 });
   assert.equal(requests.at(-1).path, '/settlements');
 });
 
 test('zero declared money and an omitted variance reason remain valid request inputs', async () => {
   const record = useRecordSettlement();
-  await record.mutationFn({ cartId: 18, cash: 0, qris: 0, transfer: 0 });
+  await record.mutationFn({ idempotencyKey: 'test-key', cartId: 18, cash: 0, qris: 0, transfer: 0 });
   assert.deepEqual({ ...requests.at(-1).options.body }, {
     cart_id: 18, cash: 0, qris: 0, transfer: 0,
   });
