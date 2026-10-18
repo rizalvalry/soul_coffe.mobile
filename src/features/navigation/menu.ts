@@ -83,14 +83,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       requirement: 'req 1, §3.2',
     },
     {
-      id: 'admin-assignments',
-      label: 'Penugasan Rider',
-      sublabel: 'Rider ↔ Coffee Bike ↔ lokasi per hari',
-      icon: 'account-switch-outline',
-      route: '/admin/assignments',
-      requirement: 'R11',
-    },
-    {
       id: 'admin-audit',
       label: 'Audit Trail',
       sublabel: 'Riwayat lengkap setiap perubahan status',

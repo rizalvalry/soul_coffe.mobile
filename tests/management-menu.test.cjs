@@ -83,6 +83,16 @@ test('every visible role menu item has a real app screen', () => {
   }
 });
 
+test('assignment menu and route are gone for every role', () => {
+  const { menuByRole } = loadTypeScript('src/features/navigation/menu.ts');
+  for (const [role, items] of Object.entries(menuByRole)) {
+    assert.ok(!items.some((item) => item.id === 'admin-assignments' || item.route === '/admin/assignments'), role);
+  }
+
+  const routes = screenFiles(join(__dirname, '..', 'app'));
+  assert.ok(!routes.some((path) => /[\\/]admin[\\/]assignments\.[jt]sx?$/.test(path)));
+});
+
 test('adding a screen exposes its existing menu item without changing the menu config', () => {
   const { menuByRole, menuItemsWithScreens } = loadTypeScript('src/features/navigation/menu.ts');
   const sitemap = sitemapFor(['(app)/finance/reports.tsx']);
