@@ -31,6 +31,26 @@ test('closing rejects negative sold and noncash above sale total', () => {
   assert.equal(closingTotals(lines, { 1: 5 }, { 1: 0 }, 100001, 0).valid, false);
 });
 
+test('Closing shows saved commission and progress from the server response', () => {
+  const screen = source('app/(app)/staff/closing.tsx');
+  const queries = source('src/features/closing/queries.ts');
+  assert.match(screen, /commissionSummary\(draft\.data\.commission\)\.earned/);
+  assert.match(screen, /commissionSummary\(draft\.data\.commission\)\.progress/);
+  assert.match(queries, /commission: \{/);
+  const compiledCommission = ts.transpileModule(source('src/features/closing/commission.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const state = { exports: {} };
+  vm.runInNewContext(compiledCommission, { module: state, exports: state.exports });
+  const result = state.exports.commissionSummary({
+    has_closing: true, cups_sold: 150, commission_minor: 150000,
+    tier_min_cups: 100, amount_per_cup_minor: 1000,
+    next_tier_min_cups: 200, cups_to_next_tier: 50, locked: false,
+  });
+  assert.match(result.earned, /150 cup.*Rp 150\.000.*tier ≥100/);
+  assert.equal(result.progress, '50 cup lagi buat sampai tier ≥200.');
+});
+
 test('Rider menu and route use Closing, with no new sale form', () => {
   const menu = source('src/features/navigation/menu.ts');
   const screen = source('app/(app)/staff/closing.tsx');

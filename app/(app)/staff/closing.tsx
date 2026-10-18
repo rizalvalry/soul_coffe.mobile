@@ -14,6 +14,7 @@ import { productImageSource } from '@/domain/productImages';
 import { useClosingDraft, useRecordClosing } from '@/features/closing/queries';
 import { closingTotals } from '@/features/closing/calculation';
 import { closingSubmissionGate } from '@/features/closing/submissionGate';
+import { commissionSummary } from '@/features/closing/commission';
 import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
 import { ApiError, uuidv4 } from '@/lib/api';
 import { brand, semantic, space } from '@/theme';
@@ -193,6 +194,10 @@ export default function RiderClosingScreen() {
           {draft.data.closing_id ? (
             <Card style={styles.card}>
               <Text variant="bodyStrong">Hasil Closing tersimpan</Text>
+              <Text variant="bodyStrong">{commissionSummary(draft.data.commission).earned}</Text>
+              {commissionSummary(draft.data.commission).progress ? (
+                <Text variant="caption" color={semantic.textMuted}>{commissionSummary(draft.data.commission).progress}</Text>
+              ) : null}
               {draft.data.lines.map((line) => (
                 <Text key={line.product_id} variant="caption">
                   {line.product_name}: {line.qty_sold} terjual · {rupiah(line.subtotal_minor)}
