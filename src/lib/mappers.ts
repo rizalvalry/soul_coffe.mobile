@@ -205,7 +205,7 @@ export type RawAppNotification = {
   type: string;
   title: string | null;
   body: string | null;
-  payload: { refill_request_id?: number | null } | null;
+  payload: { refill_request_id?: number | null; status?: string | null } | null;
   read_at: string | null;
   created_at: string;
 };
@@ -218,6 +218,7 @@ export function toAppNotification(raw: RawAppNotification): AppNotification {
     title: raw.title ?? '',
     body: raw.body ?? '',
     refill_request_id: raw.payload?.refill_request_id ?? null,
+    status: raw.payload?.status ?? null,
     read_at: raw.read_at,
     created_at: raw.created_at,
   };

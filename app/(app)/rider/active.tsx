@@ -220,7 +220,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
               icon={<MaterialCommunityIcons name="account-outline" size={14} color={semantic.textMuted} />}
             />
             <Chip
-              label={`Gerobak ${refill.cart_code}`}
+              label={`Coffee Bike ${refill.cart_code}`}
               icon={<MaterialCommunityIcons name="moped-outline" size={14} color={semantic.textMuted} />}
             />
           </View>
@@ -247,7 +247,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
         <PhotoField
           photo={photo}
           title="Foto Serah Terima (wajib)"
-          hint="Ambil foto cups yang diserahkan beserta gerobaknya. Ini bukti utama pengiriman."
+          hint="Ambil foto cups yang diserahkan beserta Coffee Bike-nya. Ini bukti utama pengiriman."
           disabled={isSubmitting}
           onCapture={() => void takePhoto()}
         />
@@ -540,7 +540,7 @@ export default function RiderActiveScreen() {
               </View>
 
               <View style={styles.metaChips}>
-                <Chip label={`Gerobak ${item.cart_code}`} icon={<MaterialCommunityIcons name="moped-outline" size={14} color={semantic.textMuted} />} />
+                <Chip label={`Coffee Bike ${item.cart_code}`} icon={<MaterialCommunityIcons name="moped-outline" size={14} color={semantic.textMuted} />} />
                 <Chip label={`${item.total_requested} cups`} icon={<MaterialCommunityIcons name="cup-outline" size={14} color={semantic.textMuted} />} />
               </View>
 

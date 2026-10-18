@@ -222,7 +222,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
         })),
       });
 
-      Alert.alert('Setoran Selesai', `Gerobak ${row.cart_code ?? ''} sudah direkonsiliasi.`);
+      Alert.alert('Setoran Selesai', `Coffee Bike ${row.cart_code ?? ''} sudah direkonsiliasi.`);
       onClose();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
@@ -235,7 +235,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
         <View>
           <Text variant="h3">{settlementId && !reRecord ? 'Cups Sisa' : 'Terima Setoran'}</Text>
           <Text variant="caption" color={semantic.textMuted}>
-            Gerobak {row.cart_code} · Penanggung jawab: {row.staff_name ?? '-'}
+            Coffee Bike {row.cart_code} · Penanggung jawab: {row.staff_name ?? '-'}
           </Text>
           {saleAttribution(row) ? <Text variant="caption" color={semantic.textMuted}>{saleAttribution(row)}</Text> : null}
         </View>
@@ -392,7 +392,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     <EmptyState
                       icon="cup-off-outline"
                       title="Tidak ada cups sisa"
-                      subtitle="Gerobak ini habis terjual, atau sudah ditutup Produksi. Tinggal selesaikan setorannya."
+                      subtitle="Coffee Bike ini habis terjual, atau sudah ditutup Produksi. Tinggal selesaikan setorannya."
                       tone="neutral"
                     />
                   </Card>
@@ -438,7 +438,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
 
                         {left > 0 ? (
                           <Text variant="caption" color={semantic.textSubtle}>
-                            {left} {line.unit} belum ditentukan — akan tetap tercatat di gerobak.
+                            {left} {line.unit} belum ditentukan — akan tetap tercatat di Coffee Bike.
                           </Text>
                         ) : null}
                       </Card>
@@ -486,12 +486,12 @@ export default function FinanceSettlementsScreen() {
       <View style={styles.headerBlock}>
         <Text variant="h2">Setoran</Text>
         <Text variant="caption" color={semantic.textMuted}>
-          {waiting > 0 ? `${waiting} gerobak belum menyetor` : 'Semua gerobak sudah menyetor'}
+          {waiting > 0 ? `${waiting} Coffee Bike belum menyetor` : 'Semua Coffee Bike sudah menyetor'}
         </Text>
       </View>
 
       {rows.some((row) => row.closing_required !== false && row.closing_id === null) ? (
-        <Banner tone="info" message="Gerobak yang belum Closing Rider masih menunggu. Form setoran baru bisa dibuka setelah Closing masuk." />
+        <Banner tone="info" message="Coffee Bike yang belum Closing Rider masih menunggu. Form setoran baru bisa dibuka setelah Closing masuk." />
       ) : null}
 
       {queueQuery.isLoading ? (
@@ -505,14 +505,14 @@ export default function FinanceSettlementsScreen() {
         <Card style={styles.card}>
           <EmptyState
             icon="cash-remove"
-            title={date ? `Belum ada gerobak bertugas pada ${date}` : 'Belum ada gerobak bertugas hari ini'}
-            subtitle="Antrean setoran terisi setelah Produksi menyerahkan cups ke gerobak."
+            title={date ? `Belum ada Coffee Bike bertugas pada ${date}` : 'Belum ada Coffee Bike bertugas hari ini'}
+            subtitle="Antrean setoran terisi setelah Produksi menyerahkan cups ke Coffee Bike."
             tone="neutral"
           />
         </Card>
       ) : (
         <>
-          <SectionTitle title={date ? `Antrean ${date}` : 'Antrean hari ini'} caption={`${rows.length} gerobak`} />
+          <SectionTitle title={date ? `Antrean ${date}` : 'Antrean hari ini'} caption={`${rows.length} Coffee Bike`} />
 
           {rows.map((row, index) => {
             const done = row.settlement_id !== null;
@@ -527,7 +527,7 @@ export default function FinanceSettlementsScreen() {
                 key={row.cart_id}
                 onPress={() => { if (!waitingClosing) setOpenCartId(row.cart_id); }}
                 accessibilityRole="button"
-                accessibilityLabel={`Setoran gerobak ${row.cart_code}`}
+                accessibilityLabel={`Setoran Coffee Bike ${row.cart_code}`}
                 accessibilityState={{ disabled: waitingClosing }}
                 style={[styles.queueRow, (done || waitingClosing) && styles.queueRowDone]}
               >
@@ -554,7 +554,7 @@ export default function FinanceSettlementsScreen() {
                   <Text variant="caption" color={semantic.textMuted}>
                     {row.closing_status ?? 'Menunggu closing Rider'}
                     {row.carry_warning ? ' · Sisa kemarin' : ''}
-                    {(row.closeout_variance_count ?? 0) > 0 ? ' · Selisih Tutup Gerobak' : ''}
+                    {(row.closeout_variance_count ?? 0) > 0 ? ' · Selisih Tutup Coffee Bike' : ''}
                   </Text>
                   <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
                     Urutan {index + 1} · {row.arrived_at === undefined

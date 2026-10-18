@@ -147,9 +147,9 @@ export default function RiderClosingScreen() {
       ) : draft.data ? (
         <>
           <Card style={styles.card}>
-            <Text variant="bodyStrong">Gerobak {draft.data.cart_code}</Text>
+            <Text variant="bodyStrong">Coffee Bike {draft.data.cart_code}</Text>
             <Text variant="caption" color={semantic.textMuted}>Stok masuk diambil dari Add Stock dan refill yang sudah diterima.</Text>
-            {draft.data.carry_warning ? <Banner tone="warning" message="Ada sisa kemarin di gerobak. Angkanya ikut dihitung dan Finance bisa lihat tandanya ya." /> : null}
+            {draft.data.carry_warning ? <Banner tone="warning" message="Ada sisa kemarin di Coffee Bike. Angkanya ikut dihitung dan Finance bisa lihat tandanya ya." /> : null}
             {!draft.data.can_correct ? <Banner tone="info" message="Setoran sudah di-approve Finance. Kalau ada koreksi, minta Finance bantu ya." /> : null}
           </Card>
           {draft.data.lines.map((line) => {

@@ -42,7 +42,7 @@ test('refill form refreshes /me on focus and offers the new no-cart copy and ret
   for (const path of ['app/(app)/staff/refill/new.tsx']) {
     const file = source(path);
     assert.match(file, /useFocusEffect\(useCallback\(\(\) => \{\s*void refreshUser\(\)/);
-    assert.match(file, /cartRefreshStatus === 'loading' \? 'Lagi cek gerobak kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
+    assert.match(file, /cartRefreshStatus === 'loading' \? 'Lagi cek Coffee Bike kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
     assert.match(file, /cartRefreshStatus === 'error'/);
     assert.match(file, /label="Coba lagi"[^\r\n]*refreshUser\(\)/);
     assert.match(file, /user\?\.cartId/);
@@ -54,9 +54,9 @@ test('Closing reads the current cart from its server draft', () => {
   assert.match(source('src/features/closing/queries.ts'), /request<ClosingDraft>\('\/me\/closing\/draft'\)/);
 });
 
-test('Absen has a back button for loading, error, and ready states', () => {
+test('Absen has a back button for read-only, loading, error, and ready states', () => {
   const file = source('app/(app)/absen.tsx');
-  assert.equal((file.match(/<IconButton icon="chevron-left" label="Kembali"/g) ?? []).length, 3);
+  assert.equal((file.match(/<IconButton icon="chevron-left" label="Kembali"/g) ?? []).length, 4);
 });
 
 test('Add Stock lets Produksi move a Rider to another cart with a visible warning', () => {

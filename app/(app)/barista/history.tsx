@@ -90,7 +90,7 @@ export default function BaristaHistoryScreen() {
                 <View style={styles.staffText}>
                   <Text variant="bodyStrong">{s.staff_name}</Text>
                   <Text variant="caption" color={semantic.textMuted}>
-                    Gerobak {s.cart_code}
+                    Coffee Bike {s.cart_code}
                   </Text>
                 </View>
                 <Chip tone={s.has_allocation ? 'brand' : 'amber'} label={s.has_allocation ? 'SUDAH' : 'BELUM'} />

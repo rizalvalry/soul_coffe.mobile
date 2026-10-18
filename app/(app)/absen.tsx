@@ -59,7 +59,8 @@ function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: n
 export default function AbsenScreen() {
   const router = useRouter();
   const role = useAuth((s) => s.session?.user.role);
-  const statusQuery = useAttendanceStatus();
+  const canAttend = role === 'BARISTA' || role === 'STAFF';
+  const statusQuery = useAttendanceStatus(canAttend);
   const rollQuery = useAttendanceRoll();
   const clockIn = useClockIn();
   const openStaffAbsen = useOpenStaffAbsen();
@@ -112,8 +113,8 @@ export default function AbsenScreen() {
   }, []);
 
   useEffect(() => {
-    void locate();
-  }, [locate]);
+    if (canAttend) void locate();
+  }, [canAttend, locate]);
 
   /** How far the phone is from where it needs to be, or null when nothing is enforced. */
   const distance = useMemo(() => {
@@ -131,6 +132,31 @@ export default function AbsenScreen() {
       setBanner(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
     }
   };
+
+  if (!canAttend) {
+    return (
+      <Screen refreshing={rollQuery.isRefetching} onRefresh={() => void rollQuery.refetch()}>
+        <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
+        <Text variant="h2">Daftar Hadir</Text>
+        <Text variant="caption" color={semantic.textMuted}>Lihat siapa yang sudah mulai shift hari ini.</Text>
+        {rollQuery.isLoading ? <SkeletonList count={2} lines={2} /> : rollQuery.isError ? (
+          <Card style={styles.stateCard}>
+            <EmptyState icon="wifi-off" title="Gagal memuat daftar hadir" subtitle="Cek koneksi kamu, lalu coba lagi ya." tone="danger" />
+            <Button label="Coba Lagi" icon="refresh" onPress={() => void rollQuery.refetch()} />
+          </Card>
+        ) : (
+          <Card style={styles.card}>
+            {roll.length === 0 ? <Text>Belum ada yang mulai shift hari ini.</Text> : roll.map((row) => (
+              <View key={row.id} style={styles.rollRow}>
+                <Text variant="bodyStrong" style={styles.rollText}>{row.user_name ?? `#${row.user_id}`}</Text>
+                <Text variant="caption">{roleMeta[row.role].label} · {clockTime(row.clocked_in_at)}</Text>
+              </View>
+            ))}
+          </Card>
+        )}
+      </Screen>
+    );
+  }
 
   if (statusQuery.isLoading) {
     return (

@@ -255,7 +255,7 @@ export default function MenuScreen() {
       </View>
 
       <Text variant="micro" color={semantic.textSubtle} center style={styles.footer}>
-        Soul Coffeemate · Operasional Gerobak Motor Listrik
+        Soul Coffeemate · Operasional Coffee Bike
       </Text>
     </Screen>
   );

@@ -74,3 +74,16 @@ test('Finance can re-record a stale settlement from current Closing numbers', ()
   assert.match(screen, /setReRecord\(true\)/);
   assert.match(screen, /line.qty_wasted/);
 });
+
+test('Closing, settlement, and Tutup Coffee Bike use the current name', () => {
+  for (const path of [
+    'app/(app)/staff/closing.tsx',
+    'app/(app)/finance/settlements.tsx',
+    'app/(app)/barista/close-out.tsx',
+  ]) {
+    const screen = source(path);
+    assert.match(screen, /Coffee Bike/);
+    assert.doesNotMatch(screen, /gerobak/i);
+  }
+  assert.match(source('app/(app)/barista/close-out.tsx'), /Tutup Coffee Bike/);
+});

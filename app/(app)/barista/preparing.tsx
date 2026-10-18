@@ -51,7 +51,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
         <View style={styles.topText}>
           <Text variant="h3">{refill.code}</Text>
           <Text variant="caption" color={semantic.textMuted}>
-            Gerobak {refill.cart_code} · {refill.staff_name}
+            Coffee Bike {refill.cart_code} · {refill.staff_name}
           </Text>
         </View>
         <StatusBadge status={refill.status} />

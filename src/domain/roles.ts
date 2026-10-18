@@ -33,7 +33,7 @@ export const roleMeta: Record<Role, RoleMeta> = {
   ADMINISTRATOR: {
     priority: 1,
     label: 'Administrator',
-    description: 'Kelola pengguna, produk, gerobak, lokasi & target',
+    description: 'Kelola pengguna, produk, Coffee Bike, lokasi & target',
     icon: 'shield-account',
     home: '/menu',
   },
@@ -68,7 +68,7 @@ export const roleMeta: Record<Role, RoleMeta> = {
   STAFF: {
     priority: 6,
     label: 'Rider',
-    description: 'Berjualan di gerobak & request refill cups',
+    description: 'Berjualan di Coffee Bike & request refill cups',
     icon: 'storefront',
     home: '/menu',
   },

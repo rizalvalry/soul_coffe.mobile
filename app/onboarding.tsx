@@ -42,7 +42,7 @@ const SLIDES: Slide[] = [
     key: 'evidence',
     icon: 'camera-outline',
     title: 'Foto Bukti Langsung dari Kamera',
-    body: 'Setiap request wajib disertai foto kondisi frozen gerobak yang diambil saat itu juga. Foto lama tidak bisa dipakai ulang.',
+    body: 'Setiap request wajib disertai foto kondisi frozen Coffee Bike yang diambil saat itu juga. Foto lama tidak bisa dipakai ulang.',
   },
   {
     key: 'tracking',

@@ -21,7 +21,7 @@ import { ApiError } from '@/lib/api';
 import { brand, feedback, pressScale, radius, semantic, space } from '@/theme';
 
 /**
- * Tutup Gerobak — sorting what came back off a cart at the end of the day.
+ * Tutup Coffee Bike — sorting what came back off a cart at the end of the day.
  *
  * Two buckets, because they mean different things to the numbers: cups going back into the
  * showcase get sold tomorrow, cups marked reject are gone. Both leave the cart either way, which
@@ -87,8 +87,8 @@ export default function BaristaCloseOutScreen() {
 
       reset();
       Alert.alert(
-        'Tutup gerobak tercatat',
-        `Gerobak ${result.cart_code}: ${totalReturned} cups masuk showcase, ${totalRejected} cups reject.`,
+        'Tutup Coffee Bike tercatat',
+        `Coffee Bike ${result.cart_code}: ${totalReturned} cups masuk showcase, ${totalRejected} cups reject.`,
       );
     } catch (e) {
       setBanner(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
@@ -112,22 +112,22 @@ export default function BaristaCloseOutScreen() {
 
   return (
     <Screen refreshing={cartsQuery.isRefetching || staffQuery.isRefetching} onRefresh={refresh}>
-      <Text variant="h2">Tutup Gerobak</Text>
+      <Text variant="h2">Tutup Coffee Bike</Text>
       <Text variant="caption" color={semantic.textMuted}>
         Catat sisa cups: masuk showcase untuk dijual besok, atau reject.
       </Text>
 
       <SectionTitle
-        title="Pilih gerobak"
-        caption={`${cartsOnShift.length} gerobak bertugas hari ini`}
+        title="Pilih Coffee Bike"
+        caption={`${cartsOnShift.length} Coffee Bike bertugas hari ini`}
         icon="moped-outline"
       />
       <Card style={styles.card}>
         {cartsOnShift.length === 0 ? (
           <EmptyState
             icon="moped-outline"
-            title="Belum ada gerobak bertugas"
-            subtitle="Gerobak masuk daftar ini setelah menerima stock hari ini."
+            title="Belum ada Coffee Bike bertugas"
+            subtitle="Coffee Bike masuk daftar ini setelah menerima stock hari ini."
             tone="neutral"
           />
         ) : (
@@ -144,7 +144,7 @@ export default function BaristaCloseOutScreen() {
                     }}
                     scaleTo={pressScale.surface}
                     accessibilityRole="button"
-                    accessibilityLabel={`Pilih gerobak ${cart.code}`}
+                    accessibilityLabel={`Pilih Coffee Bike ${cart.code}`}
                     accessibilityState={{ selected: active }}
                     style={[styles.pickRow, active && styles.pickRowActive]}
                   >
@@ -156,7 +156,7 @@ export default function BaristaCloseOutScreen() {
                       />
                     </View>
                     <View style={styles.pickText}>
-                      <Text variant="bodyStrong">Gerobak {cart.code}</Text>
+                      <Text variant="bodyStrong">Coffee Bike {cart.code}</Text>
                       <Text variant="caption" color={semantic.textMuted}>
                         {staffOn(cart.id) ?? 'Tanpa rider'}
                       </Text>
@@ -178,7 +178,7 @@ export default function BaristaCloseOutScreen() {
         <Animated.View entering={enter('below')}>
           {closingDraft.data?.closing_id ? (
             <Banner tone="info" message="Sisa dari Closing Rider sudah terisi. Kalau hitungan Produksi beda, selisihnya tetap dicatat dan terlihat di Finance ya." />
-          ) : <Banner tone="warning" message="Rider belum Closing. Hitung sisa gerobak dulu ya; Finance masih menunggu Closing Rider." />}
+          ) : <Banner tone="warning" message="Rider belum Closing. Hitung sisa Coffee Bike dulu ya; Finance masih menunggu Closing Rider." />}
           <SectionTitle title="Masuk showcase" caption="Dijual lagi besok" icon="fridge-outline" />
           <Card style={styles.card}>
             <View style={styles.lines}>
@@ -236,10 +236,10 @@ export default function BaristaCloseOutScreen() {
               ) : null}
             <Banner
               tone="info"
-              message="Server menolak bila total sisa + reject melebihi stok gerobak — angka gerobak tidak bisa jadi minus."
+              message="Server menolak bila total sisa + reject melebihi stok Coffee Bike — angka Coffee Bike tidak bisa jadi minus."
             />
             <Button
-              label="Simpan Tutup Gerobak"
+              label="Simpan Tutup Coffee Bike"
               icon="content-save-outline"
               onPress={() => void submit()}
               loading={closeOut.isPending}

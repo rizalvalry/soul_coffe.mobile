@@ -109,8 +109,8 @@ export default function BaristaAddStockScreen() {
       setQtyByProduct({});
       Alert.alert(
         'Stock terkirim',
-        `${totalCups} cups masuk ke gerobak ${result.cart_code} untuk ${result.staff_name}. ` +
-          'Stok gerobak di aplikasi rider sudah ikut ter-update.',
+        `${totalCups} cups masuk ke Coffee Bike ${result.cart_code} untuk ${result.staff_name}. ` +
+          'Stok Coffee Bike di aplikasi rider sudah ikut ter-update.',
       );
     } catch (e) {
       setBanner(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
@@ -166,14 +166,14 @@ export default function BaristaAddStockScreen() {
     <Screen refreshing={refreshing} onRefresh={refresh}>
       <Text variant="h2">Add Stock</Text>
       <Text variant="caption" color={semantic.textMuted}>
-        Pindahkan cups dari showcase ke gerobak. Uang harian sudah terisi otomatis.
+        Pindahkan cups dari showcase ke Coffee Bike. Uang harian sudah terisi otomatis.
       </Text>
 
       {/* 1 — gerobak */}
-      <SectionTitle title="1. Pilih gerobak" caption={`${carts.length} gerobak aktif`} icon="moped-outline" />
+      <SectionTitle title="1. Pilih Coffee Bike" caption={`${carts.length} unit Coffee Bike aktif`} icon="moped-outline" />
       <Card style={styles.card}>
         {carts.length === 0 ? (
-          <EmptyState icon="moped-outline" title="Tidak ada gerobak aktif" subtitle="Hubungi admin." tone="neutral" />
+          <EmptyState icon="moped-outline" title="Tidak ada Coffee Bike aktif" subtitle="Hubungi admin." tone="neutral" />
         ) : (
           <View style={styles.pickList}>
             {carts.map((cart, index) => {
@@ -187,7 +187,7 @@ export default function BaristaAddStockScreen() {
                     }}
                     scaleTo={pressScale.surface}
                     accessibilityRole="button"
-                    accessibilityLabel={`Pilih gerobak ${cart.code}`}
+                    accessibilityLabel={`Pilih Coffee Bike ${cart.code}`}
                     accessibilityState={{ selected: active }}
                     style={[styles.pickRow, active && styles.pickRowActive]}
                   >
@@ -199,7 +199,7 @@ export default function BaristaAddStockScreen() {
                       />
                     </View>
                     <View style={styles.pickText}>
-                      <Text variant="bodyStrong">Gerobak {cart.code}</Text>
+                      <Text variant="bodyStrong">Coffee Bike {cart.code}</Text>
                       <Text variant="caption" color={semantic.textMuted}>
                         {cart.plate ?? 'Tanpa plat'}
                       </Text>
@@ -220,7 +220,7 @@ export default function BaristaAddStockScreen() {
       {/* 2 — staff */}
       {cartId !== null ? (
         <Animated.View entering={enter('below')}>
-          <SectionTitle title="2. Pilih rider" caption="Yang bertugas di gerobak ini" icon="account-outline" />
+          <SectionTitle title="2. Pilih rider" caption="Yang bertugas di Coffee Bike ini" icon="account-outline" />
           <Card style={styles.card}>
             {staffList.length === 0 ? (
               <EmptyState icon="account-off-outline" title="Tidak ada rider aktif" subtitle="Hubungi admin." tone="neutral" />
@@ -256,7 +256,7 @@ export default function BaristaAddStockScreen() {
                           <Text variant="bodyStrong">{staff.name}</Text>
                           <Text variant="caption" color={semantic.textMuted}>
                             {staff.assigned_cart_code
-                              ? `Gerobak ${staff.assigned_cart_code}`
+                              ? `Coffee Bike ${staff.assigned_cart_code}`
                               : 'Belum ada penugasan hari ini'}
                           </Text>
                         </View>
@@ -282,7 +282,7 @@ export default function BaristaAddStockScreen() {
           <SectionTitle title="3. Jumlah cups & uang harian" icon="cup-outline" />
           <Card style={styles.card}>
             {selectedStaff?.assigned_cart_id != null && selectedStaff.assigned_cart_id !== cartId ? (
-              <Banner tone="warning" message={`${selectedStaff.name} sekarang di gerobak ${selectedStaff.assigned_cart_code}. Add Stock ini bakal memindahkan rider dan menyimpan riwayatnya.`} />
+              <Banner tone="warning" message={`${selectedStaff.name} sekarang di Coffee Bike ${selectedStaff.assigned_cart_code}. Add Stock ini bakal memindahkan rider dan menyimpan riwayatnya.`} />
             ) : null}
 
             <View style={styles.lines}>
@@ -333,12 +333,12 @@ export default function BaristaAddStockScreen() {
             {banner ? <Banner tone="danger" message={banner} /> : null}
 
             <Button
-              label="Kirim ke Gerobak"
+              label="Kirim ke Coffee Bike"
               icon="send"
               onPress={() => void submit()}
               loading={handToCart.isPending}
               disabled={!canSubmit}
-              hint="Cups berpindah dari showcase ke gerobak, dan rider otomatis masuk penugasan hari ini"
+              hint="Cups berpindah dari showcase ke Coffee Bike, dan rider otomatis masuk penugasan hari ini"
             />
           </Card>
         </Animated.View>
