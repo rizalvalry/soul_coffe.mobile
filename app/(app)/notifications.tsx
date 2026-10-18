@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/refill/queries';
 import { routeFor } from '@/features/push/usePushNotifications';
+import { useAuth } from '@/features/auth/store';
 import { brand, neutral, radius, shadow, semantic, space } from '@/theme';
 import type { AppNotification } from '@/domain/types';
 
@@ -27,6 +28,7 @@ function formatWhen(iso: string): string {
  */
 export default function NotificationsScreen() {
   const router = useRouter();
+  const role = useAuth((s) => s.session?.user.role);
   const inbox = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -37,7 +39,7 @@ export default function NotificationsScreen() {
   const open = (n: AppNotification) => {
     if (!n.read_at) markRead.mutate(n.id);
 
-    const target = routeFor({ refill_request_id: n.refill_request_id, type: n.type });
+    const target = role ? routeFor({ refill_request_id: n.refill_request_id, type: n.type, status: n.status }, role) : null;
     if (target) router.push(target as Href);
   };
 

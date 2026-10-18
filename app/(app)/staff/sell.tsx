@@ -286,7 +286,7 @@ export default function SellScreen() {
     void refreshUser().catch(() => {});
   }, [refreshUser]));
 
-  const absen = useAttendanceStatus();
+  const absen = useAttendanceStatus(user?.role === 'STAFF');
   const productsQuery = useProducts();
   const stockQuery = useMyStock();
   const salesQuery = useTodaySales();
@@ -359,7 +359,7 @@ export default function SellScreen() {
 
   const isSubmitting = recordSale.isPending;
   const hasClockedIn = absen.data?.has_clocked_in ?? false;
-  const dayGate = riderDayGate(absen.data);
+  const dayGate = user?.role === 'STAFF' ? riderDayGate(absen.data) : 'legacy';
   const gateMessage = riderGateMessage(dayGate);
   const canSell = dayGate === 'ready' || (dayGate === 'legacy' && hasClockedIn);
 
@@ -548,7 +548,7 @@ export default function SellScreen() {
 
       {dayGate === 'closed' ? <Banner tone="warning" message={DAY_NOT_OPEN_MESSAGE} /> : null}
 
-      {absen.isLoading || canSell || dayGate === 'closed' ? null : (
+      {user?.role !== 'STAFF' || absen.isLoading || canSell || dayGate === 'closed' ? null : (
         <Card style={styles.gateCard}>
           <EmptyState
             icon="fingerprint-off"

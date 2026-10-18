@@ -65,7 +65,7 @@ export default function NewRefillScreen() {
   }, [refreshUser]));
 
   const productsQuery = useProducts();
-  const attendance = useAttendanceStatus();
+  const attendance = useAttendanceStatus(user?.role === 'STAFF');
   const uploadEvidence = useUploadEvidence();
   const submitRefill = useSubmitRefill();
 
@@ -132,7 +132,7 @@ export default function NewRefillScreen() {
   const totalCups = useMemo(() => Object.values(qty).reduce((sum, n) => sum + n, 0), [qty]);
   const selectedCount = useMemo(() => Object.values(qty).filter((n) => n > 0).length, [qty]);
   const isSubmitting = uploadEvidence.isPending || submitRefill.isPending;
-  const dayGate = riderDayGate(attendance.data);
+  const dayGate = user?.role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
   const gateMessage = riderGateMessage(dayGate);
 
   const capturePhoto = useCallback(async () => {
