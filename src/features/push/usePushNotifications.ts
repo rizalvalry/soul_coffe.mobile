@@ -45,7 +45,8 @@ Notifications.setNotificationHandler({
  */
 export function routeFor(data: Record<string, unknown>, role: Role): string | null {
   const type = typeof data['type'] === 'string' ? data['type'] : '';
-  if (type === 'SettlementVarianceFlagged' || type === 'CartCloseOutVarianceFlagged') {
+  if (['SettlementVarianceFlagged', 'SettlementMethodVarianceFlagged', 'SettlementSelfApproved',
+    'CartCloseOutVarianceFlagged'].includes(type)) {
     return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
       ? settlementRoute(data) : null;
   }
@@ -146,7 +147,8 @@ export function usePushNotifications() {
       if (data?.['type'] === 'StaffAttendanceWindowOpened' || data?.['type'] === 'AttendanceClockedIn') {
         void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
       }
-      if (['SettlementVarianceFlagged', 'CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected'].includes(String(data?.['type'])) &&
+      if (['SettlementVarianceFlagged', 'SettlementMethodVarianceFlagged', 'SettlementSelfApproved',
+        'CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected'].includes(String(data?.['type'])) &&
         (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT' || session.user.role === 'ADMINISTRATOR')) {
         invalidateSettlementData(client, settlementTarget(data ?? {}).cartId);
       }

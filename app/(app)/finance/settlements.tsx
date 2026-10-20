@@ -82,6 +82,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [recordedVariance, setRecordedVariance] = useState<number | null>(null);
+  const [recordedMethodVariance, setRecordedMethodVariance] = useState(false);
   const [draftLocked, setDraftLocked] = useState(false);
   const attempt = useRef<Promise<RecordSettlementInput> | null>(null);
 
@@ -125,6 +126,9 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
   const expectations = settlementExpectations(draft, row);
   const expected = expectations.total;
   const variance = declared - expected;
+  const methodVariance = expectations.cash !== null && expectations.qris !== null && expectations.transfer !== null
+    && (toAmount(cash) !== expectations.cash || toAmount(qris) !== expectations.qris
+      || toAmount(transfer) !== expectations.transfer);
   const flaggedVariance = recordedVariance ?? row.variance_minor ?? 0;
 
   const remainingLines = useMemo(
@@ -166,10 +170,13 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
       setReRecord(false);
       setStaleCleared(true);
       setRecordedVariance(settlement.variance);
-      if (settlement.variance !== 0) {
+      setRecordedMethodVariance(!!settlement.method_variance_flagged);
+      if (settlement.variance !== 0 || settlement.method_variance_flagged) {
         Alert.alert(
           'Setoran Tercatat',
-          `Selisih ${rupiah(Math.abs(settlement.variance))} tercatat dan dilaporkan ke Administrator & Finance.`,
+          settlement.method_variance_flagged
+            ? 'Ada selisih per metode. Setoran tetap tercatat dan dilaporkan ke Administrator, Finance, dan Management.'
+            : `Selisih ${rupiah(Math.abs(settlement.variance))} tercatat dan dilaporkan ke Administrator & Finance.`,
         );
       }
     } catch (e) {
@@ -345,6 +352,10 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     />
                   ) : null}
 
+                  {methodVariance ? (
+                    <Banner tone="warning" message="Tunai, QRIS, atau transfer beda dari Closing. Setoran tetap bisa dicatat, lalu selisihnya dilaporkan." />
+                  ) : null}
+
                   {variance !== 0 ? (
                     <Input
                       label="Alasan selisih (opsional)"
@@ -375,8 +386,8 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
               <>
                 <Banner
                   tone="success"
-                  message={flaggedVariance !== 0 || row.settlement_status === 'VARIANCE_FLAGGED'
-                    ? 'Setoran dengan selisih tercatat dan dilaporkan ke Administrator & Finance. Sekarang pisahkan cups sisa.'
+                  message={flaggedVariance !== 0 || recordedMethodVariance || row.method_variance_flagged || row.settlement_status === 'VARIANCE_FLAGGED'
+                    ? 'Setoran dengan selisih tercatat dan dilaporkan. Sekarang pisahkan cups sisa.'
                     : 'Uang sudah tercatat. Sekarang pisahkan cups yang masih layak dari yang harus dibuang.'}
                 />
                 {row.expected_stale && !staleCleared ? (
@@ -555,6 +566,8 @@ export default function FinanceSettlementsScreen() {
                     {row.closing_status ?? 'Menunggu closing Rider'}
                     {row.carry_warning ? ' · Sisa kemarin' : ''}
                     {(row.closeout_variance_count ?? 0) > 0 ? ' · Selisih Tutup Coffee Bike' : ''}
+                    {row.method_variance_flagged ? ' · Selisih metode' : ''}
+                    {row.self_approved ? ' · Disetujui sendiri' : ''}
                   </Text>
                   <Text variant="caption" color={semantic.textMuted} numberOfLines={1}>
                     Urutan {index + 1} · {row.arrived_at === undefined

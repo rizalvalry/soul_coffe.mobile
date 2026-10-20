@@ -128,6 +128,14 @@ const roleMenus: Record<Role, MenuItem[]> = {
       requirement: 'Flow C — setoran harian per Coffee Bike',
     },
     {
+      id: 'finance-clearing',
+      label: 'Dana QRIS/transfer masuk',
+      sublabel: 'Catat dana bank dan cek saldo kliring',
+      icon: 'bank-transfer-in',
+      route: '/finance/clearing',
+      requirement: 'T-050 L-3 — kliring QRIS/transfer',
+    },
+    {
       id: 'finance-reports',
       label: 'Laporan Biaya',
       sublabel: 'Nilai total permintaan per periode',

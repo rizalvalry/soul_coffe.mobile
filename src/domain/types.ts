@@ -374,6 +374,11 @@ export type SettlementQueueRow = {
   expected_transfer_minor?: number;
   arrived_at?: string | null;
   variance_minor?: number | null;
+    method_variance_flagged?: boolean;
+    cash_variance_minor?: number | null;
+    qris_variance_minor?: number | null;
+    transfer_variance_minor?: number | null;
+    self_approved?: boolean;
   cash_minor?: number | null;
   qris_minor?: number | null;
   transfer_minor?: number | null;
@@ -443,6 +448,12 @@ export type Settlement = {
   /** Signed: positive is a surplus, negative a shortfall. The reason is optional. */
   variance: number;
   variance_reason: string | null;
+    recorded_by?: number | null;
+    self_approved?: boolean;
+    method_variance_flagged?: boolean;
+    cash_variance_minor?: number | null;
+    qris_variance_minor?: number | null;
+    transfer_variance_minor?: number | null;
   reconciled_by: string | null;
   reconciled_at: string | null;
   lines: {
