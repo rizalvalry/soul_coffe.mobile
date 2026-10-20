@@ -44,6 +44,11 @@ test('variance push and inbox notifications open Finance settlements', () => {
   assert.equal(routeFor({ type: 'CartCloseOutVarianceFlagged' }, 'FINANCE'), '/finance/settlements');
   assert.equal(routeFor({ type: 'CartCloseOutVarianceFlagged' }, 'ADMINISTRATOR'), '/finance/settlements');
   assert.equal(routeFor({ type: 'CartCloseOutVarianceFlagged' }, 'STAFF'), null);
+  for (const type of ['SettlementMethodVarianceFlagged', 'SettlementSelfApproved']) {
+    assert.equal(routeFor({ type, cart_id: 18, operating_date: '2026-10-20' }, 'MANAGEMENT'),
+      '/finance/settlements?date=2026-10-20&cart_id=18');
+    assert.equal(routeFor({ type }, 'STAFF'), null);
+  }
 });
 
 test('Closing notifications open the safe Rider menu or role-appropriate settlement queue', () => {

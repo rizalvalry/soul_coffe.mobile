@@ -174,7 +174,8 @@ test('existing stock and sale events refresh their affected query families', () 
 test('Finance and Management refresh queue, list, and only the affected cart draft for settlement events', () => {
   const types = ['SaleRecorded', 'SaleVoided', 'RiderClosingRecorded', 'RiderClosingCorrected',
     'CartCloseOutVarianceFlagged', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
-    'SettlementExpectedStale', 'SettlementVarianceFlagged'];
+    'SettlementExpectedStale', 'SettlementVarianceFlagged', 'SettlementMethodVarianceFlagged',
+    'SettlementSelfApproved'];
   for (const role of ['FINANCE', 'MANAGEMENT']) {
     const app = mountRealtimeProvider(() => false, role);
     for (const type of types) {
@@ -207,7 +208,8 @@ test('variance without cart context refreshes every draft, and other roles do no
   admin.calls.length = 0;
   admin.channelCallbacks[0]({ event_id: 'admin-recorded', type: 'SaleRecorded', cart_id: 18, refill_request_id: null });
   assert.equal(admin.calls.length, 0);
-  for (const type of ['CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected']) {
+  for (const type of ['CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected',
+    'SettlementMethodVarianceFlagged', 'SettlementSelfApproved']) {
     admin.calls.length = 0;
     admin.channelCallbacks[0]({ event_id: `admin-${type}`, type, cart_id: 18, refill_request_id: null });
     assert.deepEqual(admin.calls.map((key) => Array.from(key)), [

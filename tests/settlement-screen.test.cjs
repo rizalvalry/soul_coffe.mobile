@@ -160,6 +160,15 @@ test('a stale recorded settlement warns Finance before cup disposition', () => {
     node.props.message?.includes('Ekspektasi berubah setelah setoran dicatat')));
 });
 
+test('method variance stays visible in queue and cup disposition', () => {
+  const app = mountScreen({ row: { ...baseRow, settlement_id: 7, method_variance_flagged: true },
+    draft: baseDraft, settlement: { id: 7, variance: 0, method_variance_flagged: true } });
+  const labels = app.nodes.filter((node) => node.type === 'Text').map((node) =>
+    Array.isArray(node.props.children) ? node.props.children.flat(Infinity).join('') : node.props.children);
+  assert.ok(labels.some((value) => typeof value === 'string' && value.includes('Selisih metode')));
+  assert.ok(app.nodes.some((node) => node.type === 'Banner' && node.props.message?.includes('selisih tercatat')));
+});
+
 test('timeout retry keeps one key and payload until success, then clears the draft key', async () => {
   const app = mountScreen({ row: baseRow, draft: baseDraft,
     settlement: { id: 7, variance: 0 }, recordFailures: 1 });
