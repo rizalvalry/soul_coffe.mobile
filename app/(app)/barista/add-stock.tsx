@@ -257,7 +257,7 @@ export default function BaristaAddStockScreen() {
                           <Text variant="caption" color={semantic.textMuted}>
                             {staff.assigned_cart_code
                               ? `Coffee Bike ${staff.assigned_cart_code}`
-                              : 'Belum ada penugasan hari ini'}
+                              : 'Belum pegang Coffee Bike hari ini'}
                           </Text>
                         </View>
                         {elsewhere ? <Chip tone="amber" label="PINDAH" /> : null}
@@ -284,6 +284,11 @@ export default function BaristaAddStockScreen() {
             {selectedStaff?.assigned_cart_id != null && selectedStaff.assigned_cart_id !== cartId ? (
               <Banner tone="warning" message={`${selectedStaff.name} sekarang di Coffee Bike ${selectedStaff.assigned_cart_code}. Add Stock ini bakal memindahkan rider dan menyimpan riwayatnya.`} />
             ) : null}
+            <Text variant="bodyStrong">
+              {selectedStaff?.location_setup
+                ? `Lokasi: ${selectedStaff.location_setup.location_name ?? 'Belum ada titik jualan'} · ${selectedStaff.location_setup.basis === 'selling_location' ? 'absen & closing di titik jualan' : 'absen & closing di Dapur'} · diatur Management`
+                : 'Lokasi belum diatur Management'}
+            </Text>
 
             <View style={styles.lines}>
               {products.map((p) => {
@@ -338,7 +343,7 @@ export default function BaristaAddStockScreen() {
               onPress={() => void submit()}
               loading={handToCart.isPending}
               disabled={!canSubmit}
-              hint="Cups berpindah dari showcase ke Coffee Bike, dan rider otomatis masuk penugasan hari ini"
+              hint="Cups berpindah dari showcase ke Coffee Bike, dan Rider otomatis memakainya hari ini"
             />
           </Card>
         </Animated.View>

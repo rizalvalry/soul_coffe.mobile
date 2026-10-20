@@ -23,7 +23,9 @@ test('Management login role shows the Finance menu and its own label', () => {
   assert.equal(roles.isRole('MANAGEMENT'), true);
   assert.equal(roles.roleMeta.MANAGEMENT.label, 'Management');
   assert.equal(roles.roleMeta.MANAGEMENT.home, '/menu');
-  assert.equal(navigation.menuByRole.MANAGEMENT, navigation.menuByRole.FINANCE);
+  assert.deepEqual(navigation.menuByRole.MANAGEMENT.slice(0, navigation.menuByRole.FINANCE.length), navigation.menuByRole.FINANCE);
+  assert.ok(navigation.menuByRole.MANAGEMENT.some((item) => item.route === '/management/rider-location-setup'));
+  assert.ok(!navigation.menuByRole.FINANCE.some((item) => item.route === '/management/rider-location-setup'));
   assert.equal(demo.USERS.find((user) => user.role === 'MANAGEMENT')?.password, '');
 });
 
@@ -68,7 +70,7 @@ test('every visible role menu item has a real app screen', () => {
   const files = screenFiles(join(__dirname, '..', 'app', '(app)'))
     .map((file) => file.slice(join(__dirname, '..', 'app').length + 1));
   const sitemap = sitemapFor(files);
-  const missing = ['/staff/settlement', '/finance/reports', '/admin/users', '/creator/studio'];
+  const missing = ['/finance/reports', '/admin/users', '/creator/studio'];
   const routes = new Set(files.map((file) => `/${file.replace(/\.[jt]sx?$/, '').split(/[\\/]/)
     .filter((part) => part !== 'index' && !/^\(.+\)$/.test(part)).join('/')}`));
 

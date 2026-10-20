@@ -9,6 +9,8 @@ import { apiBaseUrl } from '@/lib/api';
 import { invalidateRefillData, qk as refillKeys } from '@/features/refill/queries';
 import { showcaseKeys } from '@/features/showcase/queries';
 import { invalidateSettlementData } from '@/features/settlements/queries';
+import { riderSettlementKey } from '@/features/settlements/rider';
+import { riderSetupKeys } from '@/features/riderLocation/queries';
 import { claimEvent } from './seen';
 import type { RefillStatus, Role } from '@/domain/types';
 
@@ -193,6 +195,17 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         void client.invalidateQueries({ queryKey: showcaseKeys.staff });
         void client.invalidateQueries({ queryKey: ['showcase', 'allowance'] });
         void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
+      }
+      if (session.user.role === 'STAFF' && ['SettlementRecorded', 'SettlementApproved', 'RiderClosingCorrected'].includes(event.type)) {
+        void client.invalidateQueries({ queryKey: riderSettlementKey });
+      }
+      if (event.type === 'RiderLocationSetupChanged' || event.type === 'RiderLocationSetupMissing') {
+        void client.invalidateQueries({ queryKey: riderSetupKeys.list });
+        void client.invalidateQueries({ queryKey: showcaseKeys.staff });
+        if (session.user.role === 'STAFF') {
+          void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
+          void client.invalidateQueries({ queryKey: ['me', 'closing', 'draft'] });
+        }
       }
       if (session.user.role === 'STAFF' &&
         (event.type === 'CartAssignmentChanged' || event.type === 'CartStockHandedOver')) {

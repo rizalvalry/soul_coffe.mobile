@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { request } from '@/lib/api';
 import { invalidateSettlementData } from '@/features/settlements/queries';
+import { riderSettlementKey } from '@/features/settlements/rider';
+import type { ClosingPoint } from './locationCheck';
 import { qk as refillKeys } from '@/features/refill/queries';
 
 export type ClosingLine = {
@@ -26,6 +28,9 @@ export type ClosingDraft = {
   qris_minor: number;
   transfer_minor: number;
   cash_minor: number;
+  closing_point: ClosingPoint;
+  outside_closing_point: boolean;
+  closing_distance_m: number | null;
   lines: ClosingLine[];
   commission: {
     has_closing: boolean;
@@ -72,6 +77,7 @@ export function useRecordClosing() {
     onSuccess: (result) => {
       client.setQueryData(closingKeys.draft, result);
       invalidateSettlementData(client, result.cart_id);
+      void client.invalidateQueries({ queryKey: riderSettlementKey });
       void client.invalidateQueries({ queryKey: refillKeys.myStock });
     },
   });

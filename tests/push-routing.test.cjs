@@ -35,6 +35,7 @@ const { routeFor } = loadTs('src/features/push/usePushNotifications.ts', {
   '@/features/realtime/seen': {},
   '@/features/settlements/navigation': navigation,
   '@/features/settlements/queries': {},
+  '@/features/settlements/rider': { riderSettlementKey: ['me', 'settlement'] },
   './registration': {},
 });
 
@@ -54,6 +55,14 @@ test('Closing notifications open the safe Rider menu or role-appropriate settlem
     }
     assert.equal(routeFor({ type }, 'BARISTA'), null);
     assert.equal(routeFor({ type }, 'RIDER'), null);
+  }
+});
+
+test('Finance settlement pushes open Rider Setoran Harian', () => {
+  for (const type of ['SettlementRecorded', 'SettlementApproved']) {
+    assert.equal(routeFor({ type }, 'STAFF'), '/staff/settlement');
+    assert.equal(routeFor({ type, operating_date: '2026-10-20' }, 'STAFF'), '/staff/settlement?operating_date=2026-10-20');
+    assert.equal(routeFor({ type }, 'FINANCE'), '/finance/settlements');
   }
 });
 
@@ -154,6 +163,7 @@ function mountPushHook(role, response) {
     '@/features/realtime/seen': { claimEvent: () => true },
     '@/features/settlements/navigation': navigation,
     '@/features/settlements/queries': { invalidateSettlementData: (_client, cartId) => settlementRefreshes.push(cartId) },
+    '@/features/settlements/rider': { riderSettlementKey: ['me', 'settlement'] },
     './registration': { syncRegistration: () => Promise.resolve() },
   });
   usePushNotifications();
@@ -165,6 +175,14 @@ test('foreground attendance push refreshes Rider day gate without Pusher', () =>
   const staff = mountPushHook('STAFF', null);
   staff.received({ request: { content: { data: { type: 'StaffAttendanceWindowOpened' } } } });
   assert.deepEqual(staff.attendanceRefreshes, ['absen/status']);
+});
+
+test('foreground settlement push refreshes Rider status without Pusher', () => {
+  const rider = mountPushHook('STAFF', null);
+  rider.received({ request: { content: { data: { type: 'SettlementRecorded' } } } });
+  assert.deepEqual(rider.attendanceRefreshes, ['me/settlement']);
+  rider.received({ request: { content: { data: { type: 'SettlementApproved' } } } });
+  assert.deepEqual(rider.attendanceRefreshes, ['me/settlement', 'me/settlement']);
 });
 
 test('a variance tap that launched the app routes after Finance signs in and clears the response', () => {
