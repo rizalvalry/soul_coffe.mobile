@@ -196,6 +196,7 @@ export type StaffPickerRow = {
    */
   assigned_cart_id: number | null;
   assigned_cart_code: string | null;
+  location_setup: { location_id: number | null; location_name: string | null; basis: 'kitchen' | 'selling_location' } | null;
 };
 
 /** The day's operational allowance for one cart (uang makan/minum). Whole rupiah, scale 0 (R9). */

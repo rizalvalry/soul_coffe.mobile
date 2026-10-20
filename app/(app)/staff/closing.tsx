@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Image, StyleSheet, View } from 'react-native';
 import * as Location from 'expo-location';
+import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
@@ -15,6 +16,8 @@ import { useClosingDraft, useRecordClosing } from '@/features/closing/queries';
 import { closingTotals } from '@/features/closing/calculation';
 import { closingSubmissionGate } from '@/features/closing/submissionGate';
 import { commissionSummary } from '@/features/closing/commission';
+import { closingLocationMessage } from '@/features/closing/locationCheck';
+import { closingFormSignature } from '@/features/closing/formState';
 import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
 import { ApiError, uuidv4 } from '@/lib/api';
 import { brand, semantic, space } from '@/theme';
@@ -27,7 +30,10 @@ function rupiah(value: number): string {
 }
 async function closingGps(): Promise<{ lat: number; lng: number } | null> {
   try {
-    const permission = await Location.getForegroundPermissionsAsync();
+    let permission = await Location.getForegroundPermissionsAsync();
+    if (!permission.granted && permission.canAskAgain) {
+      permission = await Location.requestForegroundPermissionsAsync();
+    }
     if (!permission.granted) return null;
     const fix = await Promise.race([
       Location.getCurrentPositionAsync({ accuracy: Location.LocationAccuracy.Balanced }),
@@ -40,6 +46,7 @@ async function closingGps(): Promise<{ lat: number; lng: number } | null> {
 }
 
 export default function RiderClosingScreen() {
+  const router = useRouter();
   const draft = useClosingDraft();
   const products = useProducts();
   const record = useRecordClosing();
@@ -50,17 +57,21 @@ export default function RiderClosingScreen() {
   const [transfer, setTransfer] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [needsFreshDraft, setNeedsFreshDraft] = useState(false);
+  const [showCorrection, setShowCorrection] = useState(false);
   const retry = useRef<{ key: string; signature: string; gps: { lat: number; lng: number } | null } | null>(null);
+  const hydratedForm = useRef<string | null>(null);
+  const formSignature = draft.data ? closingFormSignature(draft.data) : null;
 
   useEffect(() => {
-    if (!draft.data) return;
+    if (!draft.data || formSignature === hydratedForm.current) return;
+    hydratedForm.current = formSignature;
     setRemaining(Object.fromEntries(draft.data.lines.map((line) => [
       line.product_id, String(draft.data?.closing_id ? line.qty_remaining : line.qty_in + line.qty_carry),
     ])));
     setWasted(Object.fromEntries(draft.data.lines.map((line) => [line.product_id, String(line.qty_wasted)])));
     setQris(String(draft.data.qris_minor));
     setTransfer(String(draft.data.transfer_minor));
-  }, [draft.data]);
+  }, [draft.data, formSignature]);
 
   const counts = useMemo(
     () => Object.fromEntries(Object.entries(remaining).map(([id, value]) => [Number(id), amount(value)])),
@@ -105,29 +116,41 @@ export default function RiderClosingScreen() {
       setError('Antrean lama belum bisa dicek. Coba lagi ya.');
       return;
     }
+    const latest = await draft.refetch();
+    if (!latest.isSuccess || !latest.data) {
+      setError('Titik Closing terbaru belum bisa dicek. Coba lagi ya.');
+      return;
+    }
+    if (latest.data.cart_id !== draft.data.cart_id ||
+      JSON.stringify(latest.data.closing_point) !== JSON.stringify(draft.data.closing_point) ||
+      closingFormSignature(latest.data) !== formSignature) {
+      setError('Data Closing berubah. Cek lagi angka dan titiknya sebelum kirim ya.');
+      return;
+    }
     const lines = draft.data.lines.map((line) => ({
       product_id: line.product_id,
       qty_remaining: counts[line.product_id] ?? 0,
       qty_wasted: wasteCounts[line.product_id] ?? 0,
     }));
     const signature = JSON.stringify([draft.data.cart_id, lines, amount(qris), amount(transfer)]);
+    const attempt = retry.current?.signature === signature
+      ? retry.current
+      : { key: uuidv4(), signature, gps: await closingGps() };
+    const locationMessage = closingLocationMessage(draft.data.closing_point, attempt.gps);
     Alert.alert(
       draft.data.closing_id ? 'Koreksi Closing?' : 'Kirim Closing?',
-      String(totals.cupsSold) + ' cups terjual. Tunai yang harus disetor ' + rupiah(totals.cash) + '.',
+      String(totals.cupsSold) + ' cups terjual. Tunai yang harus disetor ' + rupiah(totals.cash) + '.\n' + locationMessage,
       [
         { text: 'Cek lagi', style: 'cancel' },
         { text: 'Kirim', onPress: async () => {
           setError(null);
-          const attempt = retry.current?.signature === signature
-            ? retry.current
-            : { key: uuidv4(), signature, gps: await closingGps() };
           retry.current = attempt;
           try {
-            await record.mutateAsync({
+            const saved = await record.mutateAsync({
               key: attempt.key, lines, qris: amount(qris), transfer: amount(transfer), gps: attempt.gps,
             });
             retry.current = null;
-            Alert.alert('Closing tersimpan', 'Hasilnya sudah bisa dicek Finance ya.');
+            router.replace({ pathname: '/staff/settlement', params: { operating_date: saved.operating_date } });
           } catch (e) {
             if (e instanceof ApiError && !e.isOffline) retry.current = null;
             setError(e instanceof ApiError ? e.message : 'Closing belum terkirim. Coba lagi ya.');
@@ -140,7 +163,7 @@ export default function RiderClosingScreen() {
   return (
     <Screen refreshing={draft.isRefetching} onRefresh={() => void draft.refetch()}>
       <Text variant="h2">Closing</Text>
-      <Text variant="caption" color={semantic.textMuted}>Isi sisa cups pas mau balik ke dapur.</Text>
+      <Text variant="caption" color={semantic.textMuted}>Isi sisa cups pas kamu selesai jualan ya.</Text>
       {draft.isLoading ? <SkeletonList count={4} lines={2} /> : draft.isError ? (
         <EmptyState icon="wifi-off" title="Closing belum bisa dibuka" subtitle={(draft.error as Error).message} tone="danger">
           <Button label="Coba lagi" onPress={() => void draft.refetch()} />
@@ -153,6 +176,7 @@ export default function RiderClosingScreen() {
             {draft.data.carry_warning ? <Banner tone="warning" message="Ada sisa kemarin di Coffee Bike. Angkanya ikut dihitung dan Finance bisa lihat tandanya ya." /> : null}
             {!draft.data.can_correct ? <Banner tone="info" message="Setoran sudah di-approve Finance. Kalau ada koreksi, minta Finance bantu ya." /> : null}
           </Card>
+          {(!draft.data.closing_id || showCorrection) ? <>
           {draft.data.lines.map((line) => {
             const image = productImageSource(productById.get(line.product_id) ?? {});
             const sold = totals.soldByProduct[line.product_id] ?? 0;
@@ -191,6 +215,7 @@ export default function RiderClosingScreen() {
               onPress={submit} loading={record.isPending}
               disabled={(!needsFreshDraft && !totals.valid) || !draft.data.can_correct || record.isPending} />
           </Card>
+          </> : null}
           {draft.data.closing_id ? (
             <Card style={styles.card}>
               <Text variant="bodyStrong">Hasil Closing tersimpan</Text>
@@ -204,6 +229,7 @@ export default function RiderClosingScreen() {
                 </Text>
               ))}
               <Text variant="bodyStrong">Total {rupiah(draft.data.total_minor)} · Tunai {rupiah(draft.data.cash_minor)}</Text>
+              {draft.data.can_correct ? <Button label="Ada pembeli lagi? Ubah sisa cups" variant="secondary" onPress={() => setShowCorrection(true)} /> : null}
             </Card>
           ) : null}
         </>

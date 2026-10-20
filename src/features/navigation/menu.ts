@@ -244,7 +244,7 @@ const roleMenus: Record<Role, MenuItem[]> = {
     {
       id: 'staff-closing',
       label: 'Closing',
-      sublabel: 'Isi sisa cups pas mau balik ke dapur',
+      sublabel: 'Isi sisa cups pas selesai jualan',
       icon: 'clipboard-check-outline',
       route: '/staff/closing',
       requirement: 'Closing Cups — sisa, rusak, QRIS, transfer',
@@ -355,7 +355,17 @@ export const menuByRole: Record<Role, MenuItem[]> = Object.fromEntries(
   }),
 ) as Record<Role, MenuItem[]>;
 
-menuByRole.MANAGEMENT = menuByRole.FINANCE;
+menuByRole.MANAGEMENT = [
+  ...menuByRole.FINANCE,
+  {
+    id: 'management-rider-location-setup',
+    label: 'Setup Lokasi Rider',
+    sublabel: 'Atur titik jualan, absen, dan Closing Rider',
+    icon: 'map-marker-account-outline',
+    route: '/management/rider-location-setup',
+    requirement: 'T-049 P-0 sampai P-5',
+  },
+];
 
 /** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */
 export function menuItemsWithScreens(items: MenuItem[], sitemap: SitemapType | null): MenuItem[] {

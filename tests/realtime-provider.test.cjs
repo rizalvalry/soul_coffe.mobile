@@ -63,6 +63,8 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
       queryClient.invalidateQueries({ queryKey: Number.isSafeInteger(cartId) && cartId > 0
         ? ['settlements', 'draft', cartId] : ['settlements', 'draft'] });
     } },
+    '@/features/settlements/rider': { riderSettlementKey: ['me', 'settlement'] },
+    '@/features/riderLocation/queries': { riderSetupKeys: { list: ['rider-location-setups'] } },
     './seen': { claimEvent },
   };
   const module = { exports: {} };

@@ -11,6 +11,7 @@ import { showcaseKeys } from '@/features/showcase/queries';
 import { claimEvent } from '@/features/realtime/seen';
 import { settlementRoute, settlementTarget } from '@/features/settlements/navigation';
 import { invalidateSettlementData } from '@/features/settlements/queries';
+import { riderSettlementKey } from '@/features/settlements/rider';
 import { syncRegistration } from './registration';
 
 /**
@@ -55,6 +56,12 @@ export function routeFor(data: Record<string, unknown>, role: Role): string | nu
     if (role === 'STAFF') return '/menu';
     return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
       ? settlementRoute(data) : null;
+  }
+  if (type === 'SettlementRecorded' || type === 'SettlementApproved') {
+    const riderDate = settlementTarget(data).date;
+    return role === 'STAFF' ? `/staff/settlement${riderDate ? `?operating_date=${riderDate}` : ''}`
+      : role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
+        ? settlementRoute(data) : null;
   }
 
   const refillId = Number(data['refill_request_id']);
@@ -151,6 +158,9 @@ export function usePushNotifications() {
         'CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected'].includes(String(data?.['type'])) &&
         (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT' || session.user.role === 'ADMINISTRATOR')) {
         invalidateSettlementData(client, settlementTarget(data ?? {}).cartId);
+      }
+      if (session.user.role === 'STAFF' && ['SettlementRecorded', 'SettlementApproved'].includes(String(data?.['type']))) {
+        void client.invalidateQueries({ queryKey: riderSettlementKey });
       }
     });
 

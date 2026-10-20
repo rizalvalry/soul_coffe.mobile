@@ -276,6 +276,8 @@ test('login before Add Stock then assignment event and foreground refresh Rider 
       absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'], staff: ['showcase', 'staff'],
     } },
     '@/features/settlements/queries': { invalidateSettlementData() {} },
+    '@/features/settlements/rider': { riderSettlementKey: ['me', 'settlement'] },
+    '@/features/riderLocation/queries': { riderSetupKeys: { list: ['rider-location-setups'] } },
     './seen': { claimEvent() {} },
   }, { setTimeout: () => 1, clearTimeout: () => {} });
   provider.RealtimeProvider({ children: null });
