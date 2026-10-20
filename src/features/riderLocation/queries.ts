@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { request, uuidv4 } from '@/lib/api';
 import type { Location } from '@/domain/types';
@@ -30,11 +31,18 @@ export function useLocations() {
 
 export function useSaveRiderSetup() {
   const client = useQueryClient();
+  const pending = useRef<{ signature: string; key: string } | null>(null);
   return useMutation({
-    mutationFn: (input: { riderId: number; locationId: number | null; basis: 'kitchen' | 'selling_location' }) =>
-      request<RiderSetup>(`/rider-location-setups/${input.riderId}`, {
-        method: 'PATCH', idempotencyKey: uuidv4(), body: { location_id: input.locationId, basis: input.basis },
-      }),
+    mutationFn: async (input: { riderId: number; locationId: number | null; basis: 'kitchen' | 'selling_location' }) => {
+      const signature = JSON.stringify(input);
+      if (pending.current?.signature !== signature) pending.current = { signature, key: uuidv4() };
+      const attempt = pending.current;
+      const result = await request<RiderSetup>(`/rider-location-setups/${input.riderId}`, {
+        method: 'PATCH', idempotencyKey: attempt.key, body: { location_id: input.locationId, basis: input.basis },
+      });
+      if (pending.current === attempt) pending.current = null;
+      return result;
+    },
     onSuccess: () => { void client.invalidateQueries({ queryKey: riderSetupKeys.list }); },
   });
 }

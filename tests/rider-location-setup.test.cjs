@@ -25,6 +25,9 @@ test('closing location copy includes distance and never blocks submit', () => {
   assert.match(closingLocationMessage(point, { lat: -6.1751, lng: 106.865 }), /dekat Dapur \(0 m\)/);
   assert.match(closingLocationMessage(point, { lat: -6.1851, lng: 106.865 }), /1,1 km dari Dapur.*tetap bisa dikirim/);
   assert.match(closingLocationMessage(point, null), /GPS belum tersedia.*tetap bisa dikirim/);
+  const noPin = { ...point, lat: null, lng: null };
+  assert.match(closingLocationMessage(noPin, null), /Pin Dapur belum tersedia.*tanpa tanda lokasi/);
+  assert.match(closingLocationMessage(noPin, { lat: -6.1751, lng: 106.865 }), /tanpa tanda lokasi/);
 });
 
 test('checking a fresh Closing point does not reset edited cups and payment fields', () => {
