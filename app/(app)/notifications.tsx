@@ -28,7 +28,7 @@ function formatWhen(iso: string): string {
  */
 export default function NotificationsScreen() {
   const router = useRouter();
-  const role = useAuth((s) => s.session?.user.role);
+  const user = useAuth((s) => s.session?.user);
   const inbox = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -39,7 +39,8 @@ export default function NotificationsScreen() {
   const open = (n: AppNotification) => {
     if (!n.read_at) markRead.mutate(n.id);
 
-    const target = role ? routeFor({ refill_request_id: n.refill_request_id, type: n.type, status: n.status }, role) : null;
+    const target = user ? routeFor({ refill_request_id: n.refill_request_id, type: n.type, status: n.status },
+      user.role, user.abilities, user.isSuperAdmin) : null;
     if (target) router.push(target as Href);
   };
 

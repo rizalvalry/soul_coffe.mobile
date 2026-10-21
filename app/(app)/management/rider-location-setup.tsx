@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/Button';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useAuth } from '@/features/auth/store';
+import { canUse } from '@/features/navigation/menu';
 import { useLocations, useRiderSetups, useSaveRiderSetup, type RiderSetupRow } from '@/features/riderLocation/queries';
 import { ApiError } from '@/lib/api';
 import { space } from '@/theme';
 
 export default function RiderLocationSetupScreen() {
-  const role = useAuth((s) => s.session?.user.role);
+  const user = useAuth((s) => s.session?.user);
   const riders = useRiderSetups();
   const locations = useLocations();
   const save = useSaveRiderSetup();
@@ -21,7 +22,7 @@ export default function RiderLocationSetupScreen() {
   const [basis, setBasis] = useState<'kitchen' | 'selling_location'>('kitchen');
   const [error, setError] = useState<string | null>(null);
 
-  if (role !== 'MANAGEMENT' && role !== 'ADMINISTRATOR') return <Screen><EmptyState icon="lock-outline" title="Akses khusus Management" /></Screen>;
+  if (!user || !canUse(user, 'rider_location_setup', 'edit')) return <Screen><EmptyState icon="lock-outline" title="Belum punya akses buat setup lokasi" /></Screen>;
 
   const choose = (rider: RiderSetupRow) => {
     setSelected(rider);

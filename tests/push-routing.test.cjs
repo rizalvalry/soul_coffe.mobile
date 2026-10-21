@@ -162,7 +162,8 @@ function mountPushHook(role, response) {
       attendanceRefreshes.push(queryKey.join('/'));
       return Promise.resolve();
     } }) },
-    '@/features/auth/store': { useAuth: (selector) => selector({ session: { user: { role } } }) },
+    '@/features/auth/store': { useAuth: (selector) => selector({ session: { user: { role,
+      abilities: ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR'].includes(role) ? { settlements: ['view'] } : {} } } }) },
     '@/features/refill/queries': { invalidateRefillData() {} },
     '@/features/showcase/queries': { showcaseKeys: { absenStatus: ['absen', 'status'] } },
     '@/features/realtime/seen': { claimEvent: () => true },

@@ -5,6 +5,7 @@ import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/features/auth/store';
+import { canUse } from '@/features/navigation/menu';
 import { apiBaseUrl } from '@/lib/api';
 import { invalidateRefillData, qk as refillKeys } from '@/features/refill/queries';
 import { showcaseKeys } from '@/features/showcase/queries';
@@ -156,7 +157,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       setState('connected');
       // One catch-up refresh per connection. Pusher does not replay events missed offline.
       void client.invalidateQueries();
-      if (session.user.role === 'STAFF') void refreshUser().catch(() => {});
+      void refreshUser().catch(() => {});
     });
     connection?.bind('connecting', () => { if (active) setState('connecting'); });
     connection?.bind('disconnected', () => { if (active) setState('disconnected'); });
@@ -179,6 +180,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       // A socket-first delivery suppresses the later push banner. A push-first delivery still
       // needs the socket's mapped query refreshes, even when both transports share an event ID.
       claimEvent(event.event_id);
+
+      if (event.type === 'AccessChanged') {
+        void refreshUser().catch(() => {});
+        void client.invalidateQueries();
+        return;
+      }
 
       invalidateRefillData(client, event.refill_request_id ?? undefined);
 
@@ -217,13 +224,12 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         }
         void refreshUser().catch(() => {});
       }
-      const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
       const existingEvent = ['CartClosedOut', 'CartCloseOutVarianceFlagged', 'SaleVoided', 'SaleFlaggedSuspect',
         'RiderClosingRecorded', 'RiderClosingCorrected', 'SettlementMethodVarianceFlagged',
         'SettlementSelfApproved'].includes(event.type);
       const queueEvent = ['SaleRecorded', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
         'SettlementExpectedStale', 'SettlementVarianceFlagged'].includes(event.type);
-      if ((isFinanceOrManagement || session.user.role === 'ADMINISTRATOR') && (existingEvent || queueEvent)) {
+      if (canUse(session.user, 'settlements') && (existingEvent || queueEvent)) {
         invalidateSettlementData(client, event.cart_id);
       }
     };
@@ -255,7 +261,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active' && previous !== 'active') {
         void client.invalidateQueries();
-        if (session.user.role === 'STAFF') void refreshUser().catch(() => {});
+        void refreshUser().catch(() => {});
       }
       previous = next;
     });

@@ -29,6 +29,21 @@ test('Management login role shows the Finance menu and its own label', () => {
   assert.equal(demo.USERS.find((user) => user.role === 'MANAGEMENT')?.password, '');
 });
 
+test('backoffice tiles follow account abilities without duplicates', () => {
+  const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
+  const production = menuForUser({ role: 'BARISTA', abilities: {
+    rider_location_setup: ['view', 'edit'], settlements: ['view'],
+  } });
+  assert.ok(production.some((item) => item.route === '/barista/add-stock'));
+  assert.ok(production.some((item) => item.route === '/management/rider-location-setup'));
+  assert.ok(production.some((item) => item.route === '/finance/settlements'));
+  assert.equal(new Set(production.map((item) => item.route)).size, production.length);
+
+  const finance = menuForUser({ role: 'FINANCE', abilities: { settlements: ['view'] } });
+  assert.ok(finance.some((item) => item.route === '/finance/settlements'));
+  assert.ok(!finance.some((item) => item.route === '/finance/clearing'));
+});
+
 test('Administrator has every Management and Finance tile once, without attendance', () => {
   const { menuByRole } = loadTypeScript('src/features/navigation/menu.ts');
   const administratorRoutes = menuByRole.ADMINISTRATOR.map((item) => item.route);
@@ -39,7 +54,7 @@ test('Administrator has every Management and Finance tile once, without attendan
   assert.equal(new Set(administratorRoutes).size, administratorRoutes.length);
   assert.ok(!administratorRoutes.includes('/absen'));
   assert.match(readFileSync(join(__dirname, '..', 'app', '(app)', 'management', 'rider-location-setup.tsx'), 'utf8'),
-    /role !== 'MANAGEMENT' && role !== 'ADMINISTRATOR'/);
+    /canUse\(user, 'rider_location_setup', 'edit'\)/);
   const demoStore = readFileSync(join(__dirname, '..', 'src', 'features', 'demo', 'store.ts'), 'utf8');
   assert.match(demoStore, /function canApprove[\s\S]*?actor\.role === 'ADMINISTRATOR'/);
   assert.match(demoStore, /function canReject[\s\S]*?actor\.role === 'ADMINISTRATOR'/);

@@ -8,6 +8,9 @@ export type AuthUser = {
   id: string;
   name: string;
   role: Role;
+  roleLabel?: string;
+  isSuperAdmin?: boolean;
+  abilities?: Record<string, string[]>;
   /** Present for STAFF — today's assigned cart. */
   cartCode?: string;
   cartId?: number;
@@ -41,6 +44,13 @@ function toSessionUser(user: Record<string, unknown>): AuthUser {
     id: String(user['id']),
     name: String(user['name']),
     role: user['role'],
+    roleLabel: typeof user['role_label'] === 'string' ? user['role_label'] : undefined,
+    isSuperAdmin: user['is_super_admin'] === true,
+    abilities: user['abilities'] && typeof user['abilities'] === 'object'
+      ? Object.fromEntries(Object.entries(user['abilities'] as Record<string, unknown>)
+        .filter((entry): entry is [string, string[]] => Array.isArray(entry[1])
+          && entry[1].every((ability: unknown) => typeof ability === 'string')))
+      : {},
     cartCode,
     cartId,
     todayCart: todayCart && cartId && cartCode
@@ -105,11 +115,25 @@ function toAuthUser(user: DemoUser): AuthUser {
     id: String(user.id),
     name: user.name,
     role: user.role,
+    abilities: demoAbilities(user.role),
     cartCode: user.cartCode,
     cartId: user.cartId,
     kitchenName: user.kitchenName,
     kitchenId: user.kitchenId,
   };
+}
+
+function demoAbilities(role: Role): Record<string, string[]> {
+  if (role === 'ADMINISTRATOR' || role === 'MANAGEMENT' || role === 'FINANCE') {
+    return {
+      refill_approval: ['view', 'edit'],
+      settlements: ['view', 'edit'],
+      clearing: ['view', 'edit'],
+      ...(role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
+        ? { rider_location_setup: ['view', 'edit'] } : {}),
+    };
+  }
+  return {};
 }
 
 function apiBaseUrl(): string {
@@ -228,7 +252,8 @@ export async function loginAsDemoRole(role: Role): Promise<Session> {
     CONTENT_CREATOR: { id: 'demo-creator', name: 'Creator Demo', role: 'CONTENT_CREATOR' },
   };
 
-  return { token: `demo-token-${role.toLowerCase()}`, user: demoUsers[role] };
+  return { token: `demo-token-${role.toLowerCase()}`,
+    user: { ...demoUsers[role], abilities: demoAbilities(role) } };
 }
 
 /**

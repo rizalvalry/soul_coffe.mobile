@@ -21,7 +21,7 @@ import { useBadges } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
 import { attendanceTileSubtitle } from '@/features/showcase/attendanceTile';
 import { riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
-import { menuByRole, menuItemsWithScreens, type MenuItem } from '@/features/navigation/menu';
+import { menuForUser, menuItemsWithScreens, type MenuItem } from '@/features/navigation/menu';
 import { ROLES, roleMeta } from '@/domain/roles';
 import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
 
@@ -69,6 +69,7 @@ export default function MenuScreen() {
   const sitemap = useSitemap();
   const session = useAuth((s) => s.session);
   const signOut = useAuth((s) => s.signOut);
+  const refreshUser = useAuth((s) => s.refreshUser);
   const badges = useMenuBadges();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -77,14 +78,15 @@ export default function MenuScreen() {
   const attendance = useAttendanceStatus(user?.role === 'STAFF' || user?.role === 'BARISTA');
   const dayGate = user?.role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
   const gateMessage = riderGateMessage(dayGate);
-  const items = useMemo(() => (user ? menuItemsWithScreens(menuByRole[user.role], sitemap) : []), [user, sitemap]);
+  const items = useMemo(() => (user ? menuItemsWithScreens(menuForUser(user), sitemap) : []), [user, sitemap]);
 
   // Declared above the `!user` bail-out: a hook after an early return runs conditionally, which
   // is exactly the ordering violation React cannot recover from.
   const refreshAll = useCallback(() => {
     setRefreshing(true);
-    void queryClient.invalidateQueries().finally(() => setRefreshing(false));
-  }, [queryClient]);
+    void Promise.allSettled([refreshUser(), queryClient.invalidateQueries()])
+      .finally(() => setRefreshing(false));
+  }, [queryClient, refreshUser]);
 
   if (!user) return null;
 
@@ -144,7 +146,7 @@ export default function MenuScreen() {
               <Text variant="micro" color={brand[700]}>
                 ROLE {meta.priority} DARI {ROLES.length}
               </Text>
-              <Text variant="h2">{meta.label}</Text>
+              <Text variant="h2">{user.isSuperAdmin ? 'Super Administrator' : user.roleLabel ?? meta.label}</Text>
               <Text variant="caption" color={semantic.textMuted}>
                 {meta.description}
               </Text>
