@@ -20,6 +20,7 @@ import type { RefillStatus, Role } from '@/domain/types';
 export type RealtimeEvent = {
   event_id: string;
   type: string;
+  source_event_type?: string;
   refill_request_id: number | null;
   status: RefillStatus | 'ARRIVED' | 'DEPARTED' | null;
   title: string;
@@ -199,7 +200,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       if (session.user.role === 'STAFF' && ['SettlementRecorded', 'SettlementApproved', 'RiderClosingCorrected'].includes(event.type)) {
         void client.invalidateQueries({ queryKey: riderSettlementKey });
       }
-      if (event.type === 'RiderLocationSetupChanged' || event.type === 'RiderLocationSetupMissing') {
+      if (event.type === 'RiderLocationSetupChanged' || event.type === 'RiderLocationSetupMissing' ||
+        (event.type === 'AdministratorDataChanged' &&
+          (event.source_event_type === 'RiderLocationSetupChanged' || event.source_event_type === 'RiderLocationSetupMissing'))) {
         void client.invalidateQueries({ queryKey: riderSetupKeys.list });
         void client.invalidateQueries({ queryKey: showcaseKeys.staff });
         if (session.user.role === 'STAFF') {
@@ -220,11 +223,10 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       const isFinanceOrManagement = session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT';
       const existingEvent = ['CartClosedOut', 'CartCloseOutVarianceFlagged', 'SaleVoided', 'SaleFlaggedSuspect',
         'RiderClosingRecorded', 'RiderClosingCorrected', 'SettlementMethodVarianceFlagged',
-        'SettlementSelfApproved'].includes(event.type);
+        'SettlementSelfApproved', 'AdministratorDataChanged'].includes(event.type);
       const queueEvent = ['SaleRecorded', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
         'SettlementExpectedStale', 'SettlementVarianceFlagged'].includes(event.type);
-      if ((isFinanceOrManagement && (existingEvent || queueEvent)) ||
-        (session.user.role === 'ADMINISTRATOR' && existingEvent)) {
+      if ((isFinanceOrManagement || session.user.role === 'ADMINISTRATOR') && (existingEvent || queueEvent)) {
         invalidateSettlementData(client, event.cart_id);
       }
     };

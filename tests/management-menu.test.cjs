@@ -29,6 +29,22 @@ test('Management login role shows the Finance menu and its own label', () => {
   assert.equal(demo.USERS.find((user) => user.role === 'MANAGEMENT')?.password, '');
 });
 
+test('Administrator has every Management and Finance tile once, without attendance', () => {
+  const { menuByRole } = loadTypeScript('src/features/navigation/menu.ts');
+  const administratorRoutes = menuByRole.ADMINISTRATOR.map((item) => item.route);
+
+  for (const item of [...menuByRole.MANAGEMENT, ...menuByRole.FINANCE]) {
+    assert.ok(administratorRoutes.includes(item.route), item.route);
+  }
+  assert.equal(new Set(administratorRoutes).size, administratorRoutes.length);
+  assert.ok(!administratorRoutes.includes('/absen'));
+  assert.match(readFileSync(join(__dirname, '..', 'app', '(app)', 'management', 'rider-location-setup.tsx'), 'utf8'),
+    /role !== 'MANAGEMENT' && role !== 'ADMINISTRATOR'/);
+  const demoStore = readFileSync(join(__dirname, '..', 'src', 'features', 'demo', 'store.ts'), 'utf8');
+  assert.match(demoStore, /function canApprove[\s\S]*?actor\.role === 'ADMINISTRATOR'/);
+  assert.match(demoStore, /function canReject[\s\S]*?actor\.role === 'ADMINISTRATOR'/);
+});
+
 test('BARISTA keeps its role code and routes while showing Produksi', () => {
   const roles = loadTypeScript('src/domain/roles.ts');
   const navigation = loadTypeScript('src/features/navigation/menu.ts');

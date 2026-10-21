@@ -305,7 +305,7 @@ export function getBadges(actor: Actor): {
   const counts = { pendingApprovals: 0, incomingRequests: 0, readyToPick: 0, myRequests: 0 };
   const OPEN: RefillStatusValue[] = ['SUBMITTED', 'APPROVED', 'PREPARING', 'READY_TO_PICK', 'PICKED_UP'];
 
-  if (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT') {
+  if (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT' || actor.role === 'ADMINISTRATOR') {
     counts.pendingApprovals = state.refillRequests.filter((r) => r.status === 'SUBMITTED').length;
   } else if (actor.role === 'BARISTA') {
     counts.incomingRequests = state.refillRequests.filter(
@@ -343,11 +343,11 @@ function isVisibleTo(actor: Actor, refill: DemoRefillRequest): boolean {
 }
 
 function canApprove(actor: Actor, r: DemoRefillRequest): boolean {
-  return (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT') && r.status === 'SUBMITTED';
+  return (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT' || actor.role === 'ADMINISTRATOR') && r.status === 'SUBMITTED';
 }
 
 function canReject(actor: Actor, r: DemoRefillRequest): boolean {
-  return (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT') && r.status === 'SUBMITTED';
+  return (actor.role === 'FINANCE' || actor.role === 'MANAGEMENT' || actor.role === 'ADMINISTRATOR') && r.status === 'SUBMITTED';
 }
 
 function canCancel(actor: Actor, r: DemoRefillRequest): boolean {

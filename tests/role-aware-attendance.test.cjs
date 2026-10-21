@@ -59,8 +59,8 @@ function renderRequestDetail(role) {
   return { enabled, buttons: nodes.filter((node) => node.type === Button).map((node) => node.props.label), banners: nodes.filter((node) => node.type === Banner) };
 }
 
-test('Finance and Management request detail shows no attendance banner or button', () => {
-  for (const role of ['FINANCE', 'MANAGEMENT']) {
+test('Finance, Management and Administrator request detail shows no attendance banner or button', () => {
+  for (const role of ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR']) {
     const screen = renderRequestDetail(role);
     assert.deepEqual(screen.enabled, [false]);
     assert.deepEqual(screen.buttons, []);
