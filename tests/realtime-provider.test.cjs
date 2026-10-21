@@ -173,13 +173,14 @@ test('existing stock and sale events refresh their affected query families', () 
   }
 });
 
-test('Finance and Management refresh queue, list, and only the affected cart draft for settlement events', () => {
+test('Finance, Management, and Administrator refresh the same settlement queries for original events', () => {
   const types = ['SaleRecorded', 'SaleVoided', 'RiderClosingRecorded', 'RiderClosingCorrected',
     'CartCloseOutVarianceFlagged', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
     'SettlementExpectedStale', 'SettlementVarianceFlagged', 'SettlementMethodVarianceFlagged',
     'SettlementSelfApproved'];
-  for (const role of ['FINANCE', 'MANAGEMENT']) {
+  for (const role of ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR']) {
     const app = mountRealtimeProvider(() => false, role);
+    assert.ok(app.channelNames.includes(`role.${role}`));
     for (const type of types) {
       app.calls.length = 0;
       const event = { event_id: `${role}-${type}`, type, cart_id: 18, refill_request_id: null };
@@ -203,13 +204,27 @@ test('variance without cart context refreshes every draft, and other roles do no
   ]);
 
   const admin = mountRealtimeProvider(() => true, 'ADMINISTRATOR');
+  admin.channelCallbacks[1]({ event_id: 'admin-setup-change', type: 'RiderLocationSetupChanged', refill_request_id: null });
+  assert.ok(admin.calls.some((key) => Array.isArray(key) && key.join('/') === 'rider-location-setups'));
+  assert.equal(admin.refillInvalidations(), 1);
+  const beforeDuplicate = admin.calls.length;
+  admin.channelCallbacks[0]({ event_id: 'admin-setup-change', type: 'RiderLocationSetupChanged', refill_request_id: null });
+  assert.equal(admin.calls.length, beforeDuplicate);
+  admin.calls.length = 0;
   admin.channelCallbacks[0]({ event_id: 'admin-void', type: 'SaleVoided', cart_id: 18, refill_request_id: null });
   assert.deepEqual(admin.calls.map((key) => Array.from(key)), [
     ['settlements', 'queue'], ['settlements', 'list'], ['settlements', 'draft', 18],
   ]);
   admin.calls.length = 0;
   admin.channelCallbacks[0]({ event_id: 'admin-recorded', type: 'SaleRecorded', cart_id: 18, refill_request_id: null });
-  assert.equal(admin.calls.length, 0);
+  assert.deepEqual(admin.calls.map((key) => Array.from(key)), [
+    ['settlements', 'queue'], ['settlements', 'list'], ['settlements', 'draft', 18],
+  ]);
+  admin.calls.length = 0;
+  admin.channelCallbacks[0]({ event_id: 'admin-variance', type: 'SettlementVarianceFlagged', cart_id: 18, refill_request_id: null });
+  assert.deepEqual(admin.calls.map((key) => Array.from(key)), [
+    ['settlements', 'queue'], ['settlements', 'list'], ['settlements', 'draft', 18],
+  ]);
   for (const type of ['CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected',
     'SettlementMethodVarianceFlagged', 'SettlementSelfApproved']) {
     admin.calls.length = 0;

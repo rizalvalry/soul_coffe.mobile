@@ -367,6 +367,12 @@ menuByRole.MANAGEMENT = [
   },
 ];
 
+const administratorRoutes = new Set(menuByRole.ADMINISTRATOR.map((item) => item.route));
+menuByRole.ADMINISTRATOR = [
+  ...menuByRole.ADMINISTRATOR,
+  ...menuByRole.MANAGEMENT.filter((item) => !administratorRoutes.has(item.route)),
+];
+
 /** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */
 export function menuItemsWithScreens(items: MenuItem[], sitemap: SitemapType | null): MenuItem[] {
   if (!sitemap) return [];

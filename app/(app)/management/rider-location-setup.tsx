@@ -21,7 +21,7 @@ export default function RiderLocationSetupScreen() {
   const [basis, setBasis] = useState<'kitchen' | 'selling_location'>('kitchen');
   const [error, setError] = useState<string | null>(null);
 
-  if (role !== 'MANAGEMENT') return <Screen><EmptyState icon="lock-outline" title="Akses khusus Management" /></Screen>;
+  if (role !== 'MANAGEMENT' && role !== 'ADMINISTRATOR') return <Screen><EmptyState icon="lock-outline" title="Akses khusus Management" /></Screen>;
 
   const choose = (rider: RiderSetupRow) => {
     setSelected(rider);

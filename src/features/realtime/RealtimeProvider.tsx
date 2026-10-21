@@ -223,8 +223,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
         'SettlementSelfApproved'].includes(event.type);
       const queueEvent = ['SaleRecorded', 'CartArrivalChanged', 'SettlementRecorded', 'SettlementApproved',
         'SettlementExpectedStale', 'SettlementVarianceFlagged'].includes(event.type);
-      if ((isFinanceOrManagement && (existingEvent || queueEvent)) ||
-        (session.user.role === 'ADMINISTRATOR' && existingEvent)) {
+      if ((isFinanceOrManagement || session.user.role === 'ADMINISTRATOR') && (existingEvent || queueEvent)) {
         invalidateSettlementData(client, event.cart_id);
       }
     };
