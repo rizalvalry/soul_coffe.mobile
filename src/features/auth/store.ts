@@ -32,6 +32,7 @@ export type SignInOutcome =
   | { result: 'ok' }
   | { result: 'pin-required'; message: string }
   | { result: 'pin-not-set'; message: string }
+  | { result: 'device-pending' | 'device-rejected' | 'device-update-required'; message: string }
   | { result: 'failed'; message: string };
 
 type AuthState = {
@@ -282,6 +283,10 @@ export const useAuth = create<AuthState>((set) => ({
 
       return { result: 'ok' };
     } catch (e) {
+      if (e instanceof AuthError && (e.kind === 'device-pending' || e.kind === 'device-rejected' || e.kind === 'device-update-required')) {
+        set({ submitting: false, error: null });
+        return { result: e.kind, message: e.message };
+      }
       if (e instanceof AuthError && e.kind === 'pin-required') {
         // The password was CORRECT — this account just uses its PIN now. Remember that, so the
         // screen opens on the PIN pad next time rather than sending them down this path again.
@@ -325,6 +330,10 @@ export const useAuth = create<AuthState>((set) => ({
 
       return { result: 'ok' };
     } catch (e) {
+      if (e instanceof AuthError && (e.kind === 'device-pending' || e.kind === 'device-rejected' || e.kind === 'device-update-required')) {
+        set({ submitting: false, error: null });
+        return { result: e.kind, message: e.message };
+      }
       if (e instanceof AuthError && e.kind === 'pin-not-set') {
         // An administrator has reset this account. Clear the stale hint so the device stops
         // offering a PIN that no longer exists.

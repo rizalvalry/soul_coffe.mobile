@@ -25,6 +25,7 @@ test('/me today_cart overrides a stale login cart and null removes it', async ()
     '@/domain/roles': { isRole: (role) => role === 'STAFF' },
     '@/features/demo/config': { isDemoMode: () => false },
     '@/features/demo/store': {},
+    './device': { loginDeviceIdentity: () => ({}) },
   }, { fetch: async () => ({ ok: true, json: async () => ({ data: {
     id: 7, name: 'Rider', role: 'STAFF', cart_id: 1, cart_code: '0001', today_cart: todayCart,
   } }) }) });
@@ -45,6 +46,7 @@ test('/me maps Management status independently of Finance role', async () => {
     '@/domain/roles': { isRole: (role) => role === 'FINANCE' },
     '@/features/demo/config': { isDemoMode: () => false },
     '@/features/demo/store': {},
+    './device': { loginDeviceIdentity: () => ({}) },
   }, { fetch: async () => ({ ok: true, json: async () => ({ data: {
     id: 8, name: 'Finance', role: 'FINANCE', is_management: isManagement,
   } }) }) });
