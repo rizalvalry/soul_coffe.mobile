@@ -10,6 +10,7 @@ export type ClosingLine = {
   product_name: string;
   qty_in: number;
   qty_carry: number;
+  qty_office_sold: number;
   qty_remaining: number;
   qty_wasted: number;
   qty_sold: number;

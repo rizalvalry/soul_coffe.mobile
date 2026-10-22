@@ -66,7 +66,7 @@ export default function RiderClosingScreen() {
     if (!draft.data || formSignature === hydratedForm.current) return;
     hydratedForm.current = formSignature;
     setRemaining(Object.fromEntries(draft.data.lines.map((line) => [
-      line.product_id, String(draft.data?.closing_id ? line.qty_remaining : line.qty_in + line.qty_carry),
+      line.product_id, String(draft.data?.closing_id ? line.qty_remaining : line.qty_in + line.qty_carry - line.qty_office_sold),
     ])));
     setWasted(Object.fromEntries(draft.data.lines.map((line) => [line.product_id, String(line.qty_wasted)])));
     setQris(String(draft.data.qris_minor));
@@ -172,7 +172,7 @@ export default function RiderClosingScreen() {
         <>
           <Card style={styles.card}>
             <Text variant="bodyStrong">Coffee Bike {draft.data.cart_code}</Text>
-            <Text variant="caption" color={semantic.textMuted}>Stok masuk diambil dari Add Stock dan refill yang sudah diterima.</Text>
+            <Text variant="caption" color={semantic.textMuted}>Stok masuk diambil dari Add Stock, refill yang sudah diterima, dan koreksi penjualan kantor bila ada.</Text>
             {draft.data.carry_warning ? <Banner tone="warning" message="Ada sisa kemarin di Coffee Bike. Angkanya ikut dihitung dan Finance bisa lihat tandanya ya." /> : null}
             {!draft.data.can_correct ? <Banner tone="info" message="Setoran sudah di-approve Finance. Kalau ada koreksi, minta Finance bantu ya." /> : null}
           </Card>
@@ -189,6 +189,9 @@ export default function RiderClosingScreen() {
                     <Text variant="caption" color={semantic.textMuted}>
                       Stok masuk {line.qty_in} cups{line.qty_carry > 0 ? ' · Sisa kemarin ' + line.qty_carry : ''}
                     </Text>
+                    {line.qty_office_sold > 0 ? (
+                      <Text variant="caption" color={semantic.textMuted}>Dijual kantor {line.qty_office_sold} cups</Text>
+                    ) : null}
                   </View>
                 </View>
                 <Input label="Sisa cups" keyboardType="number-pad" value={remaining[line.product_id] ?? ''}
@@ -224,9 +227,10 @@ export default function RiderClosingScreen() {
                 <Text variant="caption" color={semantic.textMuted}>{commissionSummary(draft.data.commission).progress}</Text>
               ) : null}
               {draft.data.lines.map((line) => (
-                <Text key={line.product_id} variant="caption">
-                  {line.product_name}: {line.qty_sold} terjual · {rupiah(line.subtotal_minor)}
-                </Text>
+                <View key={line.product_id}>
+                  <Text variant="caption">{line.product_name}: {line.qty_sold} terjual · {rupiah(line.subtotal_minor)}</Text>
+                  {line.qty_office_sold > 0 ? <Text variant="caption">Dijual kantor {line.qty_office_sold} cups</Text> : null}
+                </View>
               ))}
               <Text variant="bodyStrong">Total {rupiah(draft.data.total_minor)} · Tunai {rupiah(draft.data.cash_minor)}</Text>
               {draft.data.can_correct ? <Button label="Ada pembeli lagi? Ubah sisa cups" variant="secondary" onPress={() => setShowCorrection(true)} /> : null}
