@@ -87,5 +87,10 @@ export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }
 
+export function accountRoleLabel(user: { role: Role; roleLabel?: string; isSuperAdmin?: boolean; isManagement?: boolean }): string {
+  const role = user.isSuperAdmin ? 'Super Administrator' : user.roleLabel ?? roleMeta[user.role].label;
+  return user.isManagement ? `${role} · Management` : role;
+}
+
 /** Roles sorted by business priority. */
 export const rolesByPriority = [...ROLES].sort((a, b) => roleMeta[a].priority - roleMeta[b].priority);

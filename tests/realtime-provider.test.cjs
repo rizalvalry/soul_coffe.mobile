@@ -5,7 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
+function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF', isManagement = role === 'MANAGEMENT') {
   const source = readFileSync(join(__dirname, '..', 'src/features/realtime/RealtimeProvider.tsx'), 'utf8');
   const javascript = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
@@ -25,7 +25,7 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   let refillInvalidations = 0;
   let cartRefreshes = 0;
   const client = { invalidateQueries: (filter) => { calls.push(filter?.queryKey ?? 'all'); return Promise.resolve(); } };
-  const session = { token: 'test-token', user: { id: '7', role, cartId: 1,
+  const session = { token: 'test-token', user: { id: '7', role, cartId: 1, isManagement,
     abilities: ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR'].includes(role) ? { settlements: ['view'] } : {} } };
   const react = {
     createContext: () => ({ Provider: () => null }),
@@ -112,6 +112,20 @@ test('old account channels are left and socket disconnected on sign-out', () => 
   app.channelCallbacks[0]({ event_id: 'late', type: 'SaleRecorded', refill_request_id: null });
   app.connectionCallbacks.get('connected')();
   assert.equal(app.calls.length, before);
+});
+
+test('leadership channel follows Management status independently of role', () => {
+  for (const role of ['FINANCE', 'ADMINISTRATOR', 'BARISTA']) {
+    const marked = mountRealtimeProvider(() => true, role, true);
+    assert.ok(marked.channelNames.includes('role.MANAGEMENT'));
+    assert.ok(marked.channelNames.includes(`role.${role}`));
+    assert.equal(marked.channelNames.filter((name) => name === 'role.MANAGEMENT').length, 1);
+    marked.cleanup();
+
+    const plain = mountRealtimeProvider(() => true, role, false);
+    assert.ok(!plain.channelNames.includes('role.MANAGEMENT'));
+    plain.cleanup();
+  }
 });
 
 test('push-first event still refreshes Absen and duplicate socket channels do not refetch again', () => {

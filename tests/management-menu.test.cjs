@@ -29,6 +29,14 @@ test('Management login role shows the Finance menu and its own label', () => {
   assert.equal(demo.USERS.find((user) => user.role === 'MANAGEMENT')?.password, '');
 });
 
+test('account label appends Management status without changing the operational role', () => {
+  const { accountRoleLabel } = loadTypeScript('src/domain/roles.ts');
+  assert.equal(accountRoleLabel({ role: 'BARISTA', isManagement: true }), 'Produksi · Management');
+  assert.equal(accountRoleLabel({ role: 'FINANCE', isManagement: true }), 'Finance · Management');
+  assert.equal(accountRoleLabel({ role: 'ADMINISTRATOR', isSuperAdmin: true, isManagement: true }), 'Super Administrator · Management');
+  assert.equal(accountRoleLabel({ role: 'FINANCE', isManagement: false }), 'Finance');
+});
+
 test('backoffice tiles follow account abilities without duplicates', () => {
   const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
   const production = menuForUser({ role: 'BARISTA', abilities: {

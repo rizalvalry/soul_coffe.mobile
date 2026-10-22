@@ -54,8 +54,11 @@ function channelsFor(
   kitchenId: number | null,
   cartId: number | null,
   canViewKitchen: boolean,
+  isManagement: boolean,
 ): string[] {
-  const channels = [`user.${userId}`, `role.${role}`];
+  const channels = [`user.${userId}`];
+  if (role !== 'MANAGEMENT') channels.push(`role.${role}`);
+  if (isManagement) channels.push('role.MANAGEMENT');
   if (canViewKitchen && kitchenId) channels.push(`kitchen.${kitchenId}`);
   if (role === 'STAFF' && cartId) channels.push(`cart.${cartId}`);
   return channels;
@@ -247,6 +250,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId,
       session.user.cartId ?? null,
       canUse(session.user, 'kitchen_operations'),
+      session.user.isManagement === true,
     );
 
     for (const name of names) {

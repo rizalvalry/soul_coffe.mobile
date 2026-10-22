@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/features/auth/store';
 import { AuthError, removeLoginPin, setLoginPin } from '@/features/auth/api';
 import { Banner } from '@/components/ui/Banner';
-import { roleMeta } from '@/domain/roles';
+import { accountRoleLabel, roleMeta } from '@/domain/roles';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 
 /**
@@ -208,7 +208,7 @@ export default function SettingsScreen() {
           <View style={styles.identityText}>
             <Text variant="bodyStrong">{user.name}</Text>
             <Text variant="caption" color={semantic.textMuted}>
-              {meta.label}
+              {accountRoleLabel(user)}
             </Text>
           </View>
         </View>
