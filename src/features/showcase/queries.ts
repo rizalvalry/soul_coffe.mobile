@@ -1,7 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { request, uuidv4 } from '@/lib/api';
+import { request } from '@/lib/api';
 import { toStockRow, type RawStockRow } from '@/lib/mappers';
 import { qk as refillKeys } from '@/features/refill/queries';
+import { useKitchenSelection } from '@/features/showcase/kitchenSelection';
+import { kitchenOperationKey } from '@/features/showcase/operationKey';
 import type {
   AttendanceRow,
   AttendanceStatus,
@@ -11,6 +13,7 @@ import type {
   HandoverResult,
   Product,
   StaffPickerRow,
+  Allocation,
 } from '@/domain/types';
 
 /**
@@ -58,21 +61,23 @@ async function unitLookup(client: QueryClient): Promise<(productId: number) => s
  * own assignment.
  */
 export function useCarts() {
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: showcaseKeys.carts,
-    queryFn: () => request<Cart[]>('/carts'),
-    staleTime: 5 * 60_000, // master data
+    queryKey: [...showcaseKeys.carts, kitchenId],
+    queryFn: () => request<Cart[]>('/carts?scope=kitchen', { kitchen: true }),
+    staleTime: 0, // today's assignment can move a cart between kitchen pickers
   });
 }
 
 /** Cups sitting in the showcase right now. */
 export function useShowcaseStock() {
   const client = useQueryClient();
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: showcaseKeys.stock,
+    queryKey: [...showcaseKeys.stock, kitchenId],
     queryFn: async (): Promise<CartStockRow[]> => {
       const [rows, unitOf] = await Promise.all([
-        request<RawStockRow[]>('/showcase/stock'),
+        request<RawStockRow[]>('/showcase/stock', { kitchen: true }),
         unitLookup(client),
       ]);
       return rows.map((row) => toStockRow(row, unitOf));
@@ -90,7 +95,7 @@ export function useShowcaseStock() {
 export function useShowcaseStaff() {
   return useQuery({
     queryKey: showcaseKeys.staff,
-    queryFn: () => request<StaffPickerRow[]>('/showcase/staff'),
+    queryFn: () => request<StaffPickerRow[]>('/showcase/staff', { kitchen: true }),
     staleTime: 60_000,
   });
 }
@@ -99,7 +104,7 @@ export function useShowcaseStaff() {
 export function useCartAllowance(cartId: number | null) {
   return useQuery({
     queryKey: showcaseKeys.allowance(cartId ?? 0),
-    queryFn: () => request<DailyAllowance>(`/showcase/allowance/${cartId}`),
+    queryFn: () => request<DailyAllowance>(`/showcase/allowance/${cartId}`, { kitchen: true }),
     enabled: typeof cartId === 'number' && cartId > 0,
   });
 }
@@ -113,7 +118,7 @@ export function useCartAllowance(cartId: number | null) {
 export function useAttendanceStatus(enabled = true) {
   return useQuery({
     queryKey: showcaseKeys.absenStatus,
-    queryFn: () => request<AttendanceStatus>('/absen/status'),
+    queryFn: () => request<AttendanceStatus>('/absen/status', { kitchen: true }),
     enabled,
   });
 }
@@ -121,7 +126,7 @@ export function useAttendanceStatus(enabled = true) {
 export function useAttendanceRoll(date?: string) {
   return useQuery({
     queryKey: showcaseKeys.absenRoll(date),
-    queryFn: () => request<AttendanceRow[]>(`/absen${date ? `?date=${date}` : ''}`),
+    queryFn: () => request<AttendanceRow[]>(`/absen${date ? `?date=${date}` : ''}`, { kitchen: true }),
   });
 }
 
@@ -133,13 +138,19 @@ export type BrewInput = { lines: { product_id: number; qty: number }[] };
 export function useBrewIntoShowcase() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: BrewInput) =>
-      request<RawStockRow[]>('/showcase/brew', {
+    mutationFn: async (input: BrewInput) => {
+      const body = { lines: input.lines.filter((line) => line.qty > 0) };
+      const operation = await kitchenOperationKey('brew', body);
+      const result = await request<RawStockRow[]>('/showcase/brew', {
+        kitchen: true,
         method: 'POST',
         // R12 — a retried tap in a kitchen must not brew the same cups twice.
-        idempotencyKey: uuidv4(),
-        body: { lines: input.lines.filter((line) => line.qty > 0) },
-      }),
+        idempotencyKey: operation.key,
+        body,
+      });
+      void operation.clear().catch(() => {});
+      return result;
+    },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: showcaseKeys.stock });
       // The kitchen stock screen reads the same ledger rows under a different key.
@@ -165,24 +176,30 @@ export type HandoverInput = {
 export function useHandToCart() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: HandoverInput) =>
-      request<HandoverResult>('/showcase/hand-to-cart', {
+    mutationFn: async (input: HandoverInput) => {
+      const body = {
+        cart_id: input.cartId, staff_id: input.staffId,
+        lines: input.lines.filter((line) => line.qty > 0),
+        ...(input.allowanceAmount !== undefined ? { allowance_amount: input.allowanceAmount } : {}),
+        ...(input.locationId !== undefined ? { location_id: input.locationId } : {}),
+      };
+      const operation = await kitchenOperationKey('hand-to-cart', body);
+      const result = await request<HandoverResult>('/showcase/hand-to-cart', {
+        kitchen: true,
         method: 'POST',
-        idempotencyKey: uuidv4(),
-        body: {
-          cart_id: input.cartId,
-          staff_id: input.staffId,
-          lines: input.lines.filter((line) => line.qty > 0),
-          ...(input.allowanceAmount !== undefined ? { allowance_amount: input.allowanceAmount } : {}),
-          ...(input.locationId !== undefined ? { location_id: input.locationId } : {}),
-        },
-      }),
+        idempotencyKey: operation.key,
+        body,
+      });
+      void operation.clear().catch(() => {});
+      return result;
+    },
     onSuccess: (result) => {
       void client.invalidateQueries({ queryKey: showcaseKeys.stock });
       void client.invalidateQueries({ queryKey: refillKeys.kitchenStock });
       void client.invalidateQueries({ queryKey: showcaseKeys.allowance(result.cart_id) });
       // A handover creates today's assignment, so the roster the other screens read changed too.
       void client.invalidateQueries({ queryKey: showcaseKeys.staff });
+      void client.invalidateQueries({ queryKey: showcaseKeys.carts });
       void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
     },
   });
@@ -205,7 +222,7 @@ export type CloseOutDraft = {
 export function useCloseOutDraft(cartId: number | null) {
   return useQuery({
     queryKey: ['showcase', 'close-out', 'draft', cartId] as const,
-    queryFn: () => request<CloseOutDraft>('/showcase/close-out/draft/' + cartId),
+    queryFn: () => request<CloseOutDraft>('/showcase/close-out/draft/' + cartId, { kitchen: true }),
     enabled: cartId !== null,
     staleTime: 0,
   });
@@ -214,19 +231,25 @@ export function useCloseOutDraft(cartId: number | null) {
 export function useCloseOutCart() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (input: CloseOutInput) =>
-      request<{ cart_id: number; cart_code: string; cart_stock: RawStockRow[]; showcase_stock: RawStockRow[] }>(
+    mutationFn: async (input: CloseOutInput) => {
+      const body = {
+        cart_id: input.cartId,
+        returned: input.returned.filter((line) => line.qty > 0),
+        rejected: input.rejected.filter((line) => line.qty > 0),
+      };
+      const operation = await kitchenOperationKey('close-out', body);
+      const result = await request<{ cart_id: number; cart_code: string; cart_stock: RawStockRow[]; showcase_stock: RawStockRow[] }>(
         '/showcase/close-out',
         {
+          kitchen: true,
           method: 'POST',
-          idempotencyKey: uuidv4(),
-          body: {
-            cart_id: input.cartId,
-            returned: input.returned.filter((line) => line.qty > 0),
-            rejected: input.rejected.filter((line) => line.qty > 0),
-          },
+          idempotencyKey: operation.key,
+          body,
         },
-      ),
+      );
+      void operation.clear().catch(() => {});
+      return result;
+    },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: showcaseKeys.stock });
       void client.invalidateQueries({ queryKey: refillKeys.kitchenStock });
@@ -265,10 +288,46 @@ export function useOpenStaffAbsen() {
   return useMutation({
     mutationFn: () =>
       request<{ operating_date: string; opened_by: number; opened_at: string }>('/absen/open', {
+        kitchen: true,
         method: 'POST',
       }),
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: showcaseKeys.absenStatus });
+    },
+  });
+}
+
+export type AllocationInput = {
+  operatingDate: string;
+  cartId: number;
+  staffId: number;
+  locationId: number;
+  lines: { product_id: number; qty_issued: number }[];
+  correctionReason?: string;
+};
+
+export function useCreateAllocation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AllocationInput) => {
+      const body = {
+        operating_date: input.operatingDate,
+        cart_id: input.cartId, staff_id: input.staffId, location_id: input.locationId,
+        lines: input.lines,
+        ...(input.correctionReason ? { correction_reason: input.correctionReason } : {}),
+      };
+      const operation = await kitchenOperationKey('allocation', body);
+      const result = await request<Allocation>('/allocations', {
+      method: 'POST', kitchen: true, idempotencyKey: operation.key,
+      body,
+      });
+      void operation.clear().catch(() => {});
+      return result;
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
+      void client.invalidateQueries({ queryKey: showcaseKeys.stock });
+      void client.invalidateQueries({ queryKey: refillKeys.kitchenStock });
     },
   });
 }

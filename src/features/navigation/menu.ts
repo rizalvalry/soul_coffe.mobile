@@ -151,6 +151,22 @@ const roleMenus: Record<Role, MenuItem[]> = {
   BARISTA: [
     // First and primary, per the brief: the "+" the barista reaches for every morning.
     {
+      id: 'barista-brew',
+      label: 'Brew',
+      sublabel: 'Seduh kopi ke stok dapur',
+      icon: 'coffee-maker-outline',
+      route: '/barista/brew',
+      requirement: 'Produksi ke stok dapur',
+    },
+    {
+      id: 'barista-allocations',
+      label: 'Alokasi Tambahan',
+      sublabel: 'Tambahkan stok ke Coffee Bike yang sudah bertugas',
+      icon: 'package-variant-plus',
+      route: '/barista/allocations',
+      requirement: 'Flow A — alokasi tambahan',
+    },
+    {
       id: 'barista-add-stock',
       label: 'Add Stock',
       sublabel: 'Pindahkan cups showcase → Coffee Bike + uang harian',
@@ -397,7 +413,11 @@ export function canUse(user: AccessUser, module: string, ability: string = 'view
 
 /** Field flow remains role based; back office routes come from the effective server grants. */
 export function menuForUser(user: AccessUser): MenuItem[] {
-  const ownFlow = menuByRole[user.role].filter((item) => !BACK_OFFICE[item.route]);
+  const baristaReadRoutes = new Set(['/barista/stock', '/barista/requests', '/barista/history']);
+  const ownFlow = menuByRole[user.role].filter((item) => !BACK_OFFICE[item.route]
+    && (user.role !== 'BARISTA' || !item.route.startsWith('/barista/')
+      || (canUse(user, 'kitchen_operations', 'view')
+        && (baristaReadRoutes.has(item.route) || canUse(user, 'kitchen_operations', 'edit')))));
   const seen = new Set(ownFlow.map((item) => item.route));
   const granted: MenuItem[] = [];
   for (const item of [...menuByRole.FINANCE, ...menuByRole.MANAGEMENT, ...menuByRole.ADMINISTRATOR]) {
@@ -406,7 +426,12 @@ export function menuForUser(user: AccessUser): MenuItem[] {
     seen.add(item.route);
     granted.push(item);
   }
-  return [...ownFlow, ...granted];
+  const kitchenTile: MenuItem[] = user.role !== 'BARISTA'
+    && canUse(user, 'kitchen_operations', 'view') && canUse(user, 'kitchen_operations', 'edit')
+    ? [{ id: 'kitchen-operations', label: 'Produksi', sublabel: 'Pilih dapur dan jalankan alur Produksi',
+      icon: 'coffee-maker-outline', route: '/barista', requirement: 'T-058', primary: true }]
+    : [];
+  return [...ownFlow, ...kitchenTile, ...granted];
 }
 
 /** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */

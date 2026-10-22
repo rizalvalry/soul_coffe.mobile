@@ -94,7 +94,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
 }
 
 export default function BaristaPreparingScreen() {
-  const refillsQuery = useRefills('PREPARING');
+  const refillsQuery = useRefills('PREPARING', true);
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>

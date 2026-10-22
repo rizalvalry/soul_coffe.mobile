@@ -32,7 +32,7 @@ test('Management login role shows the Finance menu and its own label', () => {
 test('backoffice tiles follow account abilities without duplicates', () => {
   const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
   const production = menuForUser({ role: 'BARISTA', abilities: {
-    rider_location_setup: ['view', 'edit'], settlements: ['view'],
+    rider_location_setup: ['view', 'edit'], settlements: ['view'], kitchen_operations: ['view', 'edit'],
   } });
   assert.ok(production.some((item) => item.route === '/barista/add-stock'));
   assert.ok(production.some((item) => item.route === '/management/rider-location-setup'));
@@ -42,6 +42,30 @@ test('backoffice tiles follow account abilities without duplicates', () => {
   const finance = menuForUser({ role: 'FINANCE', abilities: { settlements: ['view'] } });
   assert.ok(finance.some((item) => item.route === '/finance/settlements'));
   assert.ok(!finance.some((item) => item.route === '/finance/clearing'));
+});
+
+test('Produksi tile follows kitchen operation grants without duplicating Finance', () => {
+  const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
+  const finance = menuForUser({ role: 'FINANCE', abilities: {
+    kitchen_operations: ['view', 'edit'], refill_approval: ['edit'],
+  } });
+  assert.equal(finance.filter((item) => item.route === '/barista').length, 1);
+  assert.equal(finance.filter((item) => item.route === '/finance/approvals').length, 1);
+  assert.ok(!menuForUser({ role: 'FINANCE', abilities: {} }).some((item) => item.route === '/barista'));
+  assert.ok(!menuForUser({ role: 'FINANCE', abilities: { kitchen_operations: ['edit'] } })
+    .some((item) => item.route === '/barista'));
+  assert.ok(!menuForUser({ role: 'STAFF', abilities: {} }).some((item) => item.route === '/barista'));
+});
+
+test('revoking kitchen operations keeps Produksi shared routes available', () => {
+  const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
+  const routes = menuForUser({ role: 'BARISTA', abilities: { kitchen_operations: [] } })
+    .map((item) => item.route);
+  assert.ok(routes.includes('/news'));
+  assert.ok(routes.includes('/settings'));
+  assert.ok(routes.includes('/absen'));
+  assert.ok(!routes.includes('/barista/brew'));
+  assert.ok(!routes.includes('/barista/stock'));
 });
 
 test('Administrator has every Management and Finance tile once, without attendance', () => {

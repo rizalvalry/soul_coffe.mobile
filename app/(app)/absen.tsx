@@ -58,9 +58,11 @@ function metresBetween(a: { lat: number; lng: number }, b: { lat: number; lng: n
 
 export default function AbsenScreen() {
   const router = useRouter();
-  const role = useAuth((s) => s.session?.user.role);
+  const user = useAuth((s) => s.session?.user);
+  const role = user?.role;
   const canAttend = role === 'BARISTA' || role === 'STAFF';
-  const statusQuery = useAttendanceStatus(canAttend);
+  const canOpenKitchen = user?.isSuperAdmin === true || user?.abilities?.['kitchen_operations']?.includes('edit') === true;
+  const statusQuery = useAttendanceStatus(canAttend || canOpenKitchen);
   const rollQuery = useAttendanceRoll();
   const clockIn = useClockIn();
   const openStaffAbsen = useOpenStaffAbsen();
@@ -133,7 +135,7 @@ export default function AbsenScreen() {
     }
   };
 
-  if (!canAttend) {
+  if (!canAttend && !canOpenKitchen) {
     return (
       <Screen refreshing={rollQuery.isRefetching} onRefresh={() => void rollQuery.refetch()}>
         <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
@@ -199,6 +201,7 @@ export default function AbsenScreen() {
 
       {/* The one big button. */}
       <Card style={styles.card}>
+        {canAttend ? (
         <View style={styles.hero}>
           <View
             style={[
@@ -229,6 +232,7 @@ export default function AbsenScreen() {
             </>
           )}
         </View>
+        ) : null}
 
         {banner ? <Banner tone="danger" message={banner} /> : null}
 
@@ -237,7 +241,7 @@ export default function AbsenScreen() {
           Rendered only when something is actually enforced: a kitchen with no pin, an exempt
           cart, or the rule switched off all mean there is nothing here worth saying.
         */}
-        {!status.has_clocked_in && geofence?.enforced ? (
+        {canAttend && !status.has_clocked_in && geofence?.enforced ? (
           <View style={styles.geoBlock}>
             <View style={styles.geoRow}>
               <MaterialCommunityIcons
@@ -275,11 +279,11 @@ export default function AbsenScreen() {
 
         {/* An exemption is worth showing: it explains why this phone's rule differs from a
             colleague's, and it is the answer to "kenapa saya bisa absen dari sini?". */}
-        {!status.has_clocked_in && geofence?.basis === 'exempt' && geofence.exemption_reason ? (
+        {canAttend && !status.has_clocked_in && geofence?.basis === 'exempt' && geofence.exemption_reason ? (
           <Banner tone="info" message={`Izin absen luar lokasi berlaku: ${geofence.exemption_reason}`} />
         ) : null}
 
-        {!status.has_clocked_in ? (
+        {canAttend && !status.has_clocked_in ? (
           <Button
             label="Absen Sekarang"
             icon="fingerprint"
@@ -322,7 +326,7 @@ export default function AbsenScreen() {
           </Animated.View>
         ) : null}
 
-        {role === 'BARISTA' && status.staff_window_open ? (
+        {canOpenKitchen && status.staff_window_open ? (
           <Banner tone="success" message="Absen rider sudah dibuka untuk hari ini." />
         ) : null}
       </Card>

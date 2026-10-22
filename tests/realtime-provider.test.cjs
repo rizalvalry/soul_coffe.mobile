@@ -59,7 +59,11 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
       invalidateRefillData: () => { refillInvalidations++; },
       qk: { myStock: ['me', 'stock'], kitchenStock: ['kitchen', 'stock'], allocationsToday: ['allocations', 'today'] },
     },
-    '@/features/showcase/queries': { showcaseKeys: { absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'], staff: ['showcase', 'staff'] } },
+    '@/features/showcase/queries': { showcaseKeys: { absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'],
+      staff: ['showcase', 'staff'], carts: ['carts'] } },
+    '@/features/showcase/kitchenSelection': { useKitchenSelection: (selector) => selector({
+      kitchenId: null, load: async () => {},
+    }) },
     '@/features/settlements/queries': { invalidateSettlementData: (queryClient, cartId) => {
       queryClient.invalidateQueries({ queryKey: ['settlements', 'queue'] });
       queryClient.invalidateQueries({ queryKey: ['settlements', 'list'] });
@@ -172,7 +176,7 @@ test('existing stock and sale events refresh their affected query families', () 
   const app = mountRealtimeProvider(() => true, 'FINANCE');
   const cases = [
     ['ShowcaseBrewed', ['showcase/stock', 'me/stock', 'kitchen/stock']],
-    ['CartStockHandedOver', ['showcase/stock', 'showcase/staff', 'showcase/allowance', 'allocations/today']],
+    ['CartStockHandedOver', ['showcase/stock', 'showcase/staff', 'carts', 'showcase/allowance', 'allocations/today']],
     ['CartClosedOut', ['showcase/stock', 'settlements/queue', 'settlements/list', 'settlements/draft']],
     ['CartCloseOutVarianceFlagged', ['settlements/queue', 'settlements/list', 'settlements/draft']],
     ['SaleVoided', ['settlements/queue', 'settlements/list', 'settlements/draft']],

@@ -45,6 +45,7 @@ function renderRiderForm(path, useAuth, offlineEntries = {}) {
     '@expo/vector-icons/MaterialCommunityIcons': 'Icon',
     'react-native-reanimated': { View: 'AnimatedView' },
     '@/features/auth/store': { useAuth },
+    '@/features/showcase/kitchenSelection': { useKitchenSelection: { getState: () => ({ kitchenId: null }) } },
     '@/features/refill/queries': {
       useProducts: () => query, useMyStock: () => query,
       useSubmitRefill: () => query, useUploadEvidence: () => query,
@@ -275,8 +276,11 @@ test('login before Add Stock then assignment event and foreground refresh Rider 
       myStock: ['me', 'stock'], kitchenStock: ['kitchen', 'stock'], allocationsToday: ['allocations', 'today'],
     } },
     '@/features/showcase/queries': { showcaseKeys: {
-      absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'], staff: ['showcase', 'staff'],
+      absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'], staff: ['showcase', 'staff'], carts: ['carts'],
     } },
+    '@/features/showcase/kitchenSelection': { useKitchenSelection: (selector) => selector({
+      kitchenId: null, load: async () => {},
+    }) },
     '@/features/settlements/queries': { invalidateSettlementData() {} },
     '@/features/settlements/rider': { riderSettlementKey: ['me', 'settlement'] },
     '@/features/riderLocation/queries': { riderSetupKeys: { list: ['rider-location-setups'] } },
@@ -352,6 +356,7 @@ function loadApi(useAuth, fetch) {
     'expo-constants': { expoConfig: { extra: { apiBaseUrl: 'http://localhost/api/v1' } } },
     'expo-file-system': {},
     '@/features/auth/store': { useAuth },
+    '@/features/showcase/kitchenSelection': { useKitchenSelection: { getState: () => ({ kitchenId: null }) } },
     '@/features/demo/config': { isDemoMode: () => false },
     '@/features/demo/router': {},
     '@/features/demo/store': { DemoError: class DemoError extends Error {} },
