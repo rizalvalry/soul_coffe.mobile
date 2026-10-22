@@ -4,7 +4,7 @@ import type { ClosingDraft } from './queries';
 export function closingFormSignature(draft: ClosingDraft): string {
   return JSON.stringify([
     draft.cart_id, draft.operating_date, draft.closing_id,
-    draft.lines.map((line) => [line.product_id, line.qty_in, line.qty_carry,
+    draft.lines.map((line) => [line.product_id, line.qty_in, line.qty_carry, line.qty_office_sold,
       line.qty_remaining, line.qty_wasted]),
     draft.qris_minor, draft.transfer_minor,
   ]);

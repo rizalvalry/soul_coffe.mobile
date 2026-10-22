@@ -16,7 +16,7 @@ const { closingTotals } = moduleState.exports;
 
 test('closing calculates handover plus refill and carry, less remaining and waste', () => {
   const result = closingTotals(
-    [{ product_id: 1, qty_in: 25, qty_carry: 2, unit_price_minor: 20000 }],
+    [{ product_id: 1, qty_in: 25, qty_carry: 2, qty_office_sold: 0, unit_price_minor: 20000 }],
     { 1: 3 }, { 1: 2 }, 100000, 20000,
   );
   assert.equal(result.valid, true);
@@ -26,9 +26,25 @@ test('closing calculates handover plus refill and carry, less remaining and wast
 });
 
 test('closing rejects negative sold and noncash above sale total', () => {
-  const lines = [{ product_id: 1, qty_in: 10, qty_carry: 0, unit_price_minor: 20000 }];
+  const lines = [{ product_id: 1, qty_in: 10, qty_carry: 0, qty_office_sold: 0, unit_price_minor: 20000 }];
   assert.equal(closingTotals(lines, { 1: 9 }, { 1: 2 }, 0, 0).valid, false);
   assert.equal(closingTotals(lines, { 1: 5 }, { 1: 0 }, 100001, 0).valid, false);
+});
+
+test('Closing excludes office cups from Rider total and only shows the office row when sold', () => {
+  const result = closingTotals(
+    [{ product_id: 1, qty_in: 10, qty_carry: 0, qty_office_sold: 2, unit_price_minor: 20000 }],
+    { 1: 3 }, { 1: 0 }, 0, 0,
+  );
+  assert.equal(result.valid, true);
+  assert.equal(result.soldByProduct[1], 5);
+  assert.equal(result.cash, 100000);
+  assert.equal(closingTotals(
+    [{ product_id: 1, qty_in: 10, qty_carry: 0, qty_office_sold: 2, unit_price_minor: 20000 }],
+    { 1: 9 }, { 1: 0 }, 0, 0,
+  ).valid, false);
+  const screen = source('app/(app)/staff/closing.tsx');
+  assert.match(screen, /line\.qty_office_sold > 0 \?[^]*Dijual kantor/);
 });
 
 test('Closing shows saved commission and progress from the server response', () => {
