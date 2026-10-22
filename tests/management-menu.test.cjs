@@ -65,6 +65,24 @@ test('Produksi tile follows kitchen operation grants without duplicating Finance
   assert.ok(!menuForUser({ role: 'STAFF', abilities: {} }).some((item) => item.route === '/barista'));
 });
 
+test('Tutup Coffee Bike follows its own effective grant for Runner, Finance, and Produksi', () => {
+  const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
+  const route = '/kitchen/close-out';
+  const runner = menuForUser({ role: 'RIDER', abilities: { cart_close_out: ['view', 'edit'] } });
+  assert.equal(runner.filter((item) => item.route === route).length, 1);
+  assert.equal(runner.find((item) => item.route === route)?.primary, true);
+  assert.ok(!runner.some((item) => item.route === '/barista'));
+  assert.ok(!menuForUser({ role: 'RIDER', abilities: {} }).some((item) => item.route === route));
+  assert.ok(!menuForUser({ role: 'RIDER', abilities: { cart_close_out: ['view'] } })
+    .some((item) => item.route === route));
+  assert.ok(menuForUser({ role: 'FINANCE', abilities: { cart_close_out: ['view', 'edit'] } })
+    .some((item) => item.route === route));
+  assert.ok(!menuForUser({ role: 'BARISTA', abilities: { kitchen_operations: ['view', 'edit'] } })
+    .some((item) => item.route === route));
+  assert.ok(menuForUser({ role: 'BARISTA', abilities: { cart_close_out: ['view', 'edit'] } })
+    .some((item) => item.route === route));
+});
+
 test('revoking kitchen operations keeps Produksi shared routes available', () => {
   const { menuForUser } = loadTypeScript('src/features/navigation/menu.ts');
   const routes = menuForUser({ role: 'BARISTA', abilities: { kitchen_operations: [] } })

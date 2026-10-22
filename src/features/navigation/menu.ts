@@ -184,14 +184,6 @@ const roleMenus: Record<Role, MenuItem[]> = {
       requirement: 'Absen — Produksi membuka akses rider',
     },
     {
-      id: 'barista-close-out',
-      label: 'Tutup Coffee Bike',
-      sublabel: 'Sisa cups: masuk showcase atau reject',
-      icon: 'clipboard-check-outline',
-      route: '/barista/close-out',
-      requirement: 'Showcase — rekonsiliasi sisa',
-    },
-    {
       id: 'barista-requests',
       label: 'Permintaan Refill',
       sublabel: 'Masuk dari rider — perlu approval Finance',
@@ -431,7 +423,13 @@ export function menuForUser(user: AccessUser): MenuItem[] {
     ? [{ id: 'kitchen-operations', label: 'Produksi', sublabel: 'Pilih dapur dan jalankan alur Produksi',
       icon: 'coffee-maker-outline', route: '/barista', requirement: 'T-058', primary: true }]
     : [];
-  return [...ownFlow, ...kitchenTile, ...granted];
+  const closeOutTile: MenuItem[] = canUse(user, 'cart_close_out', 'view')
+    && canUse(user, 'cart_close_out', 'edit')
+    ? [{ id: 'cart-close-out', label: 'Tutup Coffee Bike', sublabel: 'Hitung sisa cups dan reject di dapur',
+      icon: 'clipboard-check-outline', route: '/kitchen/close-out', requirement: 'T-071',
+      primary: user.role === 'RIDER' }]
+    : [];
+  return [...closeOutTile, ...ownFlow, ...kitchenTile, ...granted];
 }
 
 /** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */

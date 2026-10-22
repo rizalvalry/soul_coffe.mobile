@@ -20,7 +20,6 @@ const actions: { label: string; route: Href }[] = [
   { label: 'Alokasi Tambahan', route: '/barista/allocations' },
   { label: 'Permintaan Refill', route: '/barista/requests' },
   { label: 'Siapkan Pesanan', route: '/barista/preparing' },
-  { label: 'Tutup Coffee Bike', route: '/barista/close-out' },
   { label: 'Stok Dapur', route: '/barista/stock' },
 ];
 

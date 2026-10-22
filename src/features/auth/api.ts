@@ -136,10 +136,12 @@ function demoAbilities(role: Role): Record<string, string[]> {
       refill_approval: ['view', 'edit'],
       settlements: ['view', 'edit'],
       clearing: ['view', 'edit'],
+      cart_close_out: ['view', 'edit'],
       ...(role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
         ? { rider_location_setup: ['view', 'edit'] } : {}),
     };
   }
+  if (role === 'RIDER') return { cart_close_out: ['view', 'edit'] };
   return {};
 }
 

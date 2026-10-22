@@ -60,12 +60,13 @@ async function unitLookup(client: QueryClient): Promise<(productId: number) => s
  * pick a cart from the app before, because every earlier screen inferred it from the caller's
  * own assignment.
  */
-export function useCarts() {
+export function useCarts(enabled = true, scope: 'kitchen' | 'close-out' = 'kitchen') {
   const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: [...showcaseKeys.carts, kitchenId],
-    queryFn: () => request<Cart[]>('/carts?scope=kitchen', { kitchen: true }),
+    queryKey: [...showcaseKeys.carts, scope, kitchenId],
+    queryFn: () => request<Cart[]>(`/carts?scope=${scope}`, { kitchen: true }),
     staleTime: 0, // today's assignment can move a cart between kitchen pickers
+    enabled,
   });
 }
 
@@ -220,8 +221,9 @@ export type CloseOutDraft = {
 };
 
 export function useCloseOutDraft(cartId: number | null) {
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: ['showcase', 'close-out', 'draft', cartId] as const,
+    queryKey: ['showcase', 'close-out', 'draft', cartId, kitchenId] as const,
     queryFn: () => request<CloseOutDraft>('/showcase/close-out/draft/' + cartId, { kitchen: true }),
     enabled: cartId !== null,
     staleTime: 0,
@@ -232,6 +234,7 @@ export function useCloseOutCart() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (input: CloseOutInput) => {
+      const kitchenId = useKitchenSelection.getState().kitchenId;
       const body = {
         cart_id: input.cartId,
         returned: input.returned.filter((line) => line.qty > 0),
@@ -242,6 +245,7 @@ export function useCloseOutCart() {
         '/showcase/close-out',
         {
           kitchen: true,
+          kitchenId: kitchenId ?? undefined,
           method: 'POST',
           idempotencyKey: operation.key,
           body,

@@ -71,8 +71,10 @@ type RequestOptions = {
   signal?: AbortSignal;
   /** The departing session's token for cleanup after local auth state has been cleared. */
   authToken?: string;
-  /** Attach the selected Dapur Pusat to a Produksi request for accounts without a bound kitchen. */
+  /** Attach the selected Dapur Pusat to a kitchen request for accounts without a bound kitchen. */
   kitchen?: boolean;
+  /** Freeze a kitchen selected when an idempotent mutation began. */
+  kitchenId?: number;
 };
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -169,8 +171,10 @@ export async function requestWithStatus<T>(path: string, options: RequestOptions
   let { body } = options;
   const kitchenUser = useAuth.getState().session?.user;
   if (options.kitchen && kitchenUser?.role !== 'BARISTA' &&
-      (kitchenUser?.isSuperAdmin || kitchenUser?.abilities?.['kitchen_operations']?.includes('view'))) {
-    const kitchenId = useKitchenSelection.getState().kitchenId;
+      (kitchenUser?.isSuperAdmin || kitchenUser?.abilities?.['kitchen_operations']?.includes('view')
+        || kitchenUser?.abilities?.['cart_close_out']?.includes('view')
+        || kitchenUser?.abilities?.['cart_close_out']?.includes('edit'))) {
+    const kitchenId = options.kitchenId ?? useKitchenSelection.getState().kitchenId;
     if (!kitchenId) throw new ApiError('Pilih Dapur Pusat dulu ya.', 422);
     if (method === 'GET') {
       path += `${path.includes('?') ? '&' : '?'}kitchen_id=${kitchenId}`;
