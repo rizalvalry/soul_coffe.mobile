@@ -8,9 +8,10 @@ import { Input } from '@/components/ui/Input';
 import { QtyStepper } from '@/components/ui/QtyStepper';
 import { Banner } from '@/components/ui/Banner';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
-import { useProducts, useStaffOnShift } from '@/features/refill/queries';
+import { useKitchenStock, useProducts, useStaffOnShift } from '@/features/refill/queries';
 import { useLocations } from '@/features/riderLocation/queries';
 import { useCreateAllocation } from '@/features/showcase/queries';
+import { MAX_PRODUCTION_QTY } from '@/features/showcase/quantity';
 import { ApiError } from '@/lib/api';
 import { space } from '@/theme';
 
@@ -22,6 +23,7 @@ function todayLocal(): string {
 export default function AllocationsScreen() {
   const roster = useStaffOnShift();
   const products = useProducts();
+  const kitchenStock = useKitchenStock();
   const locations = useLocations();
   const create = useCreateAllocation();
   const [staffId, setStaffId] = useState<number | null>(null);
@@ -29,6 +31,16 @@ export default function AllocationsScreen() {
   const [qty, setQty] = useState<Record<number, number>>({});
   const [reason, setReason] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const maxForProduct = (productId: number) => kitchenStock.data === undefined ? MAX_PRODUCTION_QTY : Math.min(
+    Math.max(0, kitchenStock.data.find((row) => row.product_id === productId)?.on_hand ?? 0),
+    MAX_PRODUCTION_QTY,
+  );
+  const stockShortages = Object.entries(qty).flatMap(([productId, amount]) => {
+    const available = maxForProduct(Number(productId));
+    if (amount <= available) return [];
+    const productName = products.data?.find((product) => product.id === Number(productId))?.name ?? 'Produk';
+    return [`${productName}: dipilih ${amount}, stok dapur ${available} cups`];
+  });
   const selected = roster.data?.find((row) => row.staff_id === staffId);
   const locationId = selected?.location_id ?? fallbackLocationId;
   const lines = Object.entries(qty).filter(([, amount]) => amount > 0)
@@ -81,15 +93,17 @@ export default function AllocationsScreen() {
                 <ProductThumbnail product={product} />
                 <Text variant="bodyStrong" style={{ flex: 1 }}>{product.name}</Text>
               </View>
-              <QtyStepper value={qty[product.id] ?? 0} max={100}
+              <QtyStepper value={qty[product.id] ?? 0} max={maxForProduct(product.id)}
                 onChange={(amount) => setQty((old) => ({ ...old, [product.id]: amount }))} />
             </Card>
           ))}
           {selected.has_allocation ? <Input label="Alasan koreksi" value={reason}
             onChangeText={setReason} placeholder="Kenapa ada alokasi tambahan?" /> : null}
+          {stockShortages.length > 0 ? <Banner tone="warning"
+            message={`Stok dapur berubah. ${stockShortages.join('; ')}. Ubah jumlahnya dulu ya.`} /> : null}
           {message ? <Banner tone={create.isError ? 'danger' : 'success'} message={message} /> : null}
           <Button label="Catat Alokasi" loading={create.isPending}
-            disabled={!locationId || lines.length === 0 || (selected.has_allocation && reason.trim().length < 10)}
+            disabled={!locationId || lines.length === 0 || stockShortages.length > 0 || (selected.has_allocation && reason.trim().length < 10)}
             onPress={() => void submit()} />
         </View>
       ) : null}

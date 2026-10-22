@@ -5,6 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, w
 
 import { Text } from './Text';
 import { Touchable } from './Touchable';
+import { clampQty, formatQty, parseQtyInput } from './quantity';
 import { enter } from './Motion';
 import { brand, feedback, neutral, pressScale, radius, semantic, space, spring, timing, touch } from '@/theme';
 
@@ -31,7 +32,7 @@ export type QtyStepperProps = {
  * mid-scroll feel unacknowledged, and people tap again and over-order.
  */
 export function QtyStepper({ value, onChange, max, min = 0, disabled = false, capHint }: QtyStepperProps) {
-  const clamp = (n: number) => Math.max(min, Math.min(max, n));
+  const clamp = (n: number) => clampQty(n, min, max);
   const atMax = value >= max;
 
   const pop = useSharedValue(0);
@@ -48,8 +49,7 @@ export function QtyStepper({ value, onChange, max, min = 0, disabled = false, ca
   }));
 
   const onText = (text: string) => {
-    const digits = text.replace(/[^\d]/g, '');
-    onChange(digits === '' ? min : clamp(parseInt(digits, 10)));
+    onChange(parseQtyInput(text, min, max));
   };
 
   return (
@@ -73,13 +73,13 @@ export function QtyStepper({ value, onChange, max, min = 0, disabled = false, ca
 
         <Animated.View style={numberStyle}>
           <TextInput
-            value={String(value)}
+            value={formatQty(value)}
             onChangeText={onText}
             keyboardType="number-pad"
             editable={!disabled}
             selectTextOnFocus
             accessibilityLabel="Jumlah cups"
-            style={[styles.input, disabled && styles.inputDisabled]}
+            style={[styles.input, Math.max(value, max) >= 1000 && styles.inputWide, disabled && styles.inputDisabled]}
           />
         </Animated.View>
 
@@ -133,6 +133,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: semantic.text,
   },
+  inputWide: { width: 76 },
   inputDisabled: { backgroundColor: neutral[100], color: semantic.textMuted },
   hint: { marginTop: space.xxs },
 });

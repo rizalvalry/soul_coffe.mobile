@@ -9,6 +9,7 @@ import { Banner } from '@/components/ui/Banner';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useProducts } from '@/features/refill/queries';
 import { useBrewIntoShowcase } from '@/features/showcase/queries';
+import { MAX_PRODUCTION_QTY } from '@/features/showcase/quantity';
 import { ApiError } from '@/lib/api';
 import { space } from '@/theme';
 
@@ -42,9 +43,11 @@ export default function BrewScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm }}>
             <ProductThumbnail product={product} />
             <Text variant="bodyStrong" style={{ flex: 1 }}>{product.name}</Text>
+          </View>
+          <View style={{ alignSelf: 'flex-end' }}>
             <QtyStepper value={quantities[product.id] ?? 0}
               onChange={(qty) => setQuantities((old) => ({ ...old, [product.id]: qty }))}
-              max={100} />
+              max={MAX_PRODUCTION_QTY} />
           </View>
         </Card>
       ))}
