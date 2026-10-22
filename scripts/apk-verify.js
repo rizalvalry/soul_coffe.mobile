@@ -117,8 +117,8 @@ ok('brand lockup (563x1024) present', countOf(563, 1024) >= 1,
   'shrinkResources stripped assets/logo-lockup.png');
 ok('splash wave (1080x420) present', countOf(1080, 420) >= 1,
   'shrinkResources stripped assets/splash-wave.png — the splash loses its lower band');
-ok('old bundled product tiles absent', countOf(360, 360) === 0,
-  `found ${countOf(360, 360)} old 360x360 drink photos in the APK`);
+ok('CMS product photos not bundled', countOf(360, 360) === 0,
+  `found ${countOf(360, 360)} bundled 360x360 drink photos in the APK`);
 
 ok('dex present', entries.some((e) => /^classes\d*\.dex$/.test(e.name)), 'no dex in APK');
 

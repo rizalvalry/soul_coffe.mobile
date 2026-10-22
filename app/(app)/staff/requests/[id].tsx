@@ -12,6 +12,7 @@ import { StatusBadge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Banner } from '@/components/ui/Banner';
 import { SkeletonCard } from '@/components/ui/Skeleton';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { MetaRow } from '@/components/ui/Section';
 import { enter } from '@/components/ui/Motion';
 import { RefillTimeline } from '@/components/refill/RefillTimeline';
@@ -186,9 +187,10 @@ function RequestDetail({
 
           {refill.lines.map((line) => (
             <View key={line.id} style={styles.tableRow}>
-              <Text variant="caption" style={styles.colProduct} numberOfLines={2}>
-                {line.product_name}
-              </Text>
+              <View style={[styles.colProduct, { flexDirection: 'row', alignItems: 'center', gap: space.xxs }]}>
+                <ProductThumbnail product={line} size={32} />
+                <Text variant="caption" style={{ flex: 1 }} numberOfLines={2}>{line.product_name}</Text>
+              </View>
               <Text variant="caption" style={styles.colQty}>
                 {line.qty_requested}
               </Text>
@@ -283,8 +285,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.sm,
     marginTop: space.xxs,
   },
-  colProduct: { flex: 2 },
-  colQty: { flex: 1, textAlign: 'center' },
+  colProduct: { flex: 3 },
+  colQty: { flex: 0.75, textAlign: 'center' },
 
   timelineTitle: { marginBottom: space.md },
 });
