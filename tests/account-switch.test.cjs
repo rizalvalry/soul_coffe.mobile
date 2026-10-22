@@ -268,6 +268,8 @@ test('login before Add Stock then assignment event and foreground refresh Rider 
     'pusher-js': class Pusher {},
     '@tanstack/react-query': { useQueryClient: () => ({ invalidateQueries: async () => {} }) },
     '@/features/auth/store': { useAuth },
+    '@/features/navigation/menu': { canUse: (user, module, ability = 'view') =>
+      user.isSuperAdmin === true || user.abilities?.[module]?.includes(ability) === true },
     '@/lib/api': { apiBaseUrl: () => 'http://localhost' },
     '@/features/refill/queries': { invalidateRefillData() {}, qk: {
       myStock: ['me', 'stock'], kitchenStock: ['kitchen', 'stock'], allocationsToday: ['allocations', 'today'],

@@ -373,6 +373,42 @@ menuByRole.ADMINISTRATOR = [
   ...menuByRole.MANAGEMENT.filter((item) => !administratorRoutes.has(item.route)),
 ];
 
+type AccessUser = { role: Role; abilities?: Record<string, string[]>; isSuperAdmin?: boolean };
+
+const BACK_OFFICE: Record<string, [string, string]> = {
+  '/admin/users': ['users', 'view'],
+  '/admin/products': ['products', 'view'],
+  '/admin/carts': ['carts', 'view'],
+  '/admin/locations': ['locations', 'view'],
+  '/admin/targets': ['daily_targets', 'view'],
+  '/admin/audit': ['audit_logs', 'view'],
+  '/admin/reports': ['reports', 'view'],
+  '/finance/approvals': ['refill_approval', 'edit'],
+  '/finance/history': ['refill_approval', 'view'],
+  '/finance/settlements': ['settlements', 'view'],
+  '/finance/clearing': ['clearing', 'view'],
+  '/finance/reports': ['reports', 'view'],
+  '/management/rider-location-setup': ['rider_location_setup', 'edit'],
+};
+
+export function canUse(user: AccessUser, module: string, ability: string = 'view'): boolean {
+  return user.isSuperAdmin === true || user.abilities?.[module]?.includes(ability) === true;
+}
+
+/** Field flow remains role based; back office routes come from the effective server grants. */
+export function menuForUser(user: AccessUser): MenuItem[] {
+  const ownFlow = menuByRole[user.role].filter((item) => !BACK_OFFICE[item.route]);
+  const seen = new Set(ownFlow.map((item) => item.route));
+  const granted: MenuItem[] = [];
+  for (const item of [...menuByRole.FINANCE, ...menuByRole.MANAGEMENT, ...menuByRole.ADMINISTRATOR]) {
+    const requirement = BACK_OFFICE[item.route];
+    if (!requirement || seen.has(item.route) || !canUse(user, requirement[0], requirement[1])) continue;
+    seen.add(item.route);
+    granted.push(item);
+  }
+  return [...ownFlow, ...granted];
+}
+
 /** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */
 export function menuItemsWithScreens(items: MenuItem[], sitemap: SitemapType | null): MenuItem[] {
   if (!sitemap) return [];

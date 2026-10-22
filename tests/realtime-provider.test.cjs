@@ -25,7 +25,8 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
   let refillInvalidations = 0;
   let cartRefreshes = 0;
   const client = { invalidateQueries: (filter) => { calls.push(filter?.queryKey ?? 'all'); return Promise.resolve(); } };
-  const session = { token: 'test-token', user: { id: '7', role, cartId: 1 } };
+  const session = { token: 'test-token', user: { id: '7', role, cartId: 1,
+    abilities: ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR'].includes(role) ? { settlements: ['view'] } : {} } };
   const react = {
     createContext: () => ({ Provider: () => null }),
     useContext: () => null,
@@ -51,6 +52,8 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF') {
     'pusher-js': class Pusher {},
     '@tanstack/react-query': { useQueryClient: () => client },
     '@/features/auth/store': { useAuth: (selector) => selector({ session, refreshUser: async () => { cartRefreshes++; } }) },
+    '@/features/navigation/menu': { canUse: (user, module, ability = 'view') =>
+      user.isSuperAdmin === true || user.abilities?.[module]?.includes(ability) === true },
     '@/lib/api': { apiBaseUrl: () => 'http://localhost' },
     '@/features/refill/queries': {
       invalidateRefillData: () => { refillInvalidations++; },
@@ -135,6 +138,16 @@ test('connection and foreground transitions refresh once without an interval', (
   assert.equal(app.cartRefreshes(), 2);
   app.appState('active');
   assert.deepEqual(app.calls, ['all', 'all']);
+});
+
+test('access change refreshes the open session once without polling', () => {
+  const app = mountRealtimeProvider();
+  const event = { event_id: 'access-1', type: 'AccessChanged', refill_request_id: null };
+  app.channelCallbacks[0](event);
+  app.channelCallbacks[1](event);
+  assert.equal(app.cartRefreshes(), 1);
+  assert.deepEqual(app.calls, ['all']);
+  assert.equal(app.refillInvalidations(), 0);
 });
 
 test('Rider assignment event refreshes current cart even if push arrived first', () => {

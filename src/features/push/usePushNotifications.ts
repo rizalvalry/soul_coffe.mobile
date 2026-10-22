@@ -44,34 +44,45 @@ Notifications.setNotificationHandler({
  * tapped row to the same place a tapped push notification would — one routing decision instead
  * of two that could quietly drift apart.
  */
-export function routeFor(data: Record<string, unknown>, role: Role): string | null {
+export function routeFor(data: Record<string, unknown>, role: Role,
+  abilities?: Record<string, string[]>, isSuperAdmin: boolean = false): string | null {
   const type = typeof data['type'] === 'string' ? data['type'] : '';
+  const has = (module: string, ability: string = 'view') => abilities === undefined
+    ? ['FINANCE', 'MANAGEMENT', 'ADMINISTRATOR'].includes(role)
+    : isSuperAdmin || abilities[module]?.includes(ability) === true;
+  if (type === 'RiderLocationSetupMissing') {
+    return has('rider_location_setup', 'edit') ? '/management/rider-location-setup' : null;
+  }
+  if (type === 'AccountingPeriodReopened') return has('accounting_periods') ? '/menu' : null;
   if (['SettlementVarianceFlagged', 'SettlementMethodVarianceFlagged', 'SettlementSelfApproved',
     'CartCloseOutVarianceFlagged'].includes(type)) {
-    return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
-      ? settlementRoute(data) : null;
+    return has('settlements') ? settlementRoute(data) : null;
   }
   if (type === 'RiderClosingRecorded' || type === 'RiderClosingCorrected') {
     // A stored notification may be tapped after its operating date; today's draft is not that result.
     if (role === 'STAFF') return '/menu';
-    return role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
-      ? settlementRoute(data) : null;
+    return has('settlements') ? settlementRoute(data) : null;
   }
   if (type === 'SettlementRecorded' || type === 'SettlementApproved') {
     const riderDate = settlementTarget(data).date;
     return role === 'STAFF' ? `/staff/settlement${riderDate ? `?operating_date=${riderDate}` : ''}`
-      : role === 'FINANCE' || role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
-        ? settlementRoute(data) : null;
+      : has('settlements') ? settlementRoute(data) : null;
   }
 
   const refillId = Number(data['refill_request_id']);
   if (Number.isSafeInteger(refillId) && refillId > 0) {
     const status = typeof data['status'] === 'string' ? data['status'] : '';
+    if (has('refill_approval', 'edit') && (status === 'SUBMITTED' || type === 'RefillRequestSubmitted')) {
+      return '/finance/approvals';
+    }
+    if (has('refill_approval') && role !== 'STAFF' && role !== 'RIDER'
+      && !(role === 'BARISTA' && abilities?.['refill_approval'] === undefined)) {
+      return '/finance/history';
+    }
     switch (role) {
       case 'FINANCE':
       case 'MANAGEMENT':
-        return status === 'SUBMITTED' || type === 'RefillRequestSubmitted'
-          ? '/finance/approvals' : '/finance/history';
+        return null;
       case 'BARISTA':
         if (status === 'PREPARING' || type === 'RefillPreparingStarted') return '/barista/preparing';
         if (['READY_TO_PICK', 'PICKED_UP', 'DELIVERED', 'CLOSED'].includes(status)) return '/barista/history';
@@ -156,7 +167,7 @@ export function usePushNotifications() {
       }
       if (['SettlementVarianceFlagged', 'SettlementMethodVarianceFlagged', 'SettlementSelfApproved',
         'CartCloseOutVarianceFlagged', 'RiderClosingRecorded', 'RiderClosingCorrected'].includes(String(data?.['type'])) &&
-        (session.user.role === 'FINANCE' || session.user.role === 'MANAGEMENT' || session.user.role === 'ADMINISTRATOR')) {
+        (session.user.isSuperAdmin || session.user.abilities?.['settlements']?.includes('view'))) {
         invalidateSettlementData(client, settlementTarget(data ?? {}).cartId);
       }
       if (session.user.role === 'STAFF' && ['SettlementRecorded', 'SettlementApproved'].includes(String(data?.['type']))) {
@@ -173,7 +184,7 @@ export function usePushNotifications() {
   useEffect(() => {
     if (!session || !lastResponse) return;
     const data = (lastResponse.notification.request.content.data ?? {}) as Record<string, unknown>;
-    const target = routeFor(data, session.user.role);
+    const target = routeFor(data, session.user.role, session.user.abilities, session.user.isSuperAdmin);
     if (target) routerRef.current.push(target as never);
     Notifications.clearLastNotificationResponse();
   }, [session, lastResponse]);
