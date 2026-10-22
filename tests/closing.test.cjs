@@ -115,11 +115,24 @@ test('Closing, settlement, and Tutup Coffee Bike use the current name', () => {
   for (const path of [
     'app/(app)/staff/closing.tsx',
     'app/(app)/finance/settlements.tsx',
-    'app/(app)/barista/close-out.tsx',
+    'app/(app)/kitchen/close-out.tsx',
   ]) {
     const screen = source(path);
     assert.match(screen, /Coffee Bike/);
     assert.doesNotMatch(screen, /gerobak/i);
   }
-  assert.match(source('app/(app)/barista/close-out.tsx'), /Tutup Coffee Bike/);
+  assert.match(source('app/(app)/kitchen/close-out.tsx'), /Tutup Coffee Bike/);
+});
+
+test('Tutup Coffee Bike waits for products and draft, and uses only today assigned carts', () => {
+  const screen = source('app/(app)/kitchen/close-out.tsx');
+  const queries = source('src/features/showcase/queries.ts');
+  assert.match(screen, /useCarts\(kitchenReady, 'close-out'\)/);
+  assert.match(screen, /productsQuery\.isSuccess && products\.length > 0/);
+  assert.match(screen, /closingDraft\.isSuccess/);
+  assert.match(screen, /productsQuery\.isError/);
+  assert.match(screen, /productsQuery\.refetch\(\)/);
+  assert.match(screen, /kitchensQuery\.data\.length === 1 && kitchenId !== kitchensQuery\.data\[0\]\?\.id/);
+  assert.match(screen, /select\(kitchensQuery\.data\[0\]!\.id\)/);
+  assert.match(queries, /kitchenId: kitchenId \?\? undefined/);
 });
