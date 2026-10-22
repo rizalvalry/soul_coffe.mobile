@@ -38,6 +38,21 @@ test('/me today_cart overrides a stale login cart and null removes it', async ()
   assert.equal(after.todayCart.assignedAt, todayCart.assigned_at);
 });
 
+test('/me maps Management status independently of Finance role', async () => {
+  let isManagement = true;
+  const auth = loadTs('src/features/auth/api.ts', {
+    'expo-constants': { expoConfig: { extra: { apiBaseUrl: 'http://localhost/api/v1' } } },
+    '@/domain/roles': { isRole: (role) => role === 'FINANCE' },
+    '@/features/demo/config': { isDemoMode: () => false },
+    '@/features/demo/store': {},
+  }, { fetch: async () => ({ ok: true, json: async () => ({ data: {
+    id: 8, name: 'Finance', role: 'FINANCE', is_management: isManagement,
+  } }) }) });
+  assert.equal((await auth.fetchCurrentUser('token', 'FINANCE')).isManagement, true);
+  isManagement = false;
+  assert.equal((await auth.fetchCurrentUser('token', 'FINANCE')).isManagement, false);
+});
+
 test('refill form refreshes /me on focus and offers the new no-cart copy and retry', () => {
   for (const path of ['app/(app)/staff/refill/new.tsx']) {
     const file = source(path);

@@ -22,7 +22,7 @@ import { useAttendanceStatus } from '@/features/showcase/queries';
 import { attendanceTileSubtitle } from '@/features/showcase/attendanceTile';
 import { riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
 import { menuForUser, menuItemsWithScreens, type MenuItem } from '@/features/navigation/menu';
-import { ROLES, roleMeta } from '@/domain/roles';
+import { ROLES, accountRoleLabel, roleMeta } from '@/domain/roles';
 import { brand, neutral, pressScale, radius, shadow, semantic, space, touch } from '@/theme';
 
 /**
@@ -146,7 +146,7 @@ export default function MenuScreen() {
               <Text variant="micro" color={brand[700]}>
                 ROLE {meta.priority} DARI {ROLES.length}
               </Text>
-              <Text variant="h2">{user.isSuperAdmin ? 'Super Administrator' : user.roleLabel ?? meta.label}</Text>
+              <Text variant="h2">{accountRoleLabel(user)}</Text>
               <Text variant="caption" color={semantic.textMuted}>
                 {meta.description}
               </Text>
