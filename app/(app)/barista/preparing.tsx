@@ -11,6 +11,7 @@ import { StatusBadge } from '@/components/ui/Badge';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useMarkReady, useRefills } from '@/features/refill/queries';
 import { ApiError } from '@/lib/api';
 import type { RefillRequest } from '@/domain/types';
@@ -60,6 +61,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
       <View style={styles.lines}>
         {refill.lines.map((line) => (
           <View key={line.id} style={styles.lineRow}>
+            <ProductThumbnail product={line} />
             <View style={styles.lineText}>
               <Text variant="body" numberOfLines={1}>
                 {line.product_name}

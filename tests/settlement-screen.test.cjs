@@ -51,6 +51,7 @@ function mountScreen({ row, draft, settlement, queueRows = [row], recordFailures
     '@/components/ui/Banner': { Banner: 'Banner' },
     '@/components/ui/EmptyState': { EmptyState: 'EmptyState' },
     '@/components/ui/Skeleton': { SkeletonList: 'SkeletonList' },
+    '@/components/ui/ProductThumbnail': { ProductThumbnail: 'ProductThumbnail' },
     '@/components/ui/Section': { SectionTitle: 'SectionTitle' },
     '@/components/ui/Touchable': { Touchable: 'Touchable' },
     '@/features/settlements/queries': {

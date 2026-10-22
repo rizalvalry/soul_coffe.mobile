@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { QtyStepper } from '@/components/ui/QtyStepper';
 import { Banner } from '@/components/ui/Banner';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useProducts } from '@/features/refill/queries';
 import { useBrewIntoShowcase } from '@/features/showcase/queries';
 import { ApiError } from '@/lib/api';
@@ -39,6 +40,7 @@ export default function BrewScreen() {
       {products.data?.filter((product) => product.is_sellable).map((product) => (
         <Card key={product.id} style={{ gap: space.sm }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm }}>
+            <ProductThumbnail product={product} />
             <Text variant="bodyStrong" style={{ flex: 1 }}>{product.name}</Text>
             <QtyStepper value={quantities[product.id] ?? 0}
               onChange={(qty) => setQuantities((old) => ({ ...old, [product.id]: qty }))}

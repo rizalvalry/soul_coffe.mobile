@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
 import { Banner } from '@/components/ui/Banner';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { MetaRow } from '@/components/ui/Section';
 import { RefillCard, formatRupiah } from '@/components/refill/RefillCard';
 import { useApproveRefill, useRefills, useRejectRefill } from '@/features/refill/queries';
@@ -183,6 +184,7 @@ function ApprovalCard({
           const qty = qtyApproved[line.id] ?? line.qty_requested;
           return (
             <View key={line.id} style={styles.lineRow}>
+              <ProductThumbnail product={line} />
               <View style={styles.lineInfo}>
                 <Text variant="bodyStrong" numberOfLines={1}>
                   {line.product_name}

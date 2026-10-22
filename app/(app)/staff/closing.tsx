@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Image, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { Screen } from '@/components/ui/Screen';
@@ -10,8 +10,8 @@ import { Input } from '@/components/ui/Input';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useProducts } from '@/features/refill/queries';
-import { productImageSource } from '@/domain/productImages';
 import { useClosingDraft, useRecordClosing } from '@/features/closing/queries';
 import { closingTotals } from '@/features/closing/calculation';
 import { closingSubmissionGate } from '@/features/closing/submissionGate';
@@ -20,7 +20,7 @@ import { closingLocationMessage } from '@/features/closing/locationCheck';
 import { closingFormSignature } from '@/features/closing/formState';
 import { useOfflineSalesQueue } from '@/features/sales/useOfflineSalesQueue';
 import { ApiError, uuidv4 } from '@/lib/api';
-import { brand, semantic, space } from '@/theme';
+import { semantic, space } from '@/theme';
 
 function amount(text: string): number {
   return /^\d+$/.test(text) ? Number(text) : text === '' ? 0 : -1;
@@ -178,12 +178,11 @@ export default function RiderClosingScreen() {
           </Card>
           {(!draft.data.closing_id || showCorrection) ? <>
           {draft.data.lines.map((line) => {
-            const image = productImageSource(productById.get(line.product_id) ?? {});
             const sold = totals.soldByProduct[line.product_id] ?? 0;
             return (
               <Card key={line.product_id} style={styles.card}>
                 <View style={styles.productHead}>
-                  {image ? <Image source={image} style={styles.image} /> : null}
+                  <ProductThumbnail product={productById.get(line.product_id) ?? {}} size={48} />
                   <View style={styles.productText}>
                     <Text variant="bodyStrong">{line.product_name}</Text>
                     <Text variant="caption" color={semantic.textMuted}>
@@ -259,5 +258,4 @@ const styles = StyleSheet.create({
   card: { gap: space.md },
   productHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   productText: { flex: 1, gap: space.xxs },
-  image: { width: 48, height: 48, borderRadius: 8, backgroundColor: brand[50] },
 });

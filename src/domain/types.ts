@@ -75,6 +75,7 @@ export type RefillLine = {
   id: number;
   product_id: number;
   product_name: string;
+  image_url?: string | null;
   unit: string;
   qty_requested: number;
   qty_approved: number | null;
@@ -392,6 +393,7 @@ export type SettlementQueueRow = {
 export type SettlementDraftLine = {
   product_id: number;
   product_name: string;
+  image_url?: string | null;
   unit: string;
   qty_issued: number;
   qty_sold: number;

@@ -77,7 +77,7 @@ test('Rider menu and route use Closing, with no new sale form', () => {
   assert.match(screen, /useOfflineSalesQueue\(\)/);
   assert.match(screen, /oldSales\.rejected/);
   assert.doesNotMatch(screen, /oldSales\.enqueue/);
-  assert.match(screen, /productImageSource/);
+  assert.match(screen, /ProductThumbnail product=\{productById\.get\(line\.product_id\) \?\? \{\}\}/);
 });
 
 test('Closing syncs old pending sales before submit and shows the queue when draft fails', () => {

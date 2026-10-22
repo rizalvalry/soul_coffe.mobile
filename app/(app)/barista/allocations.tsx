@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { QtyStepper } from '@/components/ui/QtyStepper';
 import { Banner } from '@/components/ui/Banner';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useProducts, useStaffOnShift } from '@/features/refill/queries';
 import { useLocations } from '@/features/riderLocation/queries';
 import { useCreateAllocation } from '@/features/showcase/queries';
@@ -76,7 +77,10 @@ export default function AllocationsScreen() {
           )}
           {products.data?.filter((product) => product.is_sellable).map((product) => (
             <Card key={product.id} style={{ gap: space.sm }}>
-              <Text variant="bodyStrong">{product.name}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <ProductThumbnail product={product} />
+                <Text variant="bodyStrong" style={{ flex: 1 }}>{product.name}</Text>
+              </View>
               <QtyStepper value={qty[product.id] ?? 0} max={100}
                 onChange={(amount) => setQty((old) => ({ ...old, [product.id]: amount }))} />
             </Card>

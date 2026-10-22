@@ -32,6 +32,7 @@ function renderRequestDetail(role) {
     '@/components/ui/EmptyState': { EmptyState: () => null },
     '@/components/ui/Banner': { Banner },
     '@/components/ui/Skeleton': { SkeletonCard: () => null },
+    '@/components/ui/ProductThumbnail': { ProductThumbnail: () => null },
     '@/components/ui/Section': { MetaRow: () => null },
     '@/components/ui/Motion': { enter: () => null },
     '@/components/refill/RefillTimeline': { RefillTimeline: () => null },

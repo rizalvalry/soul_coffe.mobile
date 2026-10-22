@@ -14,6 +14,7 @@ import { StatusBadge, Chip } from '@/components/ui/Badge';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { Touchable } from '@/components/ui/Touchable';
 import { SignaturePad, type SignatureResult } from '@/components/ui/SignaturePad';
 import { useDeliverRefill, useRefills, useUploadHandoverPhoto } from '@/features/refill/queries';
@@ -231,6 +232,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           {/* R15 — no cost shown to Runner. */}
           {refill.lines.map((line) => (
             <View key={line.id} style={styles.lineRow}>
+              <ProductThumbnail product={line} />
               <Text variant="body" style={styles.lineText} numberOfLines={1}>
                 {line.product_name}
               </Text>
@@ -444,6 +446,7 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
           {refill.lines.map((line) => (
             <View key={line.id} style={styles.lineRow}>
+              <ProductThumbnail product={line} />
               <Text variant="body" style={styles.lineText} numberOfLines={1}>
                 {line.product_name}
               </Text>

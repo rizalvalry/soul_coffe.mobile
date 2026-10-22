@@ -44,6 +44,7 @@ export type RawRefillLine = {
   id: number;
   product_id: number;
   product_name: string | null;
+  image_url?: string | null;
   qty_requested: number;
   qty_approved: number | null;
   qty_prepared: number | null;
@@ -86,6 +87,7 @@ function toRefillLine(raw: RawRefillLine, unitOf: UnitLookup): RefillLine {
     id: raw.id,
     product_id: raw.product_id,
     product_name: raw.product_name ?? '-',
+    image_url: raw.image_url ?? null,
     unit: unitOf(raw.product_id),
     qty_requested: raw.qty_requested,
     qty_approved: raw.qty_approved,

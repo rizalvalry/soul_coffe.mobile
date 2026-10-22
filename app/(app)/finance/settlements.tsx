@@ -25,6 +25,7 @@ import {
 import { settlementExpectations } from '@/features/settlements/expectations';
 import { settlementTarget } from '@/features/settlements/navigation';
 import { clearSettlementAttempt, loadOrCreateSettlementAttempt, readSettlementAttempt } from '@/features/settlements/draftAttempt';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useAuth } from '@/features/auth/store';
 import { ApiError } from '@/lib/api';
 import type { SettlementQueueRow } from '@/domain/types';
@@ -280,9 +281,12 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                 </View>
               </View>
               {draft?.closing_id ? draft.lines.map((line) => (
-                <Text key={line.product_id} variant="caption" color={semantic.textMuted}>
-                  {line.product_name}: {line.qty_sold} terjual · {line.qty_wasted ?? 0} rusak · {line.qty_closing_remaining ?? 0} sisa
-                </Text>
+                <View key={line.product_id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <ProductThumbnail product={line} />
+                  <Text variant="caption" color={semantic.textMuted} style={{ flex: 1 }}>
+                    {line.product_name}: {line.qty_sold} terjual · {line.qty_wasted ?? 0} rusak · {line.qty_closing_remaining ?? 0} sisa
+                  </Text>
+                </View>
               )) : null}
               {expectations.cash !== null && expectations.qris !== null && expectations.transfer !== null ? (
                 <View style={styles.expectedMethods}>
@@ -416,6 +420,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                     return (
                       <Card key={line.product_id} style={styles.card}>
                         <View style={styles.lineHead}>
+                          <ProductThumbnail product={line} />
                           <Text variant="bodyStrong" numberOfLines={1} style={styles.lineName}>
                             {line.product_name}
                           </Text>
