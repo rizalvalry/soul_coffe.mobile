@@ -77,7 +77,8 @@ test('Rider request detail still offers Absen when the day gate requires it', ()
 
 test('other roles get a read-only attendance screen; Rider-only forms scope the gate', () => {
   const absen = source('app/(app)/absen.tsx');
-  assert.match(absen, /if \(!canAttend\) \{/);
+  assert.match(absen, /if \(!canAttend && !canOpenKitchen\) \{/);
+  assert.match(absen, /\{canAttend \? \(/);
   assert.match(absen, /<Text variant="h2">Daftar Hadir<\/Text>/);
   assert.match(absen, /if \(canAttend\) void locate\(\)/);
   for (const path of ['app/(app)/staff/refill/new.tsx']) {

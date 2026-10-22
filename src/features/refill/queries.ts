@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { request, requestWithStatus, uploadFile, uploadFileWithStatus, uuidv4 } from '@/lib/api';
 import { compressForUpload } from '@/lib/image';
+import { useKitchenSelection } from '@/features/showcase/kitchenSelection';
 import {
   toAppNotification,
   toRefillRequest,
@@ -150,13 +151,14 @@ export function useMarkAllNotificationsRead() {
   });
 }
 
-export function useRefills(status?: RefillStatus | RefillStatus[]) {
+export function useRefills(status?: RefillStatus | RefillStatus[], kitchen = false) {
   const client = useQueryClient();
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: qk.refills({ ...(status ? { status } : {}) }),
+    queryKey: qk.refills({ ...(status ? { status } : {}), ...(kitchen ? { kitchenId } : {}) }),
     queryFn: async () => {
       const [rows, unitOf] = await Promise.all([
-        request<RawRefillRequest[]>(`/refills${statusParam(status)}`),
+        request<RawRefillRequest[]>(`/refills${statusParam(status)}`, { kitchen }),
         unitLookup(client),
       ]);
       return rows.map((r) => toRefillRequest(r, unitOf));
@@ -180,9 +182,10 @@ export function useRefill(id: number) {
 }
 
 export function useStaffOnShift() {
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: qk.allocationsToday,
-    queryFn: () => request<StaffOnShift[]>('/allocations/today'),
+    queryKey: [...qk.allocationsToday, kitchenId],
+    queryFn: () => request<StaffOnShift[]>('/allocations/today', { kitchen: true }),
   });
 }
 
@@ -202,11 +205,12 @@ export function useMyStock() {
 
 export function useKitchenStock() {
   const client = useQueryClient();
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
   return useQuery({
-    queryKey: qk.kitchenStock,
+    queryKey: [...qk.kitchenStock, kitchenId],
     queryFn: async () => {
       const [rows, unitOf] = await Promise.all([
-        request<RawStockRow[]>('/kitchen/stock'),
+        request<RawStockRow[]>('/kitchen/stock', { kitchen: true }),
         unitLookup(client),
       ]);
       return rows.map((r) => toStockRow(r, unitOf));
@@ -305,12 +309,14 @@ export function useSubmitRefill() {
 function useTransition<TInput>(
   buildPath: (input: TInput) => string,
   buildBody?: (input: TInput) => unknown,
+  kitchen = false,
 ) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (input: TInput) => {
       const [raw, unitOf] = await Promise.all([
         request<RawRefillRequest>(buildPath(input), {
+          kitchen,
           method: 'POST',
           idempotencyKey: uuidv4(),
           ...(buildBody ? { body: buildBody(input) } : {}),
@@ -347,7 +353,7 @@ export const useCancelRefill = () =>
 
 /** The R1 gate. A `409` here is the server correctly refusing an unapproved request. */
 export const useStartPreparing = () =>
-  useTransition<{ id: number }>((i) => `/refills/${i.id}/start-preparing`);
+  useTransition<{ id: number }>((i) => `/refills/${i.id}/start-preparing`, undefined, true);
 
 export const useMarkReady = () =>
   useTransition<{
@@ -360,6 +366,7 @@ export const useMarkReady = () =>
       lines: i.lines,
       ...(i.shortfallReason ? { shortfall_reason: i.shortfallReason } : {}),
     }),
+    true,
   );
 
 /** Atomic claim. The losing rider gets `409` (E2). */
@@ -451,4 +458,3 @@ export function useDeliverRefill() {
     onSuccess: (result) => invalidateRefillData(client, result.refill?.id),
   });
 }
-

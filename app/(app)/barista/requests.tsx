@@ -31,7 +31,7 @@ const SECTION_ORDER: { key: RefillStatus; title: string }[] = [
  * request is read-only by construction (the flag is false), never by a client-side status check.
  */
 export default function BaristaRequestsScreen() {
-  const refillsQuery = useRefills(['SUBMITTED', 'APPROVED', 'PREPARING']);
+  const refillsQuery = useRefills(['SUBMITTED', 'APPROVED', 'PREPARING'], true);
   const startPreparing = useStartPreparing();
   const realtime = useRealtimeState();
 

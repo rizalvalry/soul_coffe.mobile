@@ -1,6 +1,7 @@
 import Constants from 'expo-constants';
 import { File, UploadTask, UploadType } from 'expo-file-system';
 import { useAuth } from '@/features/auth/store';
+import { useKitchenSelection } from '@/features/showcase/kitchenSelection';
 import { isDemoMode } from '@/features/demo/config';
 import { demoRequest, demoUpload } from '@/features/demo/router';
 import { DemoError } from '@/features/demo/store';
@@ -70,6 +71,8 @@ type RequestOptions = {
   signal?: AbortSignal;
   /** The departing session's token for cleanup after local auth state has been cleared. */
   authToken?: string;
+  /** Attach the selected Dapur Pusat to a Produksi request for accounts without a bound kitchen. */
+  kitchen?: boolean;
 };
 
 async function parseBody(response: Response): Promise<unknown> {
@@ -162,7 +165,19 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
  * choice rather than one of them hiding it.
  */
 export async function requestWithStatus<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
-  const { method = 'GET', body, idempotencyKey, signal, authToken } = options;
+  const { method = 'GET', idempotencyKey, signal, authToken } = options;
+  let { body } = options;
+  const kitchenUser = useAuth.getState().session?.user;
+  if (options.kitchen && kitchenUser?.role !== 'BARISTA' &&
+      (kitchenUser?.isSuperAdmin || kitchenUser?.abilities?.['kitchen_operations']?.includes('view'))) {
+    const kitchenId = useKitchenSelection.getState().kitchenId;
+    if (!kitchenId) throw new ApiError('Pilih Dapur Pusat dulu ya.', 422);
+    if (method === 'GET') {
+      path += `${path.includes('?') ? '&' : '?'}kitchen_id=${kitchenId}`;
+    } else {
+      body = { ...(body && typeof body === 'object' ? body : {}), kitchen_id: kitchenId };
+    }
+  }
 
   // Demo mode (see features/demo/config.ts) never touches the network — every hook in
   // features/refill/queries.ts calls this same function unmodified either way.

@@ -28,7 +28,7 @@ const TERMINAL_STATUSES = ['READY_TO_PICK', 'PICKED_UP', 'DELIVERED', 'CLOSED'] 
  * status" convention as `coming-soon.tsx`, not a silent gap.
  */
 export default function BaristaHistoryScreen() {
-  const refillsQuery = useRefills([...TERMINAL_STATUSES]);
+  const refillsQuery = useRefills([...TERMINAL_STATUSES], true);
   const staffQuery = useStaffOnShift();
 
   const prepared = [...(refillsQuery.data ?? [])].sort(

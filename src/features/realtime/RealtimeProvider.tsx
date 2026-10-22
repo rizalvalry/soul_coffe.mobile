@@ -9,6 +9,7 @@ import { canUse } from '@/features/navigation/menu';
 import { apiBaseUrl } from '@/lib/api';
 import { invalidateRefillData, qk as refillKeys } from '@/features/refill/queries';
 import { showcaseKeys } from '@/features/showcase/queries';
+import { useKitchenSelection } from '@/features/showcase/kitchenSelection';
 import { invalidateSettlementData } from '@/features/settlements/queries';
 import { riderSettlementKey } from '@/features/settlements/rider';
 import { riderSetupKeys } from '@/features/riderLocation/queries';
@@ -52,9 +53,10 @@ function channelsFor(
   userId: string,
   kitchenId: number | null,
   cartId: number | null,
+  canViewKitchen: boolean,
 ): string[] {
   const channels = [`user.${userId}`, `role.${role}`];
-  if (role === 'BARISTA' && kitchenId) channels.push(`kitchen.${kitchenId}`);
+  if (canViewKitchen && kitchenId) channels.push(`kitchen.${kitchenId}`);
   if (role === 'STAFF' && cartId) channels.push(`cart.${cartId}`);
   return channels;
 }
@@ -84,9 +86,13 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const client = useQueryClient();
   const session = useAuth((s) => s.session);
   const refreshUser = useAuth((s) => s.refreshUser);
+  const selectedKitchenId = useKitchenSelection((s) => s.kitchenId);
+  const loadKitchen = useKitchenSelection((s) => s.load);
   const [state, setState] = useState<ConnectionState>('connecting');
 
   const echoRef = useRef<Echo<'pusher'> | null>(null);
+
+  useEffect(() => { if (session) void loadKitchen(); }, [session, loadKitchen]);
 
   useEffect(() => {
     let active = true;
@@ -200,6 +206,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       }
       if (event.type === 'CartStockHandedOver') {
         void client.invalidateQueries({ queryKey: showcaseKeys.staff });
+        void client.invalidateQueries({ queryKey: showcaseKeys.carts });
         void client.invalidateQueries({ queryKey: ['showcase', 'allowance'] });
         void client.invalidateQueries({ queryKey: refillKeys.allocationsToday });
       }
@@ -237,8 +244,9 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     const names = channelsFor(
       session.user.role,
       session.user.id,
-      session.user.kitchenId ?? null,
+      session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId,
       session.user.cartId ?? null,
+      canUse(session.user, 'kitchen_operations'),
     );
 
     for (const name of names) {
@@ -251,7 +259,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
       echo?.disconnect();
       echoRef.current = null;
     };
-  }, [session, client, refreshUser]);
+  }, [session, selectedKitchenId, client, refreshUser]);
 
   // React Query's window-focus signal is not reliable on native. Refresh active queries when
   // the app returns, including events missed while the socket was disconnected.
