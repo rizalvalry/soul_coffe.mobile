@@ -64,6 +64,7 @@ export default function LoginScreen() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [deviceNotice, setDeviceNotice] = useState<string | null>(null);
   const [forgotOpen, setForgotOpen] = useState(false);
 
   /**
@@ -173,6 +174,7 @@ export default function LoginScreen() {
 
   const onSubmit = useCallback(
     async (values: LoginForm) => {
+      setDeviceNotice(null);
       setNotice(null);
       const outcome = await signIn({
         phone: normalisePhone(values.phone),
@@ -181,6 +183,10 @@ export default function LoginScreen() {
 
       if (outcome.result === 'ok') {
         router.replace('/menu');
+        return;
+      }
+      if (outcome.result === 'device-pending' || outcome.result === 'device-rejected' || outcome.result === 'device-update-required') {
+        setDeviceNotice(outcome.message);
         return;
       }
 
@@ -197,6 +203,7 @@ export default function LoginScreen() {
   );
 
   const onPinSubmit = useCallback(async () => {
+    setDeviceNotice(null);
     setPinError(null);
     setNotice(null);
 
@@ -213,6 +220,10 @@ export default function LoginScreen() {
 
     if (outcome.result === 'ok') {
       router.replace('/menu');
+      return;
+    }
+    if (outcome.result === 'device-pending' || outcome.result === 'device-rejected' || outcome.result === 'device-update-required') {
+      setDeviceNotice(outcome.message);
       return;
     }
 
@@ -236,6 +247,24 @@ export default function LoginScreen() {
   // The PIN shortcut is only offered when it can actually work: this device has signed in before
   // and that account had a PIN. Otherwise the button would be a dead end.
   const canUsePin = pinAvailable && !!lastPhone;
+
+  if (deviceNotice) {
+    return (
+      <View style={[styles.root, { justifyContent: 'center', padding: space.xl }]}>
+        <StatusBar style="dark" />
+        <Text variant="h1" center>HP ini belum bisa dipakai</Text>
+        <Text variant="body" center style={{ marginVertical: space.xl }}>{deviceNotice}</Text>
+        <Button
+          label="Coba login lagi"
+          onPress={() => {
+            if (mode === 'pin') void onPinSubmit();
+            else void handleSubmit(onSubmit)();
+          }}
+          loading={submitting}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>

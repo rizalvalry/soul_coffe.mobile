@@ -3,6 +3,7 @@ import { isRole, type Role } from '@/domain/roles';
 import { isDemoMode } from '@/features/demo/config';
 import { findUserByCredentials, getUserByRole } from '@/features/demo/store';
 import type { DemoUser } from '@/features/demo/seed';
+import { loginDeviceIdentity } from './device';
 
 export type AuthUser = {
   id: string;
@@ -100,7 +101,10 @@ export type AuthErrorKind =
   | 'config'
   | 'pin-required'
   | 'pin-not-set'
-  | 'locked';
+  | 'locked'
+  | 'device-pending'
+  | 'device-rejected'
+  | 'device-update-required';
 
 export class AuthError extends Error {
   constructor(
@@ -174,7 +178,7 @@ export async function login(credentials: Credentials): Promise<Session> {
       body: JSON.stringify({
         phone: credentials.phone,
         password: credentials.password,
-        device_name: 'android',
+        ...loginDeviceIdentity(),
       }),
     });
   } catch {
@@ -197,6 +201,10 @@ export async function login(credentials: Credentials): Promise<Session> {
       body?.message ?? 'Akun ini sudah memiliki PIN. Masuk dengan PIN Anda.',
       'pin-required',
     );
+  }
+
+  if (response.status === 403) {
+    throw await deviceError(response);
   }
 
   if (!response.ok) {
@@ -311,7 +319,7 @@ export async function loginWithPin(phone: string, pin: string): Promise<Session>
     response = await fetch(`${apiBaseUrl()}/auth/login-pin`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ phone, pin, device_name: 'android' }),
+      body: JSON.stringify({ phone, pin, ...loginDeviceIdentity() }),
     });
   } catch {
     throw new AuthError('Tidak dapat menghubungi server. Periksa koneksi internet Anda.', 'network');
@@ -337,6 +345,9 @@ export async function loginWithPin(phone: string, pin: string): Promise<Session>
   if (response.status === 401 || response.status === 422) {
     throw new AuthError('Nomor HP atau PIN salah.', 'credentials');
   }
+  if (response.status === 403) {
+    throw await deviceError(response);
+  }
   if (!response.ok) {
     throw new AuthError(`Server bermasalah (${response.status}). Coba lagi nanti.`, 'server');
   }
@@ -351,6 +362,14 @@ export async function loginWithPin(phone: string, pin: string): Promise<Session>
   }
 
   return { token: body.token, user: toSessionUser(body.user) };
+}
+
+async function deviceError(response: Response): Promise<AuthError> {
+  const body = (await response.json().catch(() => null)) as { code?: string; message?: string } | null;
+  const kind = body?.code === 'DEVICE_PENDING' ? 'device-pending'
+    : body?.code === 'DEVICE_REJECTED' ? 'device-rejected'
+      : body?.code === 'DEVICE_UPDATE_REQUIRED' ? 'device-update-required' : 'server';
+  return new AuthError(body?.message ?? 'Login belum bisa dipakai di HP ini. Coba lagi ya.', kind);
 }
 
 /**
