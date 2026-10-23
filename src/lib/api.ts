@@ -173,7 +173,9 @@ export async function requestWithStatus<T>(path: string, options: RequestOptions
   if (options.kitchen && kitchenUser?.role !== 'BARISTA' &&
       (kitchenUser?.isSuperAdmin || kitchenUser?.abilities?.['kitchen_operations']?.includes('view')
         || kitchenUser?.abilities?.['cart_close_out']?.includes('view')
-        || kitchenUser?.abilities?.['cart_close_out']?.includes('edit'))) {
+        || kitchenUser?.abilities?.['cart_close_out']?.includes('edit')
+        || kitchenUser?.abilities?.['kitchen_reject']?.includes('view')
+        || kitchenUser?.abilities?.['kitchen_reject']?.includes('create'))) {
     const kitchenId = options.kitchenId ?? useKitchenSelection.getState().kitchenId;
     if (!kitchenId) throw new ApiError('Pilih Dapur Pusat dulu ya.', 422);
     if (method === 'GET') {
@@ -301,7 +303,7 @@ export async function uploadFileWithStatus<T>(
 ): Promise<ApiResult<T>> {
   if (isDemoMode()) {
     try {
-      return await demoUpload<T>(path, file, fields);
+      return await demoUpload<T>(path, file, fields, idempotencyKey);
     } catch (e) {
       rethrowAsApiError(e);
     }
