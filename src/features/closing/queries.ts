@@ -23,6 +23,7 @@ export type ClosingDraft = {
   cart_code: string;
   operating_date: string;
   closing_id: number | null;
+  note: string | null;
   can_correct: boolean;
   carry_warning: boolean;
   total_minor: number;
@@ -61,6 +62,7 @@ export type ClosingInput = {
   lines: { product_id: number; qty_remaining: number; qty_wasted: number }[];
   qris: number;
   transfer: number;
+  note?: string;
   gps?: { lat: number; lng: number } | null;
 };
 
@@ -72,6 +74,7 @@ export function useRecordClosing() {
       idempotencyKey: input.key,
       body: {
         lines: input.lines, qris: input.qris, transfer: input.transfer,
+        note: input.note || null,
         ...(input.gps ? { gps_lat: input.gps.lat, gps_lng: input.gps.lng } : { gps_unavailable: true }),
       },
     }),

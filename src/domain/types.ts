@@ -76,6 +76,7 @@ export type RefillLine = {
   product_id: number;
   product_name: string;
   image_url?: string | null;
+  is_operational?: boolean;
   unit: string;
   qty_requested: number;
   qty_approved: number | null;
@@ -89,6 +90,7 @@ export type RefillLine = {
 export type RefillRequest = {
   id: number;
   code: string;
+  note: string | null;
   status: RefillStatus;
   status_message?: string | null;
   status_history?: {
@@ -214,6 +216,7 @@ export type DailyAllowance = {
 /** What `POST /showcase/hand-to-cart` returns — enough to refresh the screen with no second call. */
 export type HandoverResult = {
   assignment_id: number;
+  note: string | null;
   cart_id: number;
   cart_code: string;
   staff_id: number;
@@ -363,6 +366,7 @@ export type SettlementQueueRow = {
   transactions: number;
   cups_sold: number;
   closing_id?: number | null;
+  closing_note?: string | null;
   closing_status?: 'Sudah closing' | 'Menunggu closing Rider' | 'Legacy';
   closing_required?: boolean;
   carry_warning?: boolean;

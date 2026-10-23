@@ -69,10 +69,6 @@ export const PRODUCTS: DemoProduct[] = [
   { id: 8, code: 'SOUL-MATCHA', name: 'Soul Matcha', unit: 'cup', is_sellable: true, sort_order: 8, sell_price: 24000, cost_price: 9600 },
   { id: 9, code: 'SOUL-CHOCOLATE', name: 'Soul Chocolate', unit: 'cup', is_sellable: true, sort_order: 9, sell_price: 22000, cost_price: 8800 },
   { id: 10, code: 'LECHEE-TEA', name: 'Lechee Tea', unit: 'cup', is_sellable: true, sort_order: 10, sell_price: 18000, cost_price: 7200 },
-  // Non-sellable consumable (§3.1, Q3 of docs/02): tracked so it can be requested and refilled
-  // without polluting sales figures. No sell price; a small placeholder cost keeps its own
-  // request-value line non-zero for Finance.
-  { id: 11, code: 'ES-BATU', name: 'ES BATU', unit: 'pack', is_sellable: false, sort_order: 11, sell_price: 0, cost_price: 2000 },
 ];
 
 export const SELLABLE_PRODUCT_IDS = PRODUCTS.filter((p) => p.is_sellable).map((p) => p.id);
@@ -209,6 +205,7 @@ export type StockMovementType =
   | 'REFILL_IN'
   | 'SALE_OUT'
   | 'RETURN_IN'
+  | 'RETURN_OUT'
   | 'WASTE_OUT'
   | 'ADJUSTMENT';
 
@@ -279,6 +276,7 @@ export type DemoRefillRequest = {
   id: number;
   uuid: string;
   code: string;
+  note?: string | null;
   status: RefillStatusValue;
   version: number;
   operatingDate: string;

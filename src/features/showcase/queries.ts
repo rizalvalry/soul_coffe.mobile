@@ -27,12 +27,31 @@ import type {
 /** Same reason as `features/refill/queries.ts`: one place for keys so invalidation cannot drift. */
 export const showcaseKeys = {
   stock: ['showcase', 'stock'] as const,
+  handovers: ['showcase', 'handovers'] as const,
   staff: ['showcase', 'staff'] as const,
   carts: ['carts'] as const,
   allowance: (cartId: number) => ['showcase', 'allowance', cartId] as const,
   absenStatus: ['absen', 'status'] as const,
   absenRoll: (date?: string) => ['absen', 'roll', date ?? 'today'] as const,
 };
+
+export type HandoverHistoryRow = {
+  id: number;
+  created_at: string;
+  cart_code: string;
+  staff_name: string;
+  product_name: string;
+  qty: number;
+  note: string | null;
+};
+
+export function useHandoverHistory() {
+  const kitchenId = useKitchenSelection((s) => s.kitchenId);
+  return useQuery({
+    queryKey: [...showcaseKeys.handovers, kitchenId],
+    queryFn: () => request<HandoverHistoryRow[]>('/showcase/handovers', { kitchen: true }),
+  });
+}
 
 /**
  * Products carry `unit` only on the master-data list, exactly as in the refill queries — the
@@ -164,6 +183,7 @@ export type HandoverInput = {
   cartId: number;
   staffId: number;
   lines: { product_id: number; qty: number }[];
+  note?: string;
   /** Omitted means "keep today's amount" — the normal path, since the form arrives pre-filled. */
   allowanceAmount?: number;
   /** Only needed for a cart that has never had a location before. */
@@ -181,6 +201,7 @@ export function useHandToCart() {
       const body = {
         cart_id: input.cartId, staff_id: input.staffId,
         lines: input.lines.filter((line) => line.qty > 0),
+        note: input.note || null,
         ...(input.allowanceAmount !== undefined ? { allowance_amount: input.allowanceAmount } : {}),
         ...(input.locationId !== undefined ? { location_id: input.locationId } : {}),
       };
@@ -195,6 +216,7 @@ export function useHandToCart() {
       return result;
     },
     onSuccess: (result) => {
+      void client.invalidateQueries({ queryKey: showcaseKeys.handovers });
       void client.invalidateQueries({ queryKey: showcaseKeys.stock });
       void client.invalidateQueries({ queryKey: refillKeys.kitchenStock });
       void client.invalidateQueries({ queryKey: showcaseKeys.allowance(result.cart_id) });

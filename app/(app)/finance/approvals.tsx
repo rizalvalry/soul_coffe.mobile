@@ -110,6 +110,7 @@ function ApprovalCard({
   const [error, setError] = useState<string | null>(null);
 
   const isPending = approve.isPending || reject.isPending;
+  const hasRetiredLines = refill.lines.some((line) => line.is_operational === false);
 
   const anyReduced = refill.lines.some(
     (line) => (qtyApproved[line.id] ?? line.qty_requested) < line.qty_requested,
@@ -180,7 +181,7 @@ function ApprovalCard({
       <RefillCard refill={refill} showCost index={index} />
 
       <View style={styles.lines}>
-        {refill.lines.map((line) => {
+        {refill.lines.filter((line) => line.is_operational !== false).map((line) => {
           const qty = qtyApproved[line.id] ?? line.qty_requested;
           return (
             <View key={line.id} style={styles.lineRow}>
@@ -209,6 +210,8 @@ function ApprovalCard({
           );
         })}
       </View>
+
+      {hasRetiredLines ? <Banner tone="warning" message="Request lama ini punya produk yang sudah tidak dipakai. Tolak request ini dan minta Rider kirim ulang ya." /> : null}
 
       {hasCost ? <MetaRow label="Total Disetujui" value={formatRupiah(grandTotal)} emphasis /> : null}
 
@@ -279,7 +282,7 @@ function ApprovalCard({
               style={styles.actionBtn}
               onPress={() => void onApprove()}
               loading={approve.isPending}
-              disabled={isPending}
+              disabled={isPending || hasRetiredLines}
             />
           </>
         )}

@@ -55,6 +55,7 @@ export default function RiderClosingScreen() {
   const [wasted, setWasted] = useState<Record<number, string>>({});
   const [qris, setQris] = useState('0');
   const [transfer, setTransfer] = useState('0');
+  const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [needsFreshDraft, setNeedsFreshDraft] = useState(false);
   const [showCorrection, setShowCorrection] = useState(false);
@@ -71,6 +72,7 @@ export default function RiderClosingScreen() {
     setWasted(Object.fromEntries(draft.data.lines.map((line) => [line.product_id, String(line.qty_wasted)])));
     setQris(String(draft.data.qris_minor));
     setTransfer(String(draft.data.transfer_minor));
+    setNote(draft.data.note ?? '');
   }, [draft.data, formSignature]);
 
   const counts = useMemo(
@@ -132,7 +134,7 @@ export default function RiderClosingScreen() {
       qty_remaining: counts[line.product_id] ?? 0,
       qty_wasted: wasteCounts[line.product_id] ?? 0,
     }));
-    const signature = JSON.stringify([draft.data.cart_id, lines, amount(qris), amount(transfer)]);
+    const signature = JSON.stringify([draft.data.cart_id, lines, amount(qris), amount(transfer), note.trim()]);
     const attempt = retry.current?.signature === signature
       ? retry.current
       : { key: uuidv4(), signature, gps: await closingGps() };
@@ -147,7 +149,7 @@ export default function RiderClosingScreen() {
           retry.current = attempt;
           try {
             const saved = await record.mutateAsync({
-              key: attempt.key, lines, qris: amount(qris), transfer: amount(transfer), gps: attempt.gps,
+              key: attempt.key, lines, qris: amount(qris), transfer: amount(transfer), gps: attempt.gps, note: note.trim(),
             });
             retry.current = null;
             router.replace({ pathname: '/staff/settlement', params: { operating_date: saved.operating_date } });
@@ -210,6 +212,9 @@ export default function RiderClosingScreen() {
               editable={draft.data.can_correct} onChangeText={setQris} />
             <Input label="Total transfer (Rp)" keyboardType="number-pad" value={transfer}
               editable={draft.data.can_correct} onChangeText={setTransfer} />
+            <Input label="Catatan lapangan (opsional)" value={note} onChangeText={setNote}
+              maxLength={500} multiline editable={draft.data.can_correct}
+              placeholder="Contoh: butuh es batu 2 pack, sedotan habis" />
             <Text variant="bodyStrong">Tunai yang harus disetor: {rupiah(Math.max(0, totals.cash))}</Text>
             {!totals.valid ? <Banner tone="warning" message="Cek lagi angka sisa, rusak, QRIS, dan transfer ya." /> : null}
             {error ? <Banner tone="danger" message={error} /> : null}
@@ -232,6 +237,7 @@ export default function RiderClosingScreen() {
                 </View>
               ))}
               <Text variant="bodyStrong">Total {rupiah(draft.data.total_minor)} · Tunai {rupiah(draft.data.cash_minor)}</Text>
+              {draft.data.note ? <Text variant="body">Catatan: {draft.data.note}</Text> : null}
               {draft.data.can_correct ? <Button label="Ada pembeli lagi? Ubah sisa cups" variant="secondary" onPress={() => setShowCorrection(true)} /> : null}
             </Card>
           ) : null}

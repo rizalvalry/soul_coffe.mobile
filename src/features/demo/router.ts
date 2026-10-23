@@ -4,6 +4,7 @@ import {
   approveRefill,
   cancelRefill,
   claimRefill,
+  closeOutCart,
   createAllocation,
   deliverRefill,
   DemoError,
@@ -97,6 +98,7 @@ function serializeRefillLine(actor: Actor, line: DemoRefillLine) {
     id: line.id,
     product_id: line.productId,
     product_name: product?.name ?? 'Produk',
+    is_operational: product?.is_sellable ?? false,
     qty_requested: line.qtyRequested,
     qty_approved: line.qtyApproved,
     qty_prepared: line.qtyPrepared,
@@ -115,6 +117,7 @@ function serializeRefillRequest(actor: Actor, r: DemoRefillRequest) {
   const base = {
     id: r.id,
     code: r.code,
+    note: r.note ?? null,
     status: r.status,
     operating_date: r.operatingDate,
     cart: cart ? { id: cart.id, code: cart.code } : null,
@@ -224,7 +227,31 @@ function parseStatusParam(raw: string | undefined): RefillStatusValue[] | null {
 
 function handleGet(base: string, query: Record<string, string>, actor: Actor): unknown {
   if (base === '/products') return listProducts().map((p) => serializeProduct(actor, p));
-  if (base === '/carts') return listCarts().map(serializeCart);
+  if (base === '/carts') {
+    const carts = query['scope'] === 'close-out'
+      ? listCarts().filter((cart) => cart.status === 'active' && listStaffOnShift().some((row) => row.cartId === cart.id))
+      : listCarts();
+    return carts.map(serializeCart);
+  }
+  if (base === '/showcase/kitchens') return [{ id: 1, name: 'Dapur Pusat' }];
+  if (base === '/showcase/stock') return getKitchenStock(actor.kitchenId ?? 1).map(serializeStockRow);
+  if (base === '/showcase/handovers') return [];
+  if (base === '/showcase/staff') return listStaffOnShift().map((row) => ({
+    id: row.staffId, name: row.staffName, phone: '', assigned_cart_id: row.cartId,
+    assigned_cart_code: row.cartCode, location_setup: null,
+  }));
+  const allowanceMatch = /^\/showcase\/allowance\/(\d+)$/.exec(base);
+  if (allowanceMatch) return { id: Number(allowanceMatch[1]), operating_date: new Date().toISOString().slice(0, 10),
+    cart_id: Number(allowanceMatch[1]), amount_minor: 0, is_edited: false, set_by: null };
+  const closeOutDraftMatch = /^\/showcase\/close-out\/draft\/(\d+)$/.exec(base);
+  if (closeOutDraftMatch) {
+    const cartId = Number(closeOutDraftMatch[1]);
+    if (!getCartById(cartId)) throw new DemoError('Coffee Bike tidak ditemukan.', 404);
+    return { cart_id: cartId, closing_id: null,
+      lines: getCartStock(cartId).filter((row) => row.onHand > 0).map((row) => ({
+        product_id: row.productId, qty_remaining: row.onHand, qty_wasted: 0, qty_to_return: row.onHand,
+      })) };
+  }
   if (base === '/locations') return listLocations().map(serializeLocation);
 
   if (base === '/me') {
@@ -305,6 +332,12 @@ function asNumber(value: unknown, fallback = 0): number {
 
 function handlePost(base: string, body: unknown, actor: Actor): { data: unknown; status: number } {
   if (base === '/auth/logout') return { data: null, status: 204 };
+  if (base === '/showcase/close-out') {
+    const b = (body ?? {}) as JsonRecord;
+    const rows = (key: string) => ((Array.isArray(b[key]) ? b[key] : []) as JsonRecord[])
+      .map((row) => ({ productId: asNumber(row['product_id']), qty: asNumber(row['qty']) }));
+    return { data: closeOutCart(actor, asNumber(b['cart_id']), rows('returned'), rows('rejected')), status: 200 };
+  }
 
   if (base === '/refills') {
     const b = (body ?? {}) as JsonRecord;
@@ -316,6 +349,7 @@ function handlePost(base: string, body: unknown, actor: Actor): { data: unknown;
       gpsLat: typeof b['gps_lat'] === 'number' ? b['gps_lat'] : null,
       gpsLng: typeof b['gps_lng'] === 'number' ? b['gps_lng'] : null,
       gpsUnavailable: b['gps_unavailable'] === true,
+      note: typeof b['note'] === 'string' ? b['note'] : undefined,
       lines: lines.map((l) => ({ productId: asNumber(l['product_id']), qtyRequested: asNumber(l['qty_requested']) })),
     });
     return { data: serializeRefillRequest(actor, refill), status: 201 };
@@ -524,4 +558,3 @@ export async function demoUpload<T>(
 
   throw new DemoError(`Endpoint upload demo tidak dikenal: ${base}`, 404);
 }
-

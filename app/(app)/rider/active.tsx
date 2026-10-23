@@ -230,7 +230,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
         <Card style={styles.card}>
           <Text variant="bodyStrong">Jumlah Diterima</Text>
           {/* R15 — no cost shown to Runner. */}
-          {refill.lines.map((line) => (
+          {refill.lines.filter((line) => line.is_operational !== false).map((line) => (
             <View key={line.id} style={styles.lineRow}>
               <ProductThumbnail product={line} />
               <Text variant="body" style={styles.lineText} numberOfLines={1}>
@@ -444,7 +444,7 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
             Hanya yang benar-benar tidak layak. Sisanya tetap dihitung sebagai cups yang bisa diantar.
           </Text>
 
-          {refill.lines.map((line) => (
+          {refill.lines.filter((line) => line.is_operational !== false).map((line) => (
             <View key={line.id} style={styles.lineRow}>
               <ProductThumbnail product={line} />
               <Text variant="body" style={styles.lineText} numberOfLines={1}>
@@ -547,7 +547,8 @@ export default function RiderActiveScreen() {
                 <Chip label={`${item.total_requested} cups`} icon={<MaterialCommunityIcons name="cup-outline" size={14} color={semantic.textMuted} />} />
               </View>
 
-              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setDeliverId(item.id)} disabled={!item.can.deliver} />
+              {item.lines.some((line) => line.is_operational === false) ? <Banner tone="warning" message="Request lama ini punya produk yang sudah tidak dipakai. Minta Finance cek dulu ya." /> : null}
+              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setDeliverId(item.id)} disabled={!item.can.deliver || item.lines.some((line) => line.is_operational === false)} />
 
               {/* Second, quieter action: something went wrong on the road. Deliberately on the
                   same card as the delivery, because a runner standing over a spilled crate should
@@ -558,6 +559,7 @@ export default function RiderActiveScreen() {
                 variant="ghost"
                 size="sm"
                 onPress={() => setIncidentId(item.id)}
+                disabled={item.lines.some((line) => line.is_operational === false)}
               />
             </Card>
           )}

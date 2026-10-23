@@ -182,10 +182,51 @@ export function getKitchenStock(kitchenId: number): { productId: number; onHand:
     .map((p) => ({ productId: p.id, onHand: onHand('kitchen', kitchenId, p.id) }));
 }
 
+/** Demo Tutup Coffee Bike posts the same paired movements as the live endpoint. */
+export function closeOutCart(actor: Actor, cartId: number,
+  returned: { productId: number; qty: number }[], rejected: { productId: number; qty: number }[]) {
+  if (!['RIDER', 'FINANCE', 'ADMINISTRATOR'].includes(actor.role)) throw new DemoError('Kamu belum punya akses ke Tutup Coffee Bike.', 403);
+  const cart = getCart(cartId);
+  if (!cart) throw new DemoError('Coffee Bike tidak ditemukan.', 404);
+  const totals = new Map<number, { returned: number; rejected: number }>();
+  for (const row of returned) {
+    const current = totals.get(row.productId) ?? { returned: 0, rejected: 0 };
+    current.returned += row.qty;
+    totals.set(row.productId, current);
+  }
+  for (const row of rejected) {
+    const current = totals.get(row.productId) ?? { returned: 0, rejected: 0 };
+    current.rejected += row.qty;
+    totals.set(row.productId, current);
+  }
+  for (const [productId, count] of totals) {
+    if (!getProduct(productId)?.is_sellable) throw new DemoError('Produk ini bukan produk utama', 422);
+    if (count.returned < 0 || count.rejected < 0 || count.returned + count.rejected > onHand('cart', cartId, productId)) {
+      throw new DemoError('Hitungan cups melebihi stok Coffee Bike.', 422);
+    }
+  }
+  const at = new Date().toISOString();
+  for (const [productId, count] of totals) {
+    if (count.returned > 0) {
+      state.stockLedger.push({ id: nextId('stockLedger'), locationType: 'cart', locationId: cartId,
+        productId, movementType: 'RETURN_OUT', qtyDelta: -count.returned, refType: 'cart_closeout_return', refId: cartId, actorId: actor.id, createdAt: at });
+      state.stockLedger.push({ id: nextId('stockLedger'), locationType: 'kitchen', locationId: cart.kitchenId,
+        productId, movementType: 'RETURN_IN', qtyDelta: count.returned, refType: 'cart_closeout_return', refId: cartId, actorId: actor.id, createdAt: at });
+    }
+    if (count.rejected > 0) {
+      state.stockLedger.push({ id: nextId('stockLedger'), locationType: 'cart', locationId: cartId,
+        productId, movementType: 'WASTE_OUT', qtyDelta: -count.rejected, refType: 'cart_closeout_reject', refId: cartId, actorId: actor.id, createdAt: at });
+    }
+  }
+  return { cart_id: cartId, cart_code: cart.code,
+    cart_stock: getCartStock(cartId).map((row) => ({ product_id: row.productId, product_name: getProduct(row.productId)?.name ?? '-', on_hand: row.onHand })),
+    showcase_stock: getKitchenStock(cart.kitchenId).map((row) => ({ product_id: row.productId, product_name: getProduct(row.productId)?.name ?? '-', on_hand: row.onHand })) };
+}
+
 // ── Read models ──────────────────────────────────────────────────────────────────────────────────
 
 export function listProducts(): DemoProduct[] {
-  return state.products.slice().sort((a, b) => a.sort_order - b.sort_order);
+  return state.products.filter((product) => product.is_sellable).sort((a, b) => a.sort_order - b.sort_order);
 }
 
 export function listCarts(): DemoCart[] {
@@ -430,6 +471,7 @@ export type SubmitRefillInput = {
   gpsLng: number | null;
   gpsUnavailable: boolean;
   lines: { productId: number; qtyRequested: number }[];
+  note?: string;
 };
 
 const OPEN_STATUSES: RefillStatusValue[] = ['SUBMITTED', 'APPROVED', 'PREPARING', 'READY_TO_PICK', 'PICKED_UP'];
@@ -449,6 +491,9 @@ export function submitRefill(actor: Actor, input: SubmitRefillInput): DemoRefill
   const lines = input.lines.filter((l) => l.qtyRequested > 0);
   if (lines.length === 0) throw new DemoError('Pilih minimal satu produk', 422);
   for (const line of lines) {
+    if (!state.products.some((product) => product.id === line.productId && product.is_sellable)) {
+      throw new DemoError('Produk ini bukan produk utama', 422);
+    }
     if (!Number.isInteger(line.qtyRequested) || line.qtyRequested < 1 || line.qtyRequested > 100) {
       throw new DemoError('Jumlah harus antara 1 dan 100 cups', 422);
     }
@@ -474,6 +519,7 @@ export function submitRefill(actor: Actor, input: SubmitRefillInput): DemoRefill
     id: nextId('refill'),
     uuid: input.uuid,
     code: `REF-${today.replace(/-/g, '')}-${String(state.nextIds.refill - 1).padStart(4, '0')}`,
+    note: input.note ?? null,
     status: 'SUBMITTED',
     version: 1,
     operatingDate: today,

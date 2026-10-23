@@ -125,6 +125,7 @@ function RequestDetail({
           {typeof refill.total_cost === 'number' ? (
             <MetaRow label="Nilai Permintaan" value={formatRupiah(refill.total_cost)} emphasis />
           ) : null}
+          {refill.note ? <Text variant="body">Catatan lapangan: {refill.note}</Text> : null}
         </Card>
       </Animated.View>
 
