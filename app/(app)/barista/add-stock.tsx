@@ -18,6 +18,7 @@ import { MetaRow, SectionTitle } from '@/components/ui/Section';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { enter } from '@/components/ui/Motion';
 import { useProducts } from '@/features/refill/queries';
+import { MAX_PRODUCTION_QTY } from '@/features/showcase/quantity';
 import {
   useCartAllowance,
   useCarts,
@@ -308,7 +309,7 @@ export default function BaristaAddStockScreen() {
                       onChange={(next) => setQtyByProduct((prev) => ({ ...prev, [p.id]: next }))}
                       // Capped at what the showcase actually holds — the server refuses more
                       // anyway, and letting the barista type it first only wastes their time.
-                      max={available}
+                      max={Math.min(available, MAX_PRODUCTION_QTY)}
                       capHint={available === 0 ? 'Showcase kosong' : undefined}
                     />
                   </View>
