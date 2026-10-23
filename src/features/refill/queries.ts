@@ -71,7 +71,7 @@ export function invalidateRefillData(client: QueryClient, refillId?: number) {
 export function useProducts() {
   return useQuery({
     queryKey: qk.products,
-    queryFn: () => request<Product[]>('/products'),
+    queryFn: async () => (await request<Product[]>('/products')).filter((product) => product.is_sellable),
     // A CMS photo may change between visits; refetch on mount without a timer or polling.
     staleTime: 0,
     refetchOnMount: 'always',
@@ -277,6 +277,7 @@ export type SubmitRefillInput = {
   evidenceMediaId: number;
   gps: { lat: number; lng: number } | null;
   lines: { product_id: number; qty_requested: number }[];
+  note?: string;
 };
 
 export function useSubmitRefill() {
@@ -296,6 +297,7 @@ export function useSubmitRefill() {
             gps_unavailable: input.gps === null,
             client_submitted_at: new Date().toISOString(),
             lines: input.lines,
+            note: input.note || null,
           },
         }),
         unitLookup(client),

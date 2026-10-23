@@ -45,6 +45,7 @@ export type RawRefillLine = {
   product_id: number;
   product_name: string | null;
   image_url?: string | null;
+  is_operational?: boolean;
   qty_requested: number;
   qty_approved: number | null;
   qty_prepared: number | null;
@@ -56,6 +57,7 @@ export type RawRefillLine = {
 export type RawRefillRequest = {
   id: number;
   code: string;
+  note?: string | null;
   status: RefillRequest['status'];
   status_message?: string | null;
   status_history?: RefillRequest['status_history'];
@@ -88,6 +90,7 @@ function toRefillLine(raw: RawRefillLine, unitOf: UnitLookup): RefillLine {
     product_id: raw.product_id,
     product_name: raw.product_name ?? '-',
     image_url: raw.image_url ?? null,
+    is_operational: raw.is_operational ?? true,
     unit: unitOf(raw.product_id),
     qty_requested: raw.qty_requested,
     qty_approved: raw.qty_approved,
@@ -102,6 +105,7 @@ export function toRefillRequest(raw: RawRefillRequest, unitOf: UnitLookup): Refi
   return {
     id: raw.id,
     code: raw.code,
+    note: raw.note ?? null,
     status: raw.status,
     status_message: raw.status_message ?? null,
     status_history: raw.status_history ?? [],

@@ -19,6 +19,7 @@ import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { SectionTitle } from '@/components/ui/Section';
 import { enter } from '@/components/ui/Motion';
 import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
+import { Input } from '@/components/ui/Input';
 import { useAuth } from '@/features/auth/store';
 import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
 import { useAttendanceStatus } from '@/features/showcase/queries';
@@ -76,6 +77,7 @@ export default function NewRefillScreen() {
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
   const [placeName, setPlaceName] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [note, setNote] = useState('');
 
   // GPS is best-effort — a denial or an unavailable service must never block submit (E10).
   useEffect(() => {
@@ -192,6 +194,7 @@ export default function NewRefillScreen() {
         evidenceMediaId: evidence.id,
         gps,
         lines,
+        note: note.trim(),
       });
 
       router.replace(`/staff/requests/${created.id}`);
@@ -212,7 +215,7 @@ export default function NewRefillScreen() {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
     }
-  }, [user, totalCups, photo, qty, gps, uploadEvidence, submitRefill, router, gateMessage, attendance, refreshUser]);
+  }, [user, totalCups, photo, qty, gps, note, uploadEvidence, submitRefill, router, gateMessage, attendance, refreshUser]);
 
   if (!user?.cartId) {
     return (
@@ -367,6 +370,11 @@ export default function NewRefillScreen() {
           {cameraError ? <Banner message={cameraError} tone="danger" /> : null}
         </Card>
       </Animated.View>
+
+      <Card>
+        <Input label="Catatan lapangan (opsional)" value={note} onChangeText={setNote}
+          maxLength={500} multiline placeholder="Contoh: butuh es batu 2 pack, sedotan habis" />
+      </Card>
 
       {formError ? <Banner message={formError} tone="danger" /> : null}
 

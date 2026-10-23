@@ -26,6 +26,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
   );
   const [shortfallReason, setShortfallReason] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const hasRetiredLines = refill.lines.some((line) => line.is_operational === false);
 
   const hasShortfall = refill.lines.some((l) => (qty[l.id] ?? 0) < (l.qty_approved ?? 0));
 
@@ -59,7 +60,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
       </View>
 
       <View style={styles.lines}>
-        {refill.lines.map((line) => (
+        {refill.lines.filter((line) => line.is_operational !== false).map((line) => (
           <View key={line.id} style={styles.lineRow}>
             <ProductThumbnail product={line} />
             <View style={styles.lineText}>
@@ -77,6 +78,8 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
         ))}
       </View>
 
+      {hasRetiredLines ? <Banner tone="warning" message="Request lama ini punya produk yang sudah tidak dipakai. Minta Finance cek request ini ya." /> : null}
+
       {hasShortfall ? (
         <Input
           label="Alasan Kekurangan"
@@ -90,7 +93,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
 
       {error ? <Banner message={error} tone="danger" /> : null}
 
-      <Button label="Siap Diambil" icon="check-circle-outline" onPress={() => void onSubmit()} loading={markReady.isPending} />
+      <Button label="Siap Diambil" icon="check-circle-outline" onPress={() => void onSubmit()} loading={markReady.isPending} disabled={hasRetiredLines} />
     </Card>
   );
 }

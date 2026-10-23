@@ -288,6 +288,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   </Text>
                 </View>
               )) : null}
+              {row.closing_note ? <Text variant="body">Catatan Rider: {row.closing_note}</Text> : null}
               {expectations.cash !== null && expectations.qris !== null && expectations.transfer !== null ? (
                 <View style={styles.expectedMethods}>
                   <View style={styles.totalRow}>

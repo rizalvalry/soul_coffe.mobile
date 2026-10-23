@@ -23,6 +23,7 @@ import {
   useCartAllowance,
   useCarts,
   useHandToCart,
+  useHandoverHistory,
   useShowcaseStaff,
   useShowcaseStock,
 } from '@/features/showcase/queries';
@@ -46,11 +47,13 @@ export default function BaristaAddStockScreen() {
   const productsQuery = useProducts();
   const showcaseQuery = useShowcaseStock();
   const handToCart = useHandToCart();
+  const handovers = useHandoverHistory();
 
   const [cartId, setCartId] = useState<number | null>(null);
   const [staffId, setStaffId] = useState<number | null>(null);
   const [qtyByProduct, setQtyByProduct] = useState<Record<number, number>>({});
   const [allowanceText, setAllowanceText] = useState('');
+  const [note, setNote] = useState('');
   const [banner, setBanner] = useState<string | null>(null);
 
   const allowanceQuery = useCartAllowance(cartId);
@@ -102,12 +105,14 @@ export default function BaristaAddStockScreen() {
         cartId: selectedCart.id,
         staffId: selectedStaff.id,
         lines: products.map((p) => ({ product_id: p.id, qty: qtyByProduct[p.id] ?? 0 })),
+        note: note.trim(),
         // Only sent when the barista actually moved it — submitting the pre-filled value
         // unchanged should not read as a deliberate override in the audit trail.
         ...(allowanceChanged ? { allowanceAmount } : {}),
       });
 
       setQtyByProduct({});
+      setNote('');
       Alert.alert(
         'Stock terkirim',
         `${totalCups} cups masuk ke Coffee Bike ${result.cart_code} untuk ${result.staff_name}. ` +
@@ -336,6 +341,9 @@ export default function BaristaAddStockScreen() {
               }
             />
 
+            <Input label="Catatan lapangan (opsional)" value={note} onChangeText={setNote}
+              maxLength={500} multiline placeholder="Contoh: butuh es batu 2 pack, sedotan habis" />
+
             {banner ? <Banner tone="danger" message={banner} /> : null}
 
             <Button
@@ -349,6 +357,15 @@ export default function BaristaAddStockScreen() {
           </Card>
         </Animated.View>
       ) : null}
+      <Card style={styles.card}>
+        <Text variant="bodyStrong">Riwayat serah terima</Text>
+        {(handovers.data ?? []).slice(0, 10).map((row) => (
+          <View key={row.id}>
+            <Text variant="caption">Coffee Bike {row.cart_code} · {row.staff_name} · {row.qty} {row.product_name}</Text>
+            {row.note ? <Text variant="body">Catatan: {row.note}</Text> : null}
+          </View>
+        ))}
+      </Card>
     </Screen>
   );
 }
