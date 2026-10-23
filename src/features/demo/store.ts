@@ -64,6 +64,7 @@ const state = {
   dailyTargets: buildDailyTargets() as DemoDailyTarget[],
   staffAssignments: buildStaffAssignments() as DemoStaffAssignment[],
   stockLedger: seed.stockLedger as DemoStockEntry[],
+  kitchenRejects: [] as DemoKitchenReject[],
   allocations: seed.allocations as DemoAllocation[],
   refillRequests: seed.refillRequests as DemoRefillRequest[],
   notifications: seed.notifications as DemoNotification[],
@@ -180,6 +181,63 @@ export function getKitchenStock(kitchenId: number): { productId: number; onHand:
     .slice()
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((p) => ({ productId: p.id, onHand: onHand('kitchen', kitchenId, p.id) }));
+}
+
+export type DemoKitchenReject = {
+  id: number;
+  kitchen_id: number;
+  kitchen_name: string;
+  actor_name: string;
+  operating_date: string;
+  reason_code: string;
+  note: string | null;
+  status: 'RECORDED' | 'NEEDS_REVIEW';
+  photo_url: string;
+  created_at: string;
+  lines: { product_id: number; product_name: string; qty: number; cost_minor: number }[];
+};
+
+export function listKitchenRejects(kitchenId: number, date: string): DemoKitchenReject[] {
+  return state.kitchenRejects.filter((row) => row.kitchen_id === kitchenId && row.operating_date === date)
+    .slice().reverse();
+}
+
+export function recordKitchenReject(actor: Actor, kitchenId: number,
+  lines: { product_id: number; qty: number }[], reason: string, note: string | null, photoUri: string): DemoKitchenReject {
+  if (!['BARISTA', 'FINANCE'].includes(actor.role)) throw new DemoError('Kamu belum punya akses ke Reject Dapur.', 403);
+  if (actor.role === 'BARISTA' && kitchenId !== actor.kitchenId) throw new DemoError('Pilih dapur kamu sendiri ya.', 403);
+  if (!lines.length || new Set(lines.map((line) => line.product_id)).size !== lines.length)
+    throw new DemoError('Isi produk satu kali per baris ya.', 422);
+  if (!['DROPPED', 'PACKAGING', 'QUALITY', 'OTHER'].includes(reason) || (reason === 'OTHER' && !note?.trim()))
+    throw new DemoError('Pilih alasan dan isi catatan kalau memilih Lainnya ya.', 422);
+  if (!photoUri) throw new DemoError('Ambil foto reject dulu ya.', 422);
+  const products = lines.map((line) => getProduct(line.product_id));
+  lines.forEach((line, index) => {
+    if (!products[index]?.is_sellable) throw new DemoError('Produk ini bukan produk utama.', 422);
+    if (!Number.isInteger(line.qty) || line.qty < 1 || line.qty > 9999)
+      throw new DemoError('Jumlah per produk harus 1–9.999 cups ya.', 422);
+    if (line.qty > onHand('kitchen', kitchenId, line.product_id))
+      throw new DemoError(`Stok showcase tidak cukup untuk ${products[index]?.name}.`, 422);
+  });
+  const date = todayOperatingDate();
+  const overLimit = lines.some((line) => line.qty + state.kitchenRejects
+    .filter((row) => row.kitchen_id === kitchenId && row.operating_date === date)
+    .flatMap((row) => row.lines).filter((prior) => prior.product_id === line.product_id)
+    .reduce((sum, prior) => sum + prior.qty, 0) > 5);
+  const id = state.kitchenRejects.length + 1;
+  const at = new Date().toISOString();
+  const reject: DemoKitchenReject = { id, kitchen_id: kitchenId, kitchen_name: state.kitchen.name,
+    actor_name: actor.name, operating_date: date, reason_code: reason, note,
+    status: overLimit ? 'NEEDS_REVIEW' : 'RECORDED', photo_url: photoUri, created_at: at,
+    lines: lines.map((line, index) => ({ product_id: line.product_id,
+      product_name: products[index]!.name, qty: line.qty,
+      cost_minor: line.qty * products[index]!.cost_price })) };
+  for (const line of lines) state.stockLedger.push({ id: nextId('stockLedger'),
+    locationType: 'kitchen', locationId: kitchenId, productId: line.product_id,
+    movementType: 'WASTE_OUT', qtyDelta: -line.qty, refType: 'kitchen_reject',
+    refId: id, actorId: actor.id, createdAt: at });
+  state.kitchenRejects.push(reject);
+  return reject;
 }
 
 /** Demo Tutup Coffee Bike posts the same paired movements as the live endpoint. */

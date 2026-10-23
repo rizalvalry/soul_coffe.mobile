@@ -429,7 +429,12 @@ export function menuForUser(user: AccessUser): MenuItem[] {
       icon: 'clipboard-check-outline', route: '/kitchen/close-out', requirement: 'T-071',
       primary: user.role === 'RIDER' }]
     : [];
-  return [...closeOutTile, ...ownFlow, ...kitchenTile, ...granted];
+  const rejectTile: MenuItem[] = canUse(user, 'kitchen_reject', 'create')
+    ? [{ id: 'kitchen-reject', label: 'Catat Reject', sublabel: 'Catat cups rusak di showcase',
+      icon: 'cup-off-outline', route: '/kitchen/reject', requirement: 'T-074',
+      primary: user.role === 'BARISTA' }]
+    : [];
+  return [...rejectTile, ...closeOutTile, ...ownFlow, ...kitchenTile, ...granted];
 }
 
 /** Expo Router's sitemap follows the actual app/ files, so a newly added screen needs no menu edit. */

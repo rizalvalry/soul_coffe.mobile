@@ -1,5 +1,5 @@
 import { useAuth } from '@/features/auth/store';
-import type { DemoAllocation, DemoRefillLine, DemoRefillRequest, RefillStatusValue } from './seed';
+import { todayOperatingDate, type DemoAllocation, type DemoRefillLine, type DemoRefillRequest, type RefillStatusValue } from './seed';
 import {
   approveRefill,
   cancelRefill,
@@ -21,6 +21,7 @@ import {
   getRefillById,
   getUserById,
   listCarts,
+  listKitchenRejects,
   listLocations,
   listNotifications,
   listProducts,
@@ -30,6 +31,7 @@ import {
   markReadyRefill,
   refillCapabilities,
   rejectRefill,
+  recordKitchenReject,
   requireActor,
   startPreparingRefill,
   storeMedia,
@@ -234,6 +236,10 @@ function handleGet(base: string, query: Record<string, string>, actor: Actor): u
     return carts.map(serializeCart);
   }
   if (base === '/showcase/kitchens') return [{ id: 1, name: 'Dapur Pusat' }];
+  if (base === '/kitchen-rejects/kitchens') return [{ id: 1, name: 'Dapur Pusat' }];
+  if (base === '/kitchen-rejects/stock') return getKitchenStock(Number(query['kitchen_id'] ?? actor.kitchenId ?? 1)).map(serializeStockRow);
+  if (base === '/kitchen-rejects') return listKitchenRejects(Number(query['kitchen_id'] ?? actor.kitchenId ?? 1),
+    query['date'] ?? todayOperatingDate());
   if (base === '/showcase/stock') return getKitchenStock(actor.kitchenId ?? 1).map(serializeStockRow);
   if (base === '/showcase/handovers') return [];
   if (base === '/showcase/staff') return listStaffOnShift().map((row) => ({
@@ -480,6 +486,7 @@ export async function demoUpload<T>(
   path: string,
   file: { uri: string; name: string; type: string },
   fields: Record<string, string>,
+  idempotencyKey?: string,
 ): Promise<DemoUploadResult<T>> {
   const actor = currentActor();
   const { base } = splitPath(path);
@@ -487,6 +494,21 @@ export async function demoUpload<T>(
   if (base === '/media/evidence' || base === '/media/handover') {
     const media = storeMedia(file.uri);
     return { data: { id: media.id, url: media.url, sha256: media.sha256 } as T, status: 201 };
+  }
+
+  if (base === '/kitchen-rejects') {
+    let lines: { product_id: number; qty: number }[];
+    try {
+      const parsed = JSON.parse(fields['lines'] ?? '[]') as JsonRecord[];
+      lines = parsed.map((line) => ({ product_id: asNumber(line['product_id']), qty: asNumber(line['qty']) }));
+    } catch { throw new DemoError('Data produk tidak valid.', 422); }
+    const takenAt = new Date(fields['photo_taken_at'] ?? '');
+    if (Number.isNaN(takenAt.getTime()) || Date.now() - takenAt.getTime() > 15 * 60_000)
+      throw new DemoError('Foto reject wajib diambil langsung dari kamera.', 422);
+    const data = withIdempotency(idempotencyKey, () => recordKitchenReject(actor,
+      Number(fields['kitchen_id'] ?? actor.kitchenId ?? 1), lines,
+      fields['reason_code'] ?? '', fields['note'] ?? null, file.uri));
+    return { data: data as T, status: 201 };
   }
 
   // The runner's accident report. The demo takes the report and stops there, which is honest:

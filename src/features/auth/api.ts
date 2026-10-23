@@ -137,10 +137,12 @@ function demoAbilities(role: Role): Record<string, string[]> {
       settlements: ['view', 'edit'],
       clearing: ['view', 'edit'],
       cart_close_out: ['view', 'edit'],
+      kitchen_reject: role === 'FINANCE' ? ['view', 'create', 'edit'] : ['view'],
       ...(role === 'MANAGEMENT' || role === 'ADMINISTRATOR'
         ? { rider_location_setup: ['view', 'edit'] } : {}),
     };
   }
+  if (role === 'BARISTA') return { kitchen_reject: ['view', 'create'] };
   if (role === 'RIDER') return { cart_close_out: ['view', 'edit'] };
   return {};
 }
