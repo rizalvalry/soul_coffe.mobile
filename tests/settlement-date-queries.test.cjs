@@ -11,6 +11,7 @@ const javascript = ts.transpileModule(source, {
 }).outputText;
 const requests = [];
 const modules = {
+  react: { useRef: (initial) => ({ current: initial }) },
   '@tanstack/react-query': {
     useQuery: (options) => options,
     useMutation: (options) => options,

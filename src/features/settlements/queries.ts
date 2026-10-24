@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { request, uuidv4 } from '@/lib/api';
@@ -96,17 +97,40 @@ export type ApproveSettlementInput = {
 
 export function useApproveSettlement() {
   const client = useQueryClient();
+  const attemptRef = useRef<{
+    fingerprint: string;
+    idempotencyKey: string;
+    lines: ApproveSettlementInput['lines'];
+    note?: string;
+  } | null>(null);
 
   return useMutation({
-    mutationFn: (input: ApproveSettlementInput) =>
-      request<Settlement>(`/settlements/${input.settlementId}/approve`, {
+    mutationFn: async (input: ApproveSettlementInput) => {
+      const lines = input.lines.filter((line) => line.qty_returned > 0 || line.qty_rejected > 0)
+        .map((line) => ({
+          product_id: line.product_id,
+          qty_returned: line.qty_returned,
+          qty_rejected: line.qty_rejected,
+        }));
+      const note = input.note || undefined;
+      const fingerprint = JSON.stringify([input.settlementId, { lines, ...(note ? { note } : {}) }]);
+      let entry = attemptRef.current;
+      if (!entry || entry.fingerprint !== fingerprint) {
+        entry = { fingerprint, idempotencyKey: uuidv4(), lines, note };
+        attemptRef.current = entry;
+      }
+
+      const approved = await request<Settlement>(`/settlements/${input.settlementId}/approve`, {
         method: 'POST',
-        idempotencyKey: uuidv4(),
+        idempotencyKey: entry.idempotencyKey,
         body: {
-          lines: input.lines.filter((line) => line.qty_returned > 0 || line.qty_rejected > 0),
-          ...(input.note ? { note: input.note } : {}),
+          lines: entry.lines,
+          ...(entry.note ? { note: entry.note } : {}),
         },
-      }),
+      });
+      if (attemptRef.current === entry) attemptRef.current = null;
+      return approved;
+    },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: ['settlements'] });
       // Cups going back to the showcase change the kitchen's stock, and the rejects change it

@@ -154,12 +154,14 @@ test('Finance reject keeps trimmed reason and pending controls; queue refreshes 
 
 test('Finance mutation wire bodies remain exact and monetary values stay integer', async () => {
   const calls = [];
+  let approveUuid = 0;
   const queryClient = { invalidateQueries: () => Promise.resolve() };
   const common = {
+    react: { useRef: (initial) => ({ current: initial }) },
     '@tanstack/react-query': { useMutation: (options) => options, useQuery: (options) => options,
       useQueryClient: () => queryClient },
     '@/lib/api': { request: async (path, options) => { calls.push({ path, options: snapshot(options) }); return {}; },
-      uuidv4: () => 'approval-key' },
+      uuidv4: () => `approval-key-${++approveUuid}` },
   };
   const settlements = load('src/features/settlements/queries.ts', {
     ...common, '@/features/refill/queries': { qk: { kitchenStock: ['stock'] } },
@@ -179,7 +181,7 @@ test('Finance mutation wire bodies remain exact and monetary values stay integer
     { product_id: 4, qty_returned: 0, qty_rejected: 0 },
   ] });
   assert.deepEqual(calls.pop(), { path: '/settlements/7/approve', options: {
-    method: 'POST', idempotencyKey: 'approval-key',
+    method: 'POST', idempotencyKey: 'approval-key-1',
     body: { lines: [{ product_id: 3, qty_returned: 2, qty_rejected: 1 }] },
   } });
   const clearing = load('src/features/clearing/queries.ts', common);
