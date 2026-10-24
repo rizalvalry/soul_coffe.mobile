@@ -66,7 +66,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: space.sm,
     borderWidth: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     paddingVertical: space.md,
     paddingHorizontal: space.md,
   },

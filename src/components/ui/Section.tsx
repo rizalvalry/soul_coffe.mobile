@@ -4,7 +4,7 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { Text } from './Text';
 import { Touchable } from './Touchable';
-import { brand, pressScale, semantic, space } from '@/theme';
+import { brand, pressScale, semantic, space, touch } from '@/theme';
 
 /**
  * Section divider inside a scrolling screen.
@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
   textBlock: { flex: 1, gap: space.xxs },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
   title: { letterSpacing: 1.3 },
-  action: { flexDirection: 'row', alignItems: 'center', gap: space.xxs },
+  action: { flexDirection: 'row', alignItems: 'center', gap: space.xxs, minHeight: touch.minTarget },
 
   metaRow: {
     flexDirection: 'row',
