@@ -16,24 +16,26 @@ const refill = { id: 9, code: 'REF-9', cart_code: '0009', staff_name: 'Rider',
   lines: [{ id: 3, product_name: 'Kopi', qty_requested: 3, qty_approved: 3,
     unit_cost: 10000, is_operational: true }] };
 
-function loadScreen(file, modules) {
-  function load(path) {
-    const code = ts.transpileModule(readFileSync(join(root, path), 'utf8'), { compilerOptions: {
-      module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
-      jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
-    } }).outputText;
-    const state = { exports: {} };
-    vm.runInNewContext(code, { module: state, exports: state.exports, __DEV__: false, require: (name) => {
-      if (name === '@/features/refill/useNewRefillController' || name.startsWith('@/features/refill/useRunner')) {
-        return load(`src/features/refill/${name.slice('@/features/refill/'.length)}.ts`);
-      }
-      assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
-      return modules[name];
-    } });
-    return state.exports;
-  }
-  return load(file).default;
+function loadModule(file, modules) {
+  const code = ts.transpileModule(readFileSync(join(root, file), 'utf8'), { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+    jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true,
+  } }).outputText;
+  const state = { exports: {} };
+  vm.runInNewContext(code, { module: state, exports: state.exports, __DEV__: false, require: (name) => {
+    if (name === '@/features/refill/useNewRefillController' || name.startsWith('@/features/refill/useRunner')) {
+      return loadModule(`src/features/refill/${name.slice('@/features/refill/'.length)}.ts`, modules);
+    }
+    if (name === '@/features/showcase/usePreparingController') {
+      return loadModule('src/features/showcase/usePreparingController.ts', modules);
+    }
+    assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
+    return modules[name];
+  } });
+  return state.exports;
 }
+
+function loadScreen(file, modules) { return loadModule(file, modules).default; }
 
 function nodes(tree) {
   const found = [];

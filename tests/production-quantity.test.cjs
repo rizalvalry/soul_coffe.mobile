@@ -15,18 +15,22 @@ function load(path) {
   return module.exports;
 }
 
+function productionSource(screen, controller) {
+  return source(`app/(app)/barista/${screen}.tsx`) + source(`src/features/showcase/use${controller}Controller.ts`);
+}
+
 test('Produksi has one 9,999 cup limit shared by Brew, Allocation and Add Stock', () => {
   const { MAX_PRODUCTION_QTY } = load('src/features/showcase/quantity.ts');
   assert.equal(MAX_PRODUCTION_QTY, 9999);
-  for (const screen of ['brew.tsx', 'allocations.tsx', 'add-stock.tsx']) {
-    assert.match(source(`app/(app)/barista/${screen}`), /MAX_PRODUCTION_QTY/);
+  for (const [screen, controller] of [['brew', 'Brew'], ['allocations', 'Allocations'], ['add-stock', 'AddStock']]) {
+    assert.match(productionSource(screen, controller), /MAX_PRODUCTION_QTY/);
   }
-  const allocations = source('app/(app)/barista/allocations.tsx');
+  const allocations = productionSource('allocations', 'Allocations');
   assert.match(allocations, /kitchenStock\.data\.find/);
   assert.match(allocations, /stockShortages\.length > 0 \? <Banner tone="warning"/);
   assert.match(allocations, /disabled=\{[^\n]*stockShortages\.length > 0/);
   assert.doesNotMatch(allocations, /setQty\(\(current\) =>/);
-  assert.match(source('app/(app)/barista/add-stock.tsx'), /Math\.min\(available, MAX_PRODUCTION_QTY\)/);
+  assert.match(productionSource('add-stock', 'AddStock'), /Math\.min\(available, MAX_PRODUCTION_QTY\)/);
   assert.match(source('src/features/refill/useNewRefillController.ts'), /const MAX_PER_LINE = 100/);
   assert.match(source('app/(app)/staff/refill/new.tsx'), /max=\{maxPerLine\}/);
 });
