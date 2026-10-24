@@ -1,9 +1,12 @@
+import { useEffect, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated, { useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 
 import { IconButton } from './Button';
 import { CountBadge } from './Badge';
 import { useNotifications } from '@/features/refill/queries';
+import { entrance, spring, timing } from '@/theme';
 
 /**
  * The lonceng icon — the piece that was missing entirely.
@@ -20,6 +23,18 @@ export function NotificationBell() {
   const router = useRouter();
   const { data } = useNotifications({ unreadOnly: true });
   const unread = data?.length ?? 0;
+  const previousUnread = useRef(unread);
+  const pop = useSharedValue(0);
+
+  useEffect(() => {
+    if (previousUnread.current === unread) return;
+    previousUnread.current = unread;
+    pop.value = withSequence(withTiming(1, timing.fast), withSpring(0, spring.bouncy));
+  }, [unread, pop]);
+
+  const badgeStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 + pop.value * (entrance.badgePeak - 1) }],
+  }));
 
   return (
     <View style={styles.wrap}>
@@ -28,7 +43,11 @@ export function NotificationBell() {
         label={unread > 0 ? `Notifikasi, ${unread} belum dibaca` : 'Notifikasi'}
         onPress={() => router.push('/notifications')}
       />
-      {unread > 0 ? <CountBadge count={unread} style={styles.badge} /> : null}
+      {unread > 0 ? (
+        <Animated.View style={[styles.badge, badgeStyle]} pointerEvents="none">
+          <CountBadge count={unread} />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }

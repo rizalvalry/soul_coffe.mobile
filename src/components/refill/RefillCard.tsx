@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/Text';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Touchable } from '@/components/ui/Touchable';
 import { enter, listTransition } from '@/components/ui/Motion';
-import { neutral, pressScale, radius, shadow, semantic, space } from '@/theme';
+import { brand, pressScale, productColor, radius, shadow, semantic, space, statusColor } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 export function formatRupiah(amount: number): string {
@@ -43,6 +43,7 @@ export type RefillCardProps = {
  */
 export function RefillCard({ refill, onPress, showCost = false, index = 0 }: RefillCardProps) {
   const cost = showCost && typeof refill.total_cost === 'number' ? refill.total_cost : null;
+  const cardStyle = [styles.card, { borderLeftColor: statusColor[refill.status].fg }];
 
   const body = (
     <>
@@ -55,6 +56,26 @@ export function RefillCard({ refill, onPress, showCost = false, index = 0 }: Ref
         </View>
         <StatusBadge status={refill.status} />
       </View>
+
+      {refill.lines.length > 0 ? (
+        <View style={styles.products}>
+          {refill.lines.slice(0, 3).map((line) => {
+            const tone = productColor[line.product_name as keyof typeof productColor] ?? { bg: brand[50], fg: brand[700] };
+            return (
+              <View key={line.id} style={[styles.productChip, { backgroundColor: tone.bg }]}>
+                <Text variant="micro" color={tone.fg} numberOfLines={1}>
+                  {line.product_name} · diminta {line.qty_requested}
+                </Text>
+              </View>
+            );
+          })}
+          {refill.lines.length > 3 ? (
+            <View style={styles.productChip}>
+              <Text variant="micro" color={semantic.textMuted}>+{refill.lines.length - 3} produk</Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.metaRow}>
         <View style={styles.metaItem}>
@@ -101,7 +122,7 @@ export function RefillCard({ refill, onPress, showCost = false, index = 0 }: Ref
 
   if (!onPress) {
     return (
-      <Animated.View entering={enter('below', index)} layout={listTransition} style={styles.card}>
+      <Animated.View entering={enter('below', index)} layout={listTransition} style={cardStyle}>
         {body}
       </Animated.View>
     );
@@ -114,7 +135,7 @@ export function RefillCard({ refill, onPress, showCost = false, index = 0 }: Ref
         scaleTo={pressScale.surface}
         accessibilityRole="button"
         accessibilityLabel={`Permintaan ${refill.code}, Coffee Bike ${refill.cart_code}`}
-        style={styles.card}
+        style={cardStyle}
       >
         {body}
       </Touchable>
@@ -135,8 +156,11 @@ function Flag({ icon, label }: { icon: string; label: string }) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: neutral[0],
-    borderRadius: radius.lg,
+    backgroundColor: semantic.surface,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderLeftWidth: 4,
+    borderColor: semantic.border,
     ...shadow.card,
     padding: space.lg,
     gap: space.sm,
@@ -145,6 +169,8 @@ const styles = StyleSheet.create({
   codeBlock: { flex: 1, gap: space.xxs },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.md },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: space.xs, maxWidth: '60%' },
+  products: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xs },
+  productChip: { alignSelf: 'flex-start', maxWidth: '100%', borderRadius: radius.pill, backgroundColor: semantic.surfaceSunken, paddingHorizontal: space.sm, paddingVertical: space.xs },
   costRow: {
     flexDirection: 'row',
     alignItems: 'center',

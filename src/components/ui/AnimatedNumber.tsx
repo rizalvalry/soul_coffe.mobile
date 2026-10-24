@@ -9,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Text, type TextProps } from './Text';
-import { spring, timing } from '@/theme';
+import { duration as motionDuration, entrance, spring, timing } from '@/theme';
 
 export type AnimatedNumberProps = Omit<TextProps, 'children'> & {
   value: number;
@@ -45,7 +45,7 @@ const defaultFormat = (value: number) => value.toLocaleString('id-ID');
  */
 export function AnimatedNumber({
   value,
-  duration = 420,
+  duration = motionDuration.slower,
   prefix,
   suffix,
   format = defaultFormat,
@@ -59,11 +59,20 @@ export function AnimatedNumber({
 
   useEffect(() => {
     let active = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (active) reduceMotion.current = enabled;
-    });
+    const update = (enabled: boolean) => {
+      if (!active) return;
+      reduceMotion.current = enabled;
+      if (enabled && frame.current !== null) {
+        cancelAnimationFrame(frame.current);
+        frame.current = null;
+        setDisplay(previous.current);
+      }
+    };
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', update);
+    void AccessibilityInfo.isReduceMotionEnabled().then(update);
     return () => {
       active = false;
+      subscription.remove();
     };
   }, []);
 
@@ -111,7 +120,7 @@ export function AnimatedNumber({
   }, [value, duration, pop]);
 
   const popStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + pop.value * 0.08 }],
+    transform: [{ scale: 1 + pop.value * (entrance.badgePeak - 1) }],
   }));
 
   const label = `${prefix ?? ''}${format(value)}${suffix ?? ''}`;

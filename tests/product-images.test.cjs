@@ -35,7 +35,8 @@ test('CMS URL becomes the image source; an absent or blank URL selects the cup p
     'react-native': { Image: 'Image', View: 'View', StyleSheet: { create: (styles) => styles } },
     '@expo/vector-icons/MaterialCommunityIcons': 'CupIcon',
     '@/domain/productImages': { productImageSource },
-    '@/theme': { brand: { 50: '#eee', 400: '#aaa' }, radius: { sm: 4 } },
+    '@/theme': { brand: { 700: '#007277' }, neutral: { 100: '#f4f0e9' },
+      productColor: { 'Soul Matcha': { bg: '#E2F2DC', fg: '#2F6B2A' } }, radius: { md: 14 } },
   };
   vm.runInNewContext(compiled, { module: moduleState, exports: moduleState.exports,
     require: (name) => modules[name] });
@@ -46,6 +47,10 @@ test('CMS URL becomes the image source; an absent or blank URL selects the cup p
   assert.equal(photo.key, url);
   assert.equal(thumbnail({ product: { image_url: null } }).props.children.props.name, 'cup-outline');
   assert.equal(thumbnail({ product: { image_url: '  ' } }).props.children.props.name, 'cup-outline');
+  const matcha = thumbnail({ product: { product_name: 'Soul Matcha', image_url: null } });
+  assert.equal(matcha.props.style[1].backgroundColor, '#E2F2DC');
+  assert.equal(matcha.props.children.props.color, '#2F6B2A');
+  assert.equal(thumbnail({ product: { image_url: null } }).props.style[1].backgroundColor, '#f4f0e9');
   const replacement = 'https://cms.example.test/storage/products/replaced.jpg';
   assert.equal(thumbnail({ product: { image_url: replacement } }).props.children.key, replacement);
 });

@@ -17,9 +17,11 @@ import { enter } from '@/components/ui/Motion';
 import { productImageSource } from '@/domain/productImages';
 import {
   brand,
+  entrance,
   feedback,
   neutral,
   pressScale,
+  productColor,
   radius,
   shadow,
   semantic,
@@ -61,6 +63,7 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
   const image = productImageSource(product);
   const selected = value > 0;
   const atMax = value >= max;
+  const tone = productColor[product.name as keyof typeof productColor] ?? { bg: brand[50], fg: brand[700] };
 
   const selectedProgress = useDerivedValue(() =>
     selected ? withSpring(1, spring.gentle) : withTiming(0, timing.base),
@@ -90,7 +93,7 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
   }));
 
   const badgeStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 1 + pop.value * 0.22 }],
+    transform: [{ scale: 1 + pop.value * (entrance.badgePeak - 1) }],
   }));
 
   return (
@@ -104,19 +107,17 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
         accessibilityRole="button"
         accessibilityLabel={`Tambah ${product.name}`}
         accessibilityHint={`Jumlah saat ini ${value} ${product.unit}`}
-        style={styles.imageWrap}
+        style={[styles.imageWrap, { backgroundColor: tone.bg }]}
       >
         {image ? (
           <Image source={image} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={styles.placeholder}>
-            <MaterialCommunityIcons name="cup-outline" size={40} color={brand[400]} />
+            <MaterialCommunityIcons name="cup-outline" size={40} color={tone.fg} />
           </View>
         )}
 
-        {/* Guarantees contrast for the badge below regardless of the photo's own colours — a
-            flat tint, not a gradient ramp, painted every time so it never pops in. */}
-        <View style={styles.scrim} pointerEvents="none" />
+        {image ? <View style={styles.scrim} pointerEvents="none" /> : null}
 
         {selected ? (
           <Animated.View style={[styles.countBadge, badgeStyle]}>
@@ -131,8 +132,8 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
         )}
       </Touchable>
 
-      <View style={styles.body}>
-        <Text variant="bodyStrong" numberOfLines={2} style={styles.name}>
+      <View style={[styles.body, { backgroundColor: tone.bg }]}>
+        <Text variant="bodyStrong" color={tone.fg} numberOfLines={2} ellipsizeMode="tail" accessibilityLabel={product.name} style={styles.name}>
           {product.name}
         </Text>
 
@@ -185,7 +186,7 @@ export function ProductPickerCard({ product, value, max, disabled = false, onCha
 const styles = StyleSheet.create({
   card: {
     flex: 1,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     // The ring is transparent at rest so selecting a tile colours it in rather than adding a
     // border and nudging the grid; depth is the shadow's job, not the outline's.
     borderWidth: 2,
@@ -195,13 +196,12 @@ const styles = StyleSheet.create({
   },
   disabledCard: { opacity: 0.5 },
 
-  imageWrap: { aspectRatio: 1, backgroundColor: brand[50] },
+  imageWrap: { aspectRatio: 1 },
   image: { width: '100%', height: '100%' },
   placeholder: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: brand[50],
   },
   scrim: {
     position: 'absolute',
@@ -237,21 +237,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  body: { padding: space.sm, gap: space.xs, minHeight: 78, justifyContent: 'space-between' },
-  name: { minHeight: 36 },
+  body: { padding: space.sm, gap: space.xs, minHeight: 84, justifyContent: 'space-between' },
+  name: { minHeight: 40 },
 
-  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  stepper: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: radius.pill, backgroundColor: neutral[100], padding: space.xxs },
   stepButton: {
     width: touch.minTarget - 8,
     height: touch.minTarget - 8,
     borderRadius: (touch.minTarget - 8) / 2,
     borderWidth: 1,
-    borderColor: brand[200],
-    backgroundColor: brand[50],
+    borderColor: semantic.border,
+    backgroundColor: neutral[0],
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepButtonPrimary: { backgroundColor: brand[600], borderColor: brand[600] },
+  stepButtonPrimary: { backgroundColor: brand[700], borderColor: brand[700] },
   stepInert: { backgroundColor: neutral[100], borderColor: semantic.border },
   count: { minWidth: 40, textAlign: 'center' },
 });
