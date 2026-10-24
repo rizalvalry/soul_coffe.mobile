@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { request, requestWithStatus, uploadFile, uploadFileWithStatus, uuidv4 } from '@/lib/api';
 import { compressForUpload } from '@/lib/image';
@@ -222,8 +221,11 @@ export function useKitchenStock() {
 // ── Writes ───────────────────────────────────────────────────────────────────
 
 /**
- * A failed mutation keeps its attempt in the mounted form. Repeating the same action replays
- * the same request; success clears it, and closing the form unmounts its attempt.
+ * Every mutation below generates its own Idempotency-Key (R12).
+ *
+ * The key is created once per mutation *call*, not per retry, which is the whole point: a
+ * retried or double-tapped submit reuses the same key and the server replays the original
+ * response instead of creating a second record.
  */
 
 export type UploadEvidenceInput = {
@@ -278,95 +280,54 @@ export type SubmitRefillInput = {
   note?: string;
 };
 
-function submitAttemptId(input: SubmitRefillInput): string {
-  // GPS can arrive after a timeout. It is evidence, not a form edit; keep the first body intact.
-  return JSON.stringify([input.cartId, input.evidenceMediaId, input.lines, input.note || null]);
-}
-
 export function useSubmitRefill() {
   const client = useQueryClient();
-  const attempt = useRef<{ identity: string; key: string; body: unknown } | null>(null);
   return useMutation({
     mutationFn: async (input: SubmitRefillInput) => {
-      const identity = submitAttemptId(input);
-      if (attempt.current?.identity !== identity) {
-        const key = uuidv4();
-        attempt.current = {
-          identity,
-          key,
+      const [raw, unitOf] = await Promise.all([
+        request<RawRefillRequest>('/refills', {
+          method: 'POST',
+          idempotencyKey: uuidv4(),
           body: {
-            uuid: key,
+            uuid: uuidv4(),
             cart_id: input.cartId,
             evidence_media_id: input.evidenceMediaId,
             gps_lat: input.gps?.lat ?? null,
             gps_lng: input.gps?.lng ?? null,
             gps_unavailable: input.gps === null,
             client_submitted_at: new Date().toISOString(),
-            lines: input.lines.map((line) => ({ ...line })),
+            lines: input.lines,
             note: input.note || null,
           },
-        };
-      }
-      const current = attempt.current;
-      const [raw, unitOf] = await Promise.all([
-        request<RawRefillRequest>('/refills', {
-          method: 'POST',
-          idempotencyKey: current.key,
-          body: current.body,
         }),
         unitLookup(client),
       ]);
       return toRefillRequest(raw, unitOf);
     },
-    onSuccess: (_data, input) => {
-      if (attempt.current?.identity === submitAttemptId(input)) attempt.current = null;
-      invalidateRefillData(client);
-    },
+    onSuccess: () => invalidateRefillData(client),
   });
 }
 
-function useTransition<TInput extends object>(
+function useTransition<TInput>(
   buildPath: (input: TInput) => string,
   buildBody?: (input: TInput) => unknown,
   kitchen = false,
 ) {
   const client = useQueryClient();
-  const attempts = useRef(new Map<string, string>());
-  const sent = useRef(new WeakMap<TInput, { identity: string; key: string }>());
   return useMutation({
     mutationFn: async (input: TInput) => {
-      const path = buildPath(input);
-      const body = buildBody?.(input);
-      // requestWithStatus adds kitchen_id to management writes. Capture the selected kitchen
-      // before choosing a key so a later selection change cannot reuse it with a new wire body.
-      const kitchenId = kitchen ? useKitchenSelection.getState().kitchenId : null;
-      const identity = JSON.stringify([path, body ?? null, kitchenId]);
-      let key = attempts.current.get(identity);
-      if (!key) {
-        key = uuidv4();
-        attempts.current.set(identity, key);
-      }
-      sent.current.set(input, { identity, key });
       const [raw, unitOf] = await Promise.all([
-        request<RawRefillRequest>(path, {
+        request<RawRefillRequest>(buildPath(input), {
           kitchen,
-          ...(kitchenId ? { kitchenId } : {}),
           method: 'POST',
-          idempotencyKey: key,
-          ...(buildBody ? { body } : {}),
+          idempotencyKey: uuidv4(),
+          ...(buildBody ? { body: buildBody(input) } : {}),
         }),
         unitLookup(client),
       ]);
       return toRefillRequest(raw, unitOf);
     },
-    onSuccess: (data, input) => {
-      const successful = sent.current.get(input);
-      if (successful && attempts.current.get(successful.identity) === successful.key) {
-        attempts.current.delete(successful.identity);
-      }
-      sent.current.delete(input);
-      invalidateRefillData(client, data?.id);
-    },
+    onSuccess: (data) => invalidateRefillData(client, data?.id),
   });
 }
 
@@ -437,82 +398,55 @@ export type DeliverResult = {
   ledgerPending: boolean;
 };
 
-function deliveryAttemptId(input: DeliverInput): string {
-  // Keep the original GPS in the wire body even if a fix arrives before a retry.
-  return JSON.stringify([input.id, input.handoverMediaId, input.lines, input.signature ?? null]);
-}
-
 export function useDeliverRefill() {
   const client = useQueryClient();
-  const attempts = useRef(new Map<string, {
-    key: string;
-    path: string;
-    body: {
-      handover_media_id: number;
-      lines: DeliverInput['lines'];
-      gps_lat: number | null;
-      gps_lng: number | null;
-      gps_unavailable: boolean;
-      signature_method?: 'staff_signature' | 'pin_fallback';
-      stroke_count?: number;
-      staff_pin?: string;
-    };
-    signature?: DeliverInput['signature'];
-  }>());
   return useMutation<DeliverResult, Error, DeliverInput>({
     mutationFn: async (input: DeliverInput) => {
-      const identity = deliveryAttemptId(input);
-      let attempt = attempts.current.get(identity);
-      if (!attempt) {
-        const signature = input.signature ? { ...input.signature } : undefined;
-        attempt = {
-          key: uuidv4(),
-          path: `/refills/${input.id}/deliver`,
-          signature,
-          // Shared by both paths below. Save every field before the first network call.
-          body: {
-            handover_media_id: input.handoverMediaId,
-            lines: input.lines.map((line) => ({ ...line })),
-            gps_lat: input.gps?.lat ?? null,
-            gps_lng: input.gps?.lng ?? null,
-            // E10: a lost fix is evidence, never a reason to refuse delivery.
-            gps_unavailable: input.gps === null,
-            ...(signature?.method === 'staff_signature' ? { signature_method: 'staff_signature' as const, stroke_count: signature.strokeCount } : {}),
-            ...(signature?.method === 'pin_fallback' ? { signature_method: 'pin_fallback' as const, staff_pin: signature.staffPin } : {}),
-          },
-        };
-        attempts.current.set(identity, attempt);
-      }
-      const { body, signature } = attempt;
+      const signature = input.signature;
+
+      // Shared by both paths below. Everything except the signature file is ordinary data, so
+      // the two branches differ only in HOW they travel, never in what is sent.
+      const body = {
+        handover_media_id: input.handoverMediaId,
+        lines: input.lines,
+        gps_lat: input.gps ? input.gps.lat : null,
+        gps_lng: input.gps ? input.gps.lng : null,
+        // E10: a lost fix is reported as missing, never a reason to refuse the delivery.
+        gps_unavailable: input.gps === null,
+        ...(signature?.method === 'staff_signature' ? { signature_method: 'staff_signature', stroke_count: signature.strokeCount } : {}),
+        ...(signature?.method === 'pin_fallback' ? { signature_method: 'pin_fallback', staff_pin: signature.staffPin } : {}),
+      };
 
       // `/deliver` carries `idempotent:require`; without this header the server answers 422
       // "Header Idempotency-Key wajib dikirim untuk aksi ini." before the handler ever runs.
+      const idempotencyKey = uuidv4();
+
       const [result, unitOf] = await Promise.all([
         signature?.method === 'staff_signature'
           ? uploadFileWithStatus<RawRefillRequest | null>(
-              attempt.path,
+              `/refills/${input.id}/deliver`,
               { uri: signature.uri, name: 'signature.png', type: 'image/png' },
               {
                 // Multipart carries strings; the server casts. `lines` is JSON for the same
                 // reason it is on the incident endpoint — multipart has no array-of-objects
                 // encoding this client can rely on.
-                handover_media_id: String(body.handover_media_id),
+                handover_media_id: String(input.handoverMediaId),
                 signature_method: 'staff_signature',
                 stroke_count: String(signature.strokeCount),
-                lines: JSON.stringify(body.lines),
-                gps_lat: body.gps_lat === null ? '' : String(body.gps_lat),
-                gps_lng: body.gps_lng === null ? '' : String(body.gps_lng),
-                gps_unavailable: body.gps_unavailable ? '1' : '0',
+                lines: JSON.stringify(input.lines),
+                gps_lat: input.gps ? String(input.gps.lat) : '',
+                gps_lng: input.gps ? String(input.gps.lng) : '',
+                gps_unavailable: input.gps === null ? '1' : '0',
               },
               // The deliver endpoint names this part `signature`, not `file` (docs/04).
               'signature',
-              attempt.key,
+              idempotencyKey,
             )
           : // No file to send: a photo-only delivery, or a PIN fallback that no longer needs the
             // 1x1 placeholder image an older build had to invent.
-            requestWithStatus<RawRefillRequest | null>(attempt.path, {
+            requestWithStatus<RawRefillRequest | null>(`/refills/${input.id}/deliver`, {
               method: 'POST',
-              idempotencyKey: attempt.key,
+              idempotencyKey,
               body,
             }),
         unitLookup(client),
@@ -523,9 +457,6 @@ export function useDeliverRefill() {
         ledgerPending: result.status === 202,
       };
     },
-    onSuccess: (result, input) => {
-      attempts.current.delete(deliveryAttemptId(input));
-      invalidateRefillData(client, result.refill?.id);
-    },
+    onSuccess: (result) => invalidateRefillData(client, result.refill?.id),
   });
 }

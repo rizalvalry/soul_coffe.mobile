@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import * as ImagePicker from 'expo-image-picker';
@@ -113,8 +113,6 @@ function PhotoField({
 function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: () => void }) {
   const uploadPhoto = useUploadHandoverPhoto();
   const deliver = useDeliverRefill();
-  const uploadedPhoto = useRef<{ uri: string; takenAt: string; id: number } | null>(null);
-  const delivering = useRef(false);
 
   const [qty, setQty] = useState<Record<number, number>>(() =>
     Object.fromEntries(refill.lines.map((l) => [l.id, l.qty_prepared ?? 0])),
@@ -160,7 +158,6 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
   };
 
   const onSubmit = async () => {
-    if (delivering.current) return;
     setError(null);
 
     if (!photo) {
@@ -168,16 +165,10 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
       return;
     }
 
-    delivering.current = true;
     try {
       // Uploaded first, then referenced by id: this request may also carry a signature file, and
       // the client streams one file per request on purpose (see lib/api.ts).
-      let media = uploadedPhoto.current;
-      if (!media || media.uri !== photo.uri || media.takenAt !== photo.takenAt) {
-        const uploaded = await uploadPhoto.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
-        media = { uri: photo.uri, takenAt: photo.takenAt, id: uploaded.id };
-        uploadedPhoto.current = media;
-      }
+      const media = await uploadPhoto.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
 
       const result = await deliver.mutateAsync({
         id: refill.id,
@@ -202,8 +193,6 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
       onClose();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
-    } finally {
-      delivering.current = false;
     }
   };
 
