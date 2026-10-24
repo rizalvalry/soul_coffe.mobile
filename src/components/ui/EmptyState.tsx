@@ -4,7 +4,7 @@ import Animated from 'react-native-reanimated';
 
 import { Text } from './Text';
 import { enter } from './Motion';
-import { brand, radius, semantic, space } from '@/theme';
+import { brand, feedback, radius, semantic, space } from '@/theme';
 
 export type EmptyStateProps = {
   /** MaterialCommunityIcons glyph name. */
@@ -30,7 +30,7 @@ export function EmptyState({ icon, title, subtitle, tone = 'brand', style, child
   const palette = {
     neutral: { ring: semantic.border, halo: semantic.surfaceSunken, fg: semantic.textMuted },
     brand: { ring: brand[100], halo: brand[50], fg: brand[600] },
-    danger: { ring: '#FCA5A5', halo: '#FEE2E2', fg: '#B91C1C' },
+    danger: { ring: feedback.dangerBorder, halo: feedback.dangerBg, fg: feedback.dangerFg },
   }[tone];
 
   return (
@@ -46,7 +46,7 @@ export function EmptyState({ icon, title, subtitle, tone = 'brand', style, child
       </Text>
 
       {subtitle ? (
-        <Text variant="body" color={semantic.textMuted} center style={styles.subtitle}>
+        <Text variant="caption" color={semantic.textMuted} center style={styles.subtitle}>
           {subtitle}
         </Text>
       ) : null}

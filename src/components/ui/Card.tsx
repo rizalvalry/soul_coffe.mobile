@@ -23,7 +23,7 @@ export function Card({ padded = true, accent = false, style, ...rest }: CardProp
 const styles = StyleSheet.create({
   base: {
     backgroundColor: neutral[0],
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     ...shadow.card,
   },
   padded: { padding: space.lg },

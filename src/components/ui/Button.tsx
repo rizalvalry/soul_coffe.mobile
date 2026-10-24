@@ -38,7 +38,7 @@ const fills: Record<ButtonVariant, { fg: string; bg: string; border: string }> =
   secondary: { fg: brand[700], bg: neutral[0], border: brand[300] },
   ghost: { fg: brand[700], bg: 'transparent', border: 'transparent' },
   danger: { fg: neutral[0], bg: feedback.dangerFg, border: feedback.dangerFg },
-  accent: { fg: neutral[0], bg: accent[600], border: accent[600] },
+  accent: { fg: accent[600], bg: accent[300], border: accent[300] },
 };
 
 export function Button({
@@ -58,7 +58,7 @@ export function Button({
   const fill = fills[variant];
 
   const bg = isInert && variant !== 'ghost' && variant !== 'secondary' ? semantic.primaryDisabled : fill.bg;
-  const fg = isInert && variant !== 'ghost' && variant !== 'secondary' ? neutral[500] : fill.fg;
+  const fg = isInert && variant !== 'ghost' && variant !== 'secondary' ? neutral[600] : fill.fg;
   const border = isInert && variant !== 'ghost' && variant !== 'secondary' ? semantic.primaryDisabled : fill.border;
 
   const iconNode = icon ? (
@@ -70,6 +70,7 @@ export function Button({
       onPress={onPress}
       disabled={isInert}
       scaleTo={pressScale.control}
+      springBack="press"
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
@@ -137,12 +138,14 @@ export function IconButton({
     tinted: { bg: brand[50], fg: brand[700], border: 'transparent' },
     plain: { bg: 'transparent', fg: semantic.textMuted, border: 'transparent' },
   }[tone];
+  const hitSize = Math.max(size, touch.minTarget);
 
   return (
     <Touchable
       onPress={onPress}
       disabled={disabled}
-      scaleTo={pressScale.icon}
+      scaleTo={pressScale.control}
+      springBack="bouncy"
       hitSlop={10}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -150,9 +153,9 @@ export function IconButton({
       style={[
         styles.iconButton,
         {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
+          width: hitSize,
+          height: hitSize,
+          borderRadius: hitSize / 2,
           backgroundColor: palette.bg,
           borderColor: palette.border,
         },
@@ -179,7 +182,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   sizeMd: { minHeight: touch.buttonHeight, paddingHorizontal: space['2xl'] },
-  sizeSm: { minHeight: 40, paddingHorizontal: space.lg },
+  sizeSm: { minHeight: touch.minTarget, paddingHorizontal: space.lg },
   fullWidth: { alignSelf: 'stretch' },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: space.sm },
 

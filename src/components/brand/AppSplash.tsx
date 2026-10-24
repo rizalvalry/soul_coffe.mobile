@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
-  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -12,7 +12,7 @@ import Animated, {
 
 import { Text } from '@/components/ui/Text';
 import { enter } from '@/components/ui/Motion';
-import { brand, neutral, space } from '@/theme';
+import { brand, neutral, space, timing } from '@/theme';
 
 /**
  * The JS half of the launch sequence, matching `figma/01-splash-screen.png`.
@@ -37,12 +37,13 @@ export function AppSplash({ message = 'Menyiapkan aplikasi...' }: { message?: st
   useEffect(() => {
     breathe.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
-        withTiming(0, { duration: 1400, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
+        withTiming(1, { ...timing.ambient, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { ...timing.ambient, easing: Easing.inOut(Easing.quad) }),
       ),
       -1,
       false,
     );
+    return () => cancelAnimation(breathe);
   }, [breathe]);
 
   const markStyle = useAnimatedStyle(() => ({

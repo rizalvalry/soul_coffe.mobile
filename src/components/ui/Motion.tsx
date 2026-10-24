@@ -10,14 +10,14 @@ import Animated, {
   ZoomIn,
 } from 'react-native-reanimated';
 
-import { duration, easing, staggerDelay } from '@/theme';
+import { duration, easing, entrance, spring, staggerDelay } from '@/theme';
 
 /**
  * Screen choreography.
  *
  * The rule this file encodes: content arrives in READING ORDER, from the direction it came from,
  * and it arrives quickly. A screen where the header, the summary and the list all fade in
- * simultaneously feels like a slow screen; the same content staggered 55ms apart feels like a
+ * simultaneously feels like a slow screen; the same content staggered 40ms apart feels like a
  * fast one, even though the last item lands later than it would have.
  *
  * Every animation carries `ReduceMotion.System`, so Android's "Remove animations" setting turns
@@ -28,14 +28,16 @@ export type EnterFrom = 'below' | 'above' | 'scale' | 'fade';
 
 /** Entering animation for item `index` of a sequence. `distance` stays small (14dp default) —
  *  a 60dp slide reads as a page transition, not as one card among many settling into place. */
-export function enter(from: EnterFrom = 'below', index = 0, distance = 14) {
+export function enter(from: EnterFrom = 'below', index = 0, distance: number = entrance.rise) {
   const delay = staggerDelay(index);
 
   switch (from) {
     case 'above':
       return FadeInUp.delay(delay)
-        .duration(duration.slow)
-        .easing(easing.decelerate)
+        .springify()
+        .damping(spring.bouncy.damping)
+        .stiffness(spring.bouncy.stiffness)
+        .mass(spring.bouncy.mass)
         .withInitialValues({ transform: [{ translateY: -distance }] })
         .reduceMotion(ReduceMotion.System);
 
@@ -52,8 +54,10 @@ export function enter(from: EnterFrom = 'below', index = 0, distance = 14) {
     case 'below':
     default:
       return FadeInDown.delay(delay)
-        .duration(duration.slow)
-        .easing(easing.decelerate)
+        .springify()
+        .damping(spring.bouncy.damping)
+        .stiffness(spring.bouncy.stiffness)
+        .mass(spring.bouncy.mass)
         .withInitialValues({ transform: [{ translateY: distance }] })
         .reduceMotion(ReduceMotion.System);
   }

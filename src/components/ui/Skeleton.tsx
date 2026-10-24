@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
-  Easing,
-  ReduceMotion,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -10,7 +9,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { Gradient } from './Gradient';
-import { neutral, radius, semantic, shadow, space } from '@/theme';
+import { neutral, radius, semantic, shadow, space, timing } from '@/theme';
 
 /**
  * Shimmering placeholder for content that is still loading.
@@ -32,8 +31,6 @@ export type SkeletonProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-const SWEEP_MS = 1250;
-
 export function Skeleton({ width = '100%', height = 16, borderRadius, style }: SkeletonProps) {
   const [measured, setMeasured] = useState(0);
   const shift = useSharedValue(0);
@@ -43,10 +40,11 @@ export function Skeleton({ width = '100%', height = 16, borderRadius, style }: S
 
     shift.value = 0;
     shift.value = withRepeat(
-      withTiming(1, { duration: SWEEP_MS, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
+      withTiming(1, timing.ambient),
       -1,
       false,
     );
+    return () => cancelAnimation(shift);
   }, [measured, shift]);
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -134,7 +132,7 @@ const styles = StyleSheet.create({
   list: { gap: space.md },
   card: {
     backgroundColor: semantic.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     padding: space.lg,
     gap: space.sm,
     ...shadow.card,
@@ -147,7 +145,7 @@ const styles = StyleSheet.create({
     width: '47.5%',
     flexGrow: 1,
     backgroundColor: semantic.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     padding: space.md,
     gap: space.sm,
     ...shadow.card,

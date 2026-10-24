@@ -4,7 +4,6 @@ import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated, {
   cancelAnimation,
   Easing,
-  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -14,7 +13,7 @@ import Animated, {
 
 import { Text } from './Text';
 import { enter, exit } from './Motion';
-import { feedback, radius, space } from '@/theme';
+import { feedback, radius, space, timing } from '@/theme';
 import type { ConnectionState } from '@/features/realtime/RealtimeProvider';
 
 export type ConnectionBannerProps = {
@@ -41,12 +40,13 @@ export function ConnectionBanner({ state }: ConnectionBannerProps) {
     }
     pulse.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 900, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
-        withTiming(0, { duration: 900, easing: Easing.inOut(Easing.quad), reduceMotion: ReduceMotion.System }),
+        withTiming(1, { ...timing.ambient, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { ...timing.ambient, easing: Easing.inOut(Easing.quad) }),
       ),
       -1,
       false,
     );
+    return () => cancelAnimation(pulse);
   }, [state, pulse]);
 
   const dotStyle = useAnimatedStyle(() => ({
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     backgroundColor: feedback.warningBg,
     borderColor: feedback.warningBorder,
     borderWidth: 1,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     paddingVertical: space.sm,
     paddingHorizontal: space.md,
   },
