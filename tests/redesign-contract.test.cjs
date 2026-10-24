@@ -101,6 +101,7 @@ test('refill evidence upload precedes submit and preserves multipart names and G
   const calls = [];
   let uuid = 0;
   const queries = load('src/features/refill/queries.ts', {
+    react: { useRef: (initial) => ({ current: initial }) },
     '@tanstack/react-query': {
       useMutation: (options) => options,
       useQuery: (options) => options,
@@ -135,15 +136,50 @@ test('refill evidence upload precedes submit and preserves multipart names and G
   assert.equal(write.options.body.gps_lat, null);
   assert.equal(write.options.body.gps_lng, null);
   assert.equal(Number.isInteger(write.options.body.lines[0].qty_requested), true);
-  // T-091 owns the existing mismatch and the stable retry guarantee.
-  assert.notEqual(write.options.idempotencyKey, write.options.body.uuid);
+  assert.equal(write.options.idempotencyKey, write.options.body.uuid);
+  assert.deepEqual(Object.keys(write.options.body).sort(), [
+    'cart_id', 'client_submitted_at', 'evidence_media_id', 'gps_lat', 'gps_lng',
+    'gps_unavailable', 'lines', 'note', 'uuid',
+  ]);
 });
 
-test.todo('T-091: refill submit retry reuses one UUID in both header and body');
+test('refill submit retry reuses one UUID in both header and body until success', async () => {
+  const writes = [];
+  let nextUuid = 0;
+  const queries = load('src/features/refill/queries.ts', {
+    react: { useRef: (initial) => ({ current: initial }) },
+    '@tanstack/react-query': { useMutation: (options) => options, useQuery: (options) => options,
+      useQueryClient: () => ({ ensureQueryData: async () => [], invalidateQueries: async () => {} }) },
+    '@/lib/api': { request: async (path, options) => {
+      if (path === '/refills') {
+        writes.push({ path, options: plain(options) });
+        if (writes.length === 1) throw new Error('timeout');
+      }
+      return {};
+    }, requestWithStatus: async () => ({ data: {}, status: 200 }),
+    uploadFile: async () => ({ id: 44 }), uploadFileWithStatus: async () => ({ data: {}, status: 200 }),
+    uuidv4: () => `uuid-${++nextUuid}` },
+    '@/lib/image': { compressForUpload: async (uri) => ({ uri }) },
+    '@/features/showcase/kitchenSelection': { useKitchenSelection: () => null },
+    '@/lib/mappers': { toRefillRequest: (raw) => raw, toAppNotification: (raw) => raw,
+      toStockRow: (raw) => raw },
+  });
+  const submit = queries.useSubmitRefill();
+  const input = { cartId: 8, evidenceMediaId: 44, gps: null,
+    lines: [{ product_id: 2, qty_requested: 3 }], note: 'dekat lobi' };
+  await assert.rejects(submit.mutationFn(input), /timeout/);
+  const result = await submit.mutationFn(input);
+  assert.deepEqual(writes[1], writes[0]);
+  assert.equal(writes[0].options.idempotencyKey, writes[0].options.body.uuid);
+  submit.onSuccess(result, input);
+  await submit.mutationFn(input);
+  assert.notEqual(writes[2].options.idempotencyKey, writes[0].options.idempotencyKey);
+});
 
 test('delivery uploads handover photo first, then sends exact signature multipart and GPS-unavailable fields', async () => {
   const calls = [];
   const queries = load('src/features/refill/queries.ts', {
+    react: { useRef: (initial) => ({ current: initial }) },
     '@tanstack/react-query': { useMutation: (options) => options, useQuery: (options) => options,
       useQueryClient: () => ({ ensureQueryData: async () => [], invalidateQueries: async () => {} }) },
     '@/lib/api': {

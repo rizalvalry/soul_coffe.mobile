@@ -455,15 +455,7 @@
       "path": "/refills",
       "idempotencyKey": true,
       "bodyFields": [
-        "cart_id",
-        "client_submitted_at",
-        "evidence_media_id",
-        "gps_lat",
-        "gps_lng",
-        "gps_unavailable",
-        "lines",
-        "note",
-        "uuid"
+        "current.body"
       ]
     },
     {
@@ -478,7 +470,7 @@
       "file": "src/features/refill/queries.ts",
       "transport": "request",
       "method": "POST",
-      "path": "buildPath(input)",
+      "path": "path",
       "idempotencyKey": true,
       "bodyFields": []
     },
@@ -486,17 +478,10 @@
       "file": "src/features/refill/queries.ts",
       "transport": "requestWithStatus",
       "method": "POST",
-      "path": "`/refills/${input.id}/deliver`",
+      "path": "attempt.path",
       "idempotencyKey": true,
       "bodyFields": [
-        "gps_lat",
-        "gps_lng",
-        "gps_unavailable",
-        "handover_media_id",
-        "lines",
-        "signature_method",
-        "staff_pin",
-        "stroke_count"
+        "buildBody?.(input)"
       ]
     },
     {
@@ -525,7 +510,7 @@
       "file": "src/features/refill/queries.ts",
       "transport": "uploadFileWithStatus",
       "method": "POST",
-      "path": "`/refills/${input.id}/deliver`",
+      "path": "attempt.path",
       "idempotencyKey": true,
       "bodyFields": [
         "gps_lat",
