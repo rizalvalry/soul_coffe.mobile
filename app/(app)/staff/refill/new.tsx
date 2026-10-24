@@ -1,8 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { StatusBar } from 'expo-status-bar';
 import Animated from 'react-native-reanimated';
@@ -20,11 +16,8 @@ import { SectionTitle } from '@/components/ui/Section';
 import { enter } from '@/components/ui/Motion';
 import { ProductPickerCard } from '@/components/refill/ProductPickerCard';
 import { Input } from '@/components/ui/Input';
-import { useAuth } from '@/features/auth/store';
-import { useProducts, useSubmitRefill, useUploadEvidence } from '@/features/refill/queries';
-import { useAttendanceStatus } from '@/features/showcase/queries';
-import { DAY_NOT_OPEN_MESSAGE, NO_CART_TODAY_MESSAGE, isDayNotOpen, isNoCartToday, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
-import { ApiError } from '@/lib/api';
+import { useNewRefillController } from '@/features/refill/useNewRefillController';
+import { NO_CART_TODAY_MESSAGE } from '@/features/showcase/riderDayGate';
 import { brand, neutral, radius, semantic, shadow, space } from '@/theme';
 
 /**
@@ -38,198 +31,13 @@ const LIGHT_TEXT = neutral[0];
 const LIGHT_MUTED = 'rgba(255,255,255,0.72)';
 const LIGHT_SUBTLE = 'rgba(255,255,255,0.56)';
 
-/** Hard ceiling per line — R7/§9: "Jumlah harus antara 1 dan 100 cups". */
-const MAX_PER_LINE = 100;
-
-type Photo = { uri: string; takenAt: string };
-type GpsCoords = { lat: number; lng: number };
-type GpsStatus = 'checking' | 'granted' | 'unavailable';
-
-/**
- * The most important screen in the app (requirement 2).
- *
- * Two invariants this screen exists to protect:
- *  - The total is *computed*, never typed — the paper form's manual addition is exactly where
- *    errors came from (§4).
- *  - Evidence is uploaded and linked *before* the request is created (E4), via camera capture
- *    only (R3/E6) — `launchImageLibraryAsync` must never appear here.
- */
 export default function NewRefillScreen() {
-  const router = useRouter();
-  const user = useAuth((s) => s.session?.user);
-  const refreshUser = useAuth((s) => s.refreshUser);
-  const cartRefreshStatus = useAuth((s) => s.cartRefreshStatus);
-  const cartRefreshError = useAuth((s) => s.cartRefreshError);
-
-  useFocusEffect(useCallback(() => {
-    void refreshUser().catch(() => {});
-  }, [refreshUser]));
-
-  const productsQuery = useProducts();
-  const attendance = useAttendanceStatus(user?.role === 'STAFF');
-  const uploadEvidence = useUploadEvidence();
-  const submitRefill = useSubmitRefill();
-  const uploadedEvidence = useRef<{ uri: string; takenAt: string; id: number } | null>(null);
-  const submitting = useRef(false);
-
-  const [qty, setQty] = useState<Record<number, number>>({});
-  const [photo, setPhoto] = useState<Photo | null>(null);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [gps, setGps] = useState<GpsCoords | null>(null);
-  const [gpsStatus, setGpsStatus] = useState<GpsStatus>('checking');
-  const [placeName, setPlaceName] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [note, setNote] = useState('');
-
-  // GPS is best-effort — a denial or an unavailable service must never block submit (E10).
-  useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const permission = await Location.requestForegroundPermissionsAsync();
-        if (!permission.granted) {
-          if (!cancelled) setGpsStatus('unavailable');
-          return;
-        }
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.LocationAccuracy.Balanced,
-        });
-        if (cancelled) return;
-
-        setGps({ lat: position.coords.latitude, lng: position.coords.longitude });
-        setGpsStatus('granted');
-
-        // The address is for the human reading this screen; the request itself carries the raw
-        // coordinates either way (submitted below via `gps`), so this runs after the coordinates
-        // are already committed above, and its failure is silent — a rider must never be
-        // blocked from filing a request because the device's geocoder was slow or offline.
-        try {
-          const [place] = await Location.reverseGeocodeAsync({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          });
-
-          if (cancelled || !place) return;
-
-          // Street then district then city, which is how a field address is actually read out
-          // loud here. Falsy and duplicate parts are dropped so a village that repeats its city
-          // does not read "Cilandak, Cilandak".
-          const parts = [place.street, place.district ?? place.subregion, place.city ?? place.region]
-            .filter((part): part is string => Boolean(part))
-            .filter((part, index, all) => all.indexOf(part) === index);
-
-          if (parts.length > 0) setPlaceName(parts.join(', '));
-        } catch {
-          // Leave placeName null; the header falls back to the plain "Lokasi terdeteksi".
-        }
-      } catch {
-        if (!cancelled) setGpsStatus('unavailable');
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const totalCups = useMemo(() => Object.values(qty).reduce((sum, n) => sum + n, 0), [qty]);
-  const selectedCount = useMemo(() => Object.values(qty).filter((n) => n > 0).length, [qty]);
-  const isSubmitting = uploadEvidence.isPending || submitRefill.isPending;
-  const dayGate = user?.role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
-  const gateMessage = riderGateMessage(dayGate);
-
-  const capturePhoto = useCallback(async () => {
-    setCameraError(null);
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        setCameraError('Izin kamera ditolak. Aktifkan izin kamera di pengaturan HP untuk melanjutkan.');
-        return;
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        quality: 0.6,
-        allowsEditing: false,
-      });
-
-      if (result.canceled || !result.assets?.[0]) return;
-      setPhoto({ uri: result.assets[0].uri, takenAt: new Date().toISOString() });
-    } catch {
-      setCameraError('Tidak dapat membuka kamera. Coba lagi.');
-    }
-  }, []);
-
-  const onSubmit = useCallback(async () => {
-    if (submitting.current) return;
-    setFormError(null);
-
-    if (gateMessage) {
-      setFormError(gateMessage);
-      return;
-    }
-
-    if (!user?.cartId) {
-      setFormError(NO_CART_TODAY_MESSAGE);
-      return;
-    }
-    if (totalCups <= 0) {
-      setFormError('Pilih minimal satu produk');
-      return;
-    }
-    if (!photo) {
-      setFormError('Foto bukti wajib diambil langsung dari kamera');
-      return;
-    }
-
-    const cartId = user.cartId;
-    submitting.current = true;
-
-    try {
-      // The first upload may have succeeded even when /refills times out. Reuse its media id so
-      // the retry reaches the saved submit attempt instead of trying to upload spent evidence.
-      let evidence = uploadedEvidence.current;
-      if (!evidence || evidence.uri !== photo.uri || evidence.takenAt !== photo.takenAt) {
-        const media = await uploadEvidence.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
-        evidence = { uri: photo.uri, takenAt: photo.takenAt, id: media.id };
-        uploadedEvidence.current = evidence;
-      }
-
-      const lines = Object.entries(qty)
-        .map(([productId, requested]) => ({ product_id: Number(productId), qty_requested: requested }))
-        .filter((line) => line.qty_requested > 0);
-
-      const created = await submitRefill.mutateAsync({
-        cartId,
-        evidenceMediaId: evidence.id,
-        gps,
-        lines,
-        note: note.trim(),
-      });
-
-      router.replace(`/staff/requests/${created.id}`);
-    } catch (e) {
-      if (e instanceof ApiError) {
-        if (isDayNotOpen(e)) {
-          setFormError(DAY_NOT_OPEN_MESSAGE);
-          void attendance.refetch();
-        } else if (e.isConflict) {
-          setFormError('Masih ada request yang belum selesai untuk Coffee Bike ini.');
-        } else if (e.isForbidden) {
-          setFormError(e.message);
-          if (isNoCartToday(e)) void refreshUser().catch(() => {});
-        } else {
-          setFormError(e.message);
-        }
-      } else {
-        setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
-      }
-    } finally {
-      submitting.current = false;
-    }
-  }, [user, totalCups, photo, qty, gps, note, uploadEvidence, submitRefill, router, gateMessage, attendance, refreshUser]);
-
+  const {
+    router, user, cartRefreshStatus, cartRefreshError, productsQuery, uploadEvidence,
+    qty, changeQty, photo, cameraError, gpsStatus, placeName, formError, note, setNote,
+    totalCups, selectedCount, isSubmitting, dayGate, gateMessage, capturePhoto, onSubmit,
+    maxPerLine, controlsDisabled, refreshProps, retryCartRefresh, refreshProducts,
+  } = useNewRefillController();
   if (!user?.cartId) {
     return (
       <Screen>
@@ -246,7 +54,7 @@ export default function NewRefillScreen() {
               : cartRefreshStatus === 'loading' ? 'Lagi cek Coffee Bike kamu...' : NO_CART_TODAY_MESSAGE}
             tone="neutral"
           />
-          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
+          <Button label="Coba lagi" icon="refresh" onPress={retryCartRefresh} />
         </Card>
       </Screen>
     );
@@ -258,7 +66,7 @@ export default function NewRefillScreen() {
       refreshing={productsQuery.isRefetching}
       // Disabled mid-submit: pulling the list out from under an in-flight upload would be a
       // surprising way to lose a photo that is already on the wire.
-      {...(isSubmitting ? {} : { onRefresh: () => void productsQuery.refetch() })}
+      {...refreshProps}
     >
       {/* Overrides the app-wide dark status bar icons — this screen's dark backdrop bleeds
           under them, and dark-on-dark icons would be unreadable. */}
@@ -300,7 +108,7 @@ export default function NewRefillScreen() {
       {cartRefreshStatus === 'error' ? (
         <Card>
           <Banner tone="warning" message={cartRefreshError ?? 'Coffee Bike belum bisa dicek. Kamu masih bisa pakai Coffee Bike terakhir.'} />
-          <Button label="Coba lagi" icon="refresh" onPress={() => void refreshUser().catch(() => {})} />
+          <Button label="Coba lagi" icon="refresh" onPress={retryCartRefresh} />
         </Card>
       ) : null}
 
@@ -320,7 +128,7 @@ export default function NewRefillScreen() {
       ) : productsQuery.isError ? (
         <Card style={styles.stateCard}>
           <EmptyState icon="wifi-off" title="Gagal memuat produk" subtitle="Periksa koneksi internet Anda." tone="danger" />
-          <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void productsQuery.refetch()} />
+          <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={refreshProducts} />
         </Card>
       ) : !productsQuery.data || productsQuery.data.length === 0 ? (
         <Card>
@@ -336,10 +144,10 @@ export default function NewRefillScreen() {
               <ProductPickerCard
                 product={product}
                 value={qty[product.id] ?? 0}
-                max={MAX_PER_LINE}
-                disabled={isSubmitting || !!gateMessage}
+                max={maxPerLine}
+                disabled={controlsDisabled}
                 index={index}
-                onChange={(next) => setQty((prev) => ({ ...prev, [product.id]: next }))}
+                onChange={(next) => changeQty(product.id, next)}
               />
             </View>
           ))}
@@ -374,10 +182,10 @@ export default function NewRefillScreen() {
                   />
                 </View>
               </View>
-              <Button label="Ambil Ulang" icon="camera-retake-outline" variant="secondary" onPress={capturePhoto} disabled={isSubmitting || !!gateMessage} />
+              <Button label="Ambil Ulang" icon="camera-retake-outline" variant="secondary" onPress={capturePhoto} disabled={controlsDisabled} />
             </View>
           ) : (
-            <Button label="Ambil Foto" icon="camera-outline" onPress={capturePhoto} disabled={isSubmitting || !!gateMessage} />
+            <Button label="Ambil Foto" icon="camera-outline" onPress={capturePhoto} disabled={controlsDisabled} />
           )}
 
           {cameraError ? <Banner message={cameraError} tone="danger" /> : null}
@@ -391,7 +199,7 @@ export default function NewRefillScreen() {
 
       {formError ? <Banner message={formError} tone="danger" /> : null}
 
-      <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={isSubmitting || !!gateMessage} />
+      <Button label="Kirim Request" icon="send" iconTrailing onPress={() => void onSubmit()} loading={isSubmitting} disabled={controlsDisabled} />
 
       {/* The photo is re-encoded on the device before it is sent (lib/image.ts), so submit is a
           multi-second operation with two distinct stages. Naming the stage is what stops a rider

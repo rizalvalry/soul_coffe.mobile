@@ -58,10 +58,12 @@ test('/me maps Management status independently of Finance role', async () => {
 test('refill form refreshes /me on focus and offers the new no-cart copy and retry', () => {
   for (const path of ['app/(app)/staff/refill/new.tsx']) {
     const file = source(path);
-    assert.match(file, /useFocusEffect\(useCallback\(\(\) => \{\s*void refreshUser\(\)/);
+    const controller = source('src/features/refill/useNewRefillController.ts');
+    assert.match(controller, /useFocusEffect\(useCallback\(\(\) => \{\s*void refreshUser\(\)/);
     assert.match(file, /cartRefreshStatus === 'loading' \? 'Lagi cek Coffee Bike kamu\.\.\.' : NO_CART_TODAY_MESSAGE/);
     assert.match(file, /cartRefreshStatus === 'error'/);
-    assert.match(file, /label="Coba lagi"[^\r\n]*refreshUser\(\)/);
+    assert.match(file, /label="Coba lagi"[^\r\n]*retryCartRefresh/);
+    assert.match(controller, /retryCartRefresh = \(\) => void refreshUser\(\)/);
     assert.match(file, /user\?\.cartId/);
   }
 });

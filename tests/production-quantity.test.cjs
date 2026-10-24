@@ -27,7 +27,8 @@ test('Produksi has one 9,999 cup limit shared by Brew, Allocation and Add Stock'
   assert.match(allocations, /disabled=\{[^\n]*stockShortages\.length > 0/);
   assert.doesNotMatch(allocations, /setQty\(\(current\) =>/);
   assert.match(source('app/(app)/barista/add-stock.tsx'), /Math\.min\(available, MAX_PRODUCTION_QTY\)/);
-  assert.match(source('app/(app)/staff/refill/new.tsx'), /const MAX_PER_LINE = 100/);
+  assert.match(source('src/features/refill/useNewRefillController.ts'), /const MAX_PER_LINE = 100/);
+  assert.match(source('app/(app)/staff/refill/new.tsx'), /max=\{maxPerLine\}/);
 });
 
 test('stepper formats four digits and clamps button and typed quantities', () => {
