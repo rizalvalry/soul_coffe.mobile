@@ -146,6 +146,21 @@ test('ProductPickerCard keeps full name, qty callbacks, CMS image source and pro
   assert.equal(find(withPhoto, (node) => node.type === 'Image').props.source.uri, url);
   const capped = ProductPickerCard({ product, value: 2, max: 2, onChange: () => {} });
   assert.equal(find(capped, (node) => node.props?.accessibilityLabel === `Tambah ${product.name}`).props.disabled, true);
+  const cupChanges = [];
+  const ninetyNine = ProductPickerCard({ product, value: 99, max: 100,
+    onChange: (value) => cupChanges.push(value) });
+  find(ninetyNine, (node) => node.props?.accessibilityLabel === `Tambah ${product.name}` &&
+    node.props?.style?.[0]?.width === 40).props.onPress();
+  const hundred = ProductPickerCard({ product, value: 100, max: 100,
+    onChange: (value) => cupChanges.push(value) });
+  assert.equal(find(hundred, (node) => node.props?.accessibilityLabel === `Tambah ${product.name}`).props.disabled, true);
+  find(hundred, (node) => node.props?.accessibilityLabel === `Tambah ${product.name}` &&
+    node.props?.style?.[0]?.width === 40).props.onPress();
+  const zero = ProductPickerCard({ product, value: 0, max: 100,
+    onChange: (value) => cupChanges.push(value) });
+  assert.equal(find(zero, (node) => node.props?.accessibilityLabel === `Kurangi ${product.name}`), undefined);
+  assert.deepEqual(cupChanges, [100]);
+  assert.equal(Number.isInteger(cupChanges[0]), true);
 });
 
 test('AnimatedNumber stops its JS roll when Reduce Motion turns on', async () => {
