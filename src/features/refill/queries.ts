@@ -331,8 +331,7 @@ function useTransition<TInput extends object>(
   kitchen = false,
 ) {
   const client = useQueryClient();
-  const attempts = useRef(new Map<string, string>());
-  const sent = useRef(new WeakMap<TInput, { identity: string; key: string }>());
+  const attempts = useRef(new Map<string, { key: string; inFlight: number; failed: boolean }>());
   return useMutation({
     mutationFn: async (input: TInput) => {
       const path = buildPath(input);
@@ -341,32 +340,36 @@ function useTransition<TInput extends object>(
       // before choosing a key so a later selection change cannot reuse it with a new wire body.
       const kitchenId = kitchen ? useKitchenSelection.getState().kitchenId : null;
       const identity = JSON.stringify([path, body ?? null, kitchenId]);
-      let key = attempts.current.get(identity);
-      if (!key) {
-        key = uuidv4();
-        attempts.current.set(identity, key);
+      let attempt = attempts.current.get(identity);
+      if (!attempt) {
+        attempt = { key: uuidv4(), inFlight: 0, failed: false };
+        attempts.current.set(identity, attempt);
       }
-      sent.current.set(input, { identity, key });
-      const [raw, unitOf] = await Promise.all([
-        request<RawRefillRequest>(path, {
-          kitchen,
-          ...(kitchenId ? { kitchenId } : {}),
-          method: 'POST',
-          idempotencyKey: key,
-          ...(buildBody ? { body } : {}),
-        }),
-        unitLookup(client),
-      ]);
-      return toRefillRequest(raw, unitOf);
-    },
-    onSuccess: (data, input) => {
-      const successful = sent.current.get(input);
-      if (successful && attempts.current.get(successful.identity) === successful.key) {
-        attempts.current.delete(successful.identity);
+      if (attempt.inFlight === 0) attempt.failed = false;
+      attempt.inFlight += 1;
+      try {
+        const [raw, unitOf] = await Promise.all([
+          request<RawRefillRequest>(path, {
+            kitchen,
+            ...(kitchenId ? { kitchenId } : {}),
+            method: 'POST',
+            idempotencyKey: attempt.key,
+            ...(buildBody ? { body } : {}),
+          }),
+          unitLookup(client),
+        ]);
+        return toRefillRequest(raw, unitOf);
+      } catch (error) {
+        attempt.failed = true;
+        throw error;
+      } finally {
+        attempt.inFlight -= 1;
+        if (attempt.inFlight === 0 && !attempt.failed && attempts.current.get(identity) === attempt) {
+          attempts.current.delete(identity);
+        }
       }
-      sent.current.delete(input);
-      invalidateRefillData(client, data?.id);
     },
+    onSuccess: (data) => invalidateRefillData(client, data?.id),
   });
 }
 

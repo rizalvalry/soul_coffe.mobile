@@ -10,7 +10,7 @@ const javascript = ts.transpileModule(source, {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
 }).outputText;
 
-function harness() {
+function harness({ onRequest } = {}) {
   const calls = [];
   const failures = new Set();
   let sequence = 0;
@@ -33,6 +33,7 @@ function harness() {
       uuidv4: () => `attempt-${++sequence}`,
       request: async (path, options) => {
         record('json', path, options);
+        await onRequest?.(calls.length);
         return { id: 17 };
       },
       requestWithStatus: async (path, options) => {
@@ -117,18 +118,23 @@ test('changing a failed refill form starts a new attempt even if it is later cha
 
 test('all refill transitions replay the exact path, key and body after timeout', async () => {
   const actions = [
-    ['useApproveRefill', { id: 17, lines: [{ line_id: 2, qty_approved: 3 }], partialReason: 'Stoknya kurang' }],
-    ['useRejectRefill', { id: 17, reason: 'Stoknya kosong' }],
-    ['useCancelRefill', { id: 17 }],
-    ['useStartPreparing', { id: 17 }],
-    ['useMarkReady', { id: 17, lines: [{ line_id: 2, qty_prepared: 3 }], shortfallReason: 'Stoknya kurang' }],
-    ['useClaimRefill', { id: 17 }],
+    ['useApproveRefill', { id: 17, lines: [{ line_id: 2, qty_approved: 3 }], partialReason: 'Stoknya kurang' },
+      '/refills/17/approve', { lines: [{ line_id: 2, qty_approved: 3 }], partial_reason: 'Stoknya kurang' }],
+    ['useRejectRefill', { id: 17, reason: 'Stoknya kosong' },
+      '/refills/17/reject', { reason: 'Stoknya kosong' }],
+    ['useCancelRefill', { id: 17 }, '/refills/17/cancel', undefined],
+    ['useStartPreparing', { id: 17 }, '/refills/17/start-preparing', undefined],
+    ['useMarkReady', { id: 17, lines: [{ line_id: 2, qty_prepared: 3 }], shortfallReason: 'Stoknya kurang' },
+      '/refills/17/ready', { lines: [{ line_id: 2, qty_prepared: 3 }], shortfall_reason: 'Stoknya kurang' }],
+    ['useClaimRefill', { id: 17 }, '/refills/17/claim', undefined],
   ];
-  for (const [hook, input] of actions) {
+  for (const [hook, input, path, body] of actions) {
     const app = harness();
     const mutation = app.hooks[hook]();
     app.failures.add(1);
     await assert.rejects(app.send(mutation, input), /timeout/);
+    assert.equal(app.calls[0].path, path, hook);
+    assert.deepEqual(app.calls[0].options.body, body, hook);
     await app.send(mutation, structuredClone(input));
     assert.deepEqual(app.calls[1], app.calls[0], hook);
     await app.send(mutation, input);
@@ -149,6 +155,47 @@ test('transition attempts are distinct per refill and body, including when anoth
   await app.send(mutation, one);
   assert.equal(app.calls[3].options.idempotencyKey, app.calls[0].options.idempotencyKey);
   assert.notEqual(app.calls[1].options.idempotencyKey, app.calls[0].options.idempotencyKey);
+  assert.notEqual(app.calls[2].options.idempotencyKey, app.calls[0].options.idempotencyKey);
+});
+
+test('overlapping transition success and timeout keep the original key until retry succeeds', async () => {
+  let finishFirst;
+  let failSecond;
+  const firstResponse = new Promise((resolve) => { finishFirst = resolve; });
+  const secondResponse = new Promise((_, reject) => { failSecond = reject; });
+  const app = harness({ onRequest: async (number) => {
+    if (number === 1) await firstResponse;
+    if (number === 2) await secondResponse;
+  } });
+  const mutation = app.hooks.useApproveRefill();
+  const input = { id: 17, lines: [{ line_id: 2, qty_approved: 3 }] };
+  const first = app.send(mutation, input);
+  const second = assert.rejects(app.send(mutation, structuredClone(input)), /timeout/);
+  finishFirst();
+  await first;
+  failSecond(new Error('timeout'));
+  await second;
+  await app.send(mutation, input);
+  assert.equal(app.calls[0].options.idempotencyKey, app.calls[1].options.idempotencyKey);
+  assert.equal(app.calls[0].options.idempotencyKey, app.calls[2].options.idempotencyKey);
+  await app.send(mutation, input);
+  assert.notEqual(app.calls[3].options.idempotencyKey, app.calls[2].options.idempotencyKey);
+});
+
+test('overlapping successes with the same input object reset the transition key', async () => {
+  let finishFirst;
+  const firstResponse = new Promise((resolve) => { finishFirst = resolve; });
+  const app = harness({ onRequest: async (number) => {
+    if (number === 1) await firstResponse;
+  } });
+  const mutation = app.hooks.useClaimRefill();
+  const input = { id: 17 };
+  const first = app.send(mutation, input);
+  await app.send(mutation, input);
+  finishFirst();
+  await first;
+  await app.send(mutation, input);
+  assert.equal(app.calls[0].options.idempotencyKey, app.calls[1].options.idempotencyKey);
   assert.notEqual(app.calls[2].options.idempotencyKey, app.calls[0].options.idempotencyKey);
 });
 
@@ -183,6 +230,10 @@ test('photo-only delivery retries the same JSON body and header, then rotates af
   await app.send(mutation, { ...deliveryInput, gps: { lat: -6.1, lng: 106.8 } });
   assert.deepEqual(app.calls[1], app.calls[0]);
   assert.equal(app.calls[0].path, '/refills/17/deliver');
+  assert.deepEqual(app.calls[0].options.body, {
+    handover_media_id: 30, lines: [{ line_id: 2, qty_received: 3 }],
+    gps_lat: null, gps_lng: null, gps_unavailable: true,
+  });
   await app.send(mutation, deliveryInput);
   assert.notEqual(app.calls[2].options.idempotencyKey, app.calls[1].options.idempotencyKey);
 });
@@ -195,14 +246,24 @@ test('signed delivery retries identical multipart fields and changes key when pr
   await assert.rejects(app.send(mutation, signed), /timeout/);
   await app.send(mutation, { ...signed, gps: { lat: -6.1, lng: 106.8 } });
   assert.deepEqual(app.calls[1], app.calls[0]);
+  assert.equal(app.calls[0].path, '/refills/17/deliver');
   assert.equal(app.calls[0].options.part, 'signature');
-  assert.equal(app.calls[0].options.fields.lines, '[{"line_id":2,"qty_received":3}]');
+  assert.deepEqual(app.calls[0].options.fields, {
+    handover_media_id: '30', signature_method: 'staff_signature', stroke_count: '3',
+    lines: '[{"line_id":2,"qty_received":3}]', gps_lat: '', gps_lng: '', gps_unavailable: '1',
+  });
   const changed = { ...signed, lines: [{ line_id: 2, qty_received: 2 }] };
   await app.send(mutation, changed);
   assert.notEqual(app.calls[2].options.operation, app.calls[1].options.operation);
   const pin = { ...deliveryInput, signature: { method: 'pin_fallback', staffPin: '123456' } };
   await app.send(mutation, pin);
   assert.equal(app.calls[3].kind, 'delivery-json');
+  assert.equal(app.calls[3].path, '/refills/17/deliver');
+  assert.deepEqual(app.calls[3].options.body, {
+    handover_media_id: 30, lines: [{ line_id: 2, qty_received: 3 }],
+    gps_lat: null, gps_lng: null, gps_unavailable: true,
+    signature_method: 'pin_fallback', staff_pin: '123456',
+  });
   assert.notEqual(app.calls[3].options.idempotencyKey, app.calls[2].options.operation);
 });
 

@@ -7,7 +7,7 @@ const ts = require('typescript');
 
 const root = join(__dirname, '..');
 const jsx = (type, props) => ({ type, props: props ?? {} });
-const react = { useMemo: (fn) => fn(), useState: (initial) =>
+const react = { useMemo: (fn) => fn(), useRef: (initial) => ({ current: initial }), useState: (initial) =>
   [typeof initial === 'function' ? initial() : initial, () => {}] };
 const theme = { neutral: { 50: '#fff' }, brand: { 600: '#123', 700: '#123' },
   radius: { sm: 4 }, semantic: { textMuted: '#666' }, space: { sm: 8, md: 12, lg: 16 } };
@@ -255,11 +255,7 @@ test('delivery requires handover photo and disables submit while upload or deliv
 
 test('delivery screen waits for handover upload and forwards its media ID before submit', async () => {
   const trace = { calls: [], finishUpload: null };
-  // Reuse the same mounted sheet setup as the state test, with a deferred upload.
-  const refillSource = readFileSync(join(root, 'app/(app)/rider/active.tsx'), 'utf8');
-  assert.ok(refillSource.includes('const media = await uploadPhoto.mutateAsync'));
-  assert.ok(refillSource.includes('handoverMediaId: media.id'));
-  // The screen behavior is exercised below through its own onPress handler.
+  // Exercise the mounted sheet with a deferred upload.
   const initial = [9, null, { 3: 3 }, { uri: 'handover.jpg', takenAt: 'now' },
     'none', null, '', null, 'unavailable', null];
   let index = 0;
@@ -372,7 +368,7 @@ test('refill screen waits for evidence upload before sending its media ID and GP
   const sizes = new Proxy({}, { get: () => 8 });
   const screen = loadScreen('app/(app)/staff/refill/new.tsx', {
     ...common(),
-    react: { useCallback: (fn) => fn, useEffect: () => {}, useMemo: (fn) => fn(),
+    react: { ...react, useCallback: (fn) => fn, useEffect: () => {}, useMemo: (fn) => fn(),
       useState: (fallback) => { const value = state[index++];
         return [value === undefined ? typeof fallback === 'function' ? fallback() : fallback : value, () => {}]; } },
     'react-native': { ...common()['react-native'], Image: 'Image' },
