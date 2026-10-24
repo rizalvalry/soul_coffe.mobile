@@ -45,6 +45,19 @@ function renderRequestDetail(role) {
     '@/theme': { brand: theme, feedback: theme, neutral: theme, radius: theme, semantic: theme, space: theme },
   };
   vm.runInNewContext(code, { module, exports: module.exports, require: (name) => {
+    if (name === '@/features/refill/useRefillDetailController') {
+      const controllerCode = ts.transpileModule(source('src/features/refill/useRefillDetailController.ts'), {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+          esModuleInterop: true },
+      }).outputText;
+      const controller = { exports: {} };
+      vm.runInNewContext(controllerCode, { module: controller, exports: controller.exports,
+        require: (dependency) => {
+          assert.ok(Object.hasOwn(modules, dependency), `unexpected controller import: ${dependency}`);
+          return modules[dependency];
+        } });
+      return controller.exports;
+    }
     assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
     return modules[name];
   } });
@@ -83,7 +96,7 @@ test('other roles get a read-only attendance screen; Rider-only forms scope the 
   assert.match(absen, /<Text variant="h2">Daftar Hadir<\/Text>/);
   assert.match(absen, /if \(canAttend\) void locate\(\)/);
   for (const path of ['app/(app)/staff/refill/new.tsx']) {
-    const file = source(path);
+    const file = source('src/features/refill/useNewRefillController.ts');
     assert.match(file, /useAttendanceStatus\(user\?\.role === 'STAFF'\)/);
     assert.match(file, /user\?\.role === 'STAFF' \? riderDayGate\(.*?\.data\) : 'legacy'/);
   }

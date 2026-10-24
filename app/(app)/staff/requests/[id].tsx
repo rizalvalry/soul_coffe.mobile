@@ -1,6 +1,4 @@
-import { useCallback, useState } from 'react';
-import { Alert, Image, StyleSheet, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import Animated from 'react-native-reanimated';
 
@@ -17,58 +15,26 @@ import { MetaRow } from '@/components/ui/Section';
 import { enter } from '@/components/ui/Motion';
 import { RefillTimeline } from '@/components/refill/RefillTimeline';
 import { formatRupiah } from '@/components/refill/RefillCard';
-import { useCancelRefill, useRefill } from '@/features/refill/queries';
-import { useAuth } from '@/features/auth/store';
-import { useAttendanceStatus } from '@/features/showcase/queries';
-import { DAY_NOT_OPEN_MESSAGE, isDayNotOpen, riderDayGate, riderGateMessage } from '@/features/showcase/riderDayGate';
-import { ApiError } from '@/lib/api';
+import { useRefillDetailController } from '@/features/refill/useRefillDetailController';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 export default function StaffRequestDetailScreen() {
-  const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const refillId = Number(id);
-  const role = useAuth((s) => s.session?.user.role);
-
-  const refillQuery = useRefill(refillId);
-  const attendance = useAttendanceStatus(role === 'STAFF');
-  const cancelRefill = useCancelRefill();
-  const [actionError, setActionError] = useState<string | null>(null);
-  const dayGate = role === 'STAFF' ? riderDayGate(attendance.data) : 'legacy';
-  const gateMessage = role === 'STAFF' ? riderGateMessage(dayGate) : null;
-
-  const doCancel = useCallback(async () => {
-    setActionError(null);
-    if (gateMessage) {
-      setActionError(gateMessage);
-      return;
-    }
-    try {
-      await cancelRefill.mutateAsync({ id: refillId });
-    } catch (e) {
-      setActionError(isDayNotOpen(e) ? DAY_NOT_OPEN_MESSAGE : e instanceof ApiError ? e.message : 'Gagal membatalkan permintaan. Coba lagi.');
-      if (role === 'STAFF' && isDayNotOpen(e)) void attendance.refetch();
-    }
-  }, [cancelRefill, refillId, gateMessage, attendance, role]);
-
-  const onCancelPress = useCallback(() => {
-    Alert.alert('Batalkan permintaan?', 'Permintaan yang dibatalkan tidak dapat diproses kembali.', [
-      { text: 'Tidak', style: 'cancel' },
-      { text: 'Batalkan', style: 'destructive', onPress: () => void doCancel() },
-    ]);
-  }, [doCancel]);
+  const {
+    router, refillQuery, cancelRefill, actionError, gateMessage, onCancelPress,
+    refreshRefill, showAttendanceButton, validRefillId, canCancel, cancelDisabled,
+  } = useRefillDetailController();
 
   return (
-    <Screen refreshing={refillQuery.isRefetching} onRefresh={() => void refillQuery.refetch()}>
+    <Screen refreshing={refillQuery.isRefetching} onRefresh={refreshRefill}>
       <View style={styles.top}>
         <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
       </View>
 
       {gateMessage ? <Banner tone="warning" message={gateMessage} /> : null}
-      {role === 'STAFF' && dayGate === 'attendance' ? <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} /> : null}
+      {showAttendanceButton ? <Button label="Buka Absen" icon="fingerprint" onPress={() => router.push('/absen')} /> : null}
 
-      {!Number.isFinite(refillId) || refillId <= 0 ? (
+      {!validRefillId ? (
         <Card>
           <EmptyState icon="alert-circle-outline" title="Permintaan tidak ditemukan" tone="danger" />
         </Card>
@@ -80,15 +46,16 @@ export default function StaffRequestDetailScreen() {
       ) : refillQuery.isError || !refillQuery.data ? (
         <Card style={styles.stateCard}>
           <EmptyState icon="wifi-off" title="Gagal memuat permintaan" subtitle="Periksa koneksi internet Anda." tone="danger" />
-          <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillQuery.refetch()} />
+          <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={refreshRefill} />
         </Card>
       ) : (
         <RequestDetail
           refill={refillQuery.data}
           onCancel={onCancelPress}
           cancelPending={cancelRefill.isPending}
+          canCancel={canCancel}
+          cancelDisabled={cancelDisabled}
           actionError={actionError}
-          gateMessage={gateMessage}
         />
       )}
     </Screen>
@@ -99,14 +66,16 @@ function RequestDetail({
   refill,
   onCancel,
   cancelPending,
+  canCancel,
+  cancelDisabled,
   actionError,
-  gateMessage,
 }: {
   refill: RefillRequest;
   onCancel: () => void;
   cancelPending: boolean;
+  canCancel: boolean;
+  cancelDisabled: boolean;
   actionError: string | null;
-  gateMessage: string | null;
 }) {
   return (
     <>
@@ -232,7 +201,7 @@ function RequestDetail({
 
       {actionError ? <Banner message={actionError} tone="danger" /> : null}
 
-      {refill.can.cancel ? (
+      {canCancel ? (
         <Animated.View entering={enter('below', 5)}>
           <Button
             label="Batalkan Permintaan"
@@ -240,7 +209,7 @@ function RequestDetail({
             variant="danger"
             onPress={onCancel}
             loading={cancelPending}
-            disabled={cancelPending || !!gateMessage}
+            disabled={cancelDisabled}
           />
         </Animated.View>
       ) : null}

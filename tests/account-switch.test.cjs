@@ -13,6 +13,9 @@ function loadTs(path, modules, globals = {}) {
   }).outputText;
   const module = { exports: {} };
   vm.runInNewContext(javascript, { setTimeout, clearTimeout, ...globals, module, exports: module.exports, require: (name) => {
+    if (name === '@/features/refill/useNewRefillController') {
+      return loadTs('src/features/refill/useNewRefillController.ts', modules, globals);
+    }
     assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
     return modules[name];
   } });

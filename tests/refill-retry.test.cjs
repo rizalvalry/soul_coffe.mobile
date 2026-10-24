@@ -273,6 +273,11 @@ test('refill screen keeps upload before submit and reuses uploaded evidence afte
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
       jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
+  const controllerJavaScript = ts.transpileModule(readFileSync(join(__dirname, '..',
+    'src/features/refill/useNewRefillController.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+      esModuleInterop: true },
+  }).outputText;
   const events = [];
   const submissions = [];
   let releaseUpload;
@@ -340,6 +345,17 @@ test('refill screen keeps upload before submit and reuses uploaded evidence afte
   vm.runInNewContext(screenJavaScript, {
     module, exports: module.exports,
     require: (name) => {
+      if (name === '@/features/refill/useNewRefillController') {
+        const controller = { exports: {} };
+        vm.runInNewContext(controllerJavaScript, {
+          module: controller, exports: controller.exports,
+          require: (dependency) => {
+            assert.ok(Object.hasOwn(modules, dependency), `unexpected controller import: ${dependency}`);
+            return modules[dependency];
+          },
+        });
+        return controller.exports;
+      }
       assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
       return modules[name];
     },
