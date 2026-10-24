@@ -122,6 +122,7 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
     '@/lib/api': { ApiError, uuidv4: () => 'unused' },
     '@/theme': { brand: { 700: '#123' }, semantic: { textMuted: '#666' }, space: { sm: 8, md: 12 } },
   };
+  modules['@/features/clearing/financeController'] = load('src/features/clearing/financeController.ts', modules);
   const source = readFileSync(join(__dirname, '..', 'app/(app)/finance/clearing.tsx'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,

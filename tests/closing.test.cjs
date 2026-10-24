@@ -105,9 +105,10 @@ test('failed draft refresh after old sales sync cannot unlock Closing submit', a
 
 test('Finance can re-record a stale settlement from current Closing numbers', () => {
   const screen = source('app/(app)/finance/settlements.tsx');
+  const controller = source('src/features/settlements/financeController.ts');
   assert.match(screen, /Catat ulang setoran/);
-  assert.match(screen, /draftQuery.refetch\(\)/);
-  assert.match(screen, /setReRecord\(true\)/);
+  assert.match(controller, /draftQuery.refetch\(\)/);
+  assert.match(controller, /setReRecord\(true\)/);
   assert.match(screen, /line.qty_wasted/);
 });
 

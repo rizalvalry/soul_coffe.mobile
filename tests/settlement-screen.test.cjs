@@ -84,6 +84,15 @@ function mountScreen({ row, draft, settlement, queueRows = [row], recordFailures
       space: { xxs: 2, sm: 8, md: 12, lg: 16 },
     },
   };
+  const controllerModule = { exports: {} };
+  vm.runInNewContext(compile('src/features/settlements/financeController.ts', false), {
+    module: controllerModule, exports: controllerModule.exports,
+    require: (name) => {
+      assert.ok(Object.hasOwn(modules, name), `unexpected controller import: ${name}`);
+      return modules[name];
+    },
+  });
+  modules['@/features/settlements/financeController'] = controllerModule.exports;
   const sandboxModule = { exports: {} };
   vm.runInNewContext(compile('app/(app)/finance/settlements.tsx', true), {
     module: sandboxModule, exports: sandboxModule.exports,
