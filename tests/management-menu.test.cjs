@@ -103,7 +103,7 @@ test('Administrator has every Management and Finance tile once, without attendan
   }
   assert.equal(new Set(administratorRoutes).size, administratorRoutes.length);
   assert.ok(!administratorRoutes.includes('/absen'));
-  assert.match(readFileSync(join(__dirname, '..', 'app', '(app)', 'management', 'rider-location-setup.tsx'), 'utf8'),
+  assert.match(readFileSync(join(__dirname, '..', 'src', 'features', 'riderLocation', 'useRiderLocationSetupController.ts'), 'utf8'),
     /canUse\(user, 'rider_location_setup', 'edit'\)/);
   const demoStore = readFileSync(join(__dirname, '..', 'src', 'features', 'demo', 'store.ts'), 'utf8');
   assert.match(demoStore, /function canApprove[\s\S]*?actor\.role === 'ADMINISTRATOR'/);

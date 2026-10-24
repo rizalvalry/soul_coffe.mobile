@@ -15,7 +15,13 @@ const compile = (file, jsx = false) => ts.transpileModule(source(file), { compil
 function moduleOf(file, modules, jsx = false) {
   const state = { exports: {} };
   vm.runInNewContext(compile(file, jsx), { module: state, exports: state.exports,
-    require: (name) => { assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`); return modules[name]; } });
+    require: (name) => {
+      if (name === '@/features/closing/useClosingController') {
+        return moduleOf('src/features/closing/useClosingController.ts', modules);
+      }
+      assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
+      return modules[name];
+    } });
   return state.exports;
 }
 

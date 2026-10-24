@@ -1,45 +1,18 @@
-import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { Screen } from '@/components/ui/Screen';
 import { Card } from '@/components/ui/Card';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
 import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useAuth } from '@/features/auth/store';
-import { canUse } from '@/features/navigation/menu';
-import { useLocations, useRiderSetups, useSaveRiderSetup, type RiderSetupRow } from '@/features/riderLocation/queries';
-import { ApiError } from '@/lib/api';
+import { useRiderLocationSetupController } from '@/features/riderLocation/useRiderLocationSetupController';
 import { space } from '@/theme';
 
 export default function RiderLocationSetupScreen() {
-  const user = useAuth((s) => s.session?.user);
-  const riders = useRiderSetups();
-  const locations = useLocations();
-  const save = useSaveRiderSetup();
-  const [selected, setSelected] = useState<RiderSetupRow | null>(null);
-  const [locationId, setLocationId] = useState<number | null>(null);
-  const [basis, setBasis] = useState<'kitchen' | 'selling_location'>('kitchen');
-  const [error, setError] = useState<string | null>(null);
+  const { canEdit, riders, locations, save, selected, setSelected, locationId, setLocationId,
+    basis, setBasis, error, choose, submit } = useRiderLocationSetupController();
 
-  if (!user || !canUse(user, 'rider_location_setup', 'edit')) return <Screen><EmptyState icon="lock-outline" title="Belum punya akses buat setup lokasi" /></Screen>;
-
-  const choose = (rider: RiderSetupRow) => {
-    setSelected(rider);
-    setLocationId(rider.setup?.location_id ?? null);
-    setBasis(rider.setup?.basis ?? 'kitchen');
-    setError(null);
-  };
-  const submit = async () => {
-    if (!selected) return;
-    try {
-      await save.mutateAsync({ riderId: selected.id, locationId, basis });
-      setSelected(null);
-      Alert.alert('Setup tersimpan', `Lokasi ${selected.name} sudah diperbarui ya.`);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Setup belum tersimpan. Coba lagi ya.');
-    }
-  };
+  if (!canEdit) return <Screen><EmptyState icon="lock-outline" title="Belum punya akses buat setup lokasi" /></Screen>;
 
   return <Screen refreshing={riders.isRefetching} onRefresh={() => void riders.refetch()}>
     <Text variant="h2">Setup Lokasi Rider</Text>

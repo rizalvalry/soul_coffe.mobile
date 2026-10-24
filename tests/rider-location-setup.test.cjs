@@ -41,16 +41,16 @@ test('checking a fresh Closing point does not reset edited cups and payment fiel
   assert.notEqual(closingFormSignature(base), closingFormSignature({ ...base,
     lines: [{ ...base.lines[0], qty_in: 12 }],
   }));
-  assert.match(source('app/(app)/staff/closing.tsx'), /closingFormSignature\(latest\.data\) !== formSignature/);
+  assert.match(source('src/features/closing/useClosingController.ts'), /closingFormSignature\(latest\.data\) !== formSignature/);
 });
 
 test('Rider setup, Add Stock, Closing, and Setoran have reachable screens', () => {
   assert.equal(existsSync(join(root, 'app/(app)/management/rider-location-setup.tsx')), true);
   assert.equal(existsSync(join(root, 'app/(app)/staff/settlement.tsx')), true);
   assert.match(source('app/(app)/barista/add-stock.tsx'), /Lokasi belum diatur Management/);
-  assert.match(source('app/(app)/staff/closing.tsx'), /closingLocationMessage/);
-  assert.match(source('app/(app)/staff/closing.tsx'), /requestForegroundPermissionsAsync/);
-  assert.match(source('app/(app)/staff/closing.tsx'), /router\.replace\(\{ pathname: '\/staff\/settlement', params: \{ operating_date: saved\.operating_date \} \}\)/);
+  assert.match(source('src/features/closing/useClosingController.ts'), /closingLocationMessage/);
+  assert.match(source('src/features/closing/useClosingController.ts'), /requestForegroundPermissionsAsync/);
+  assert.match(source('src/features/closing/useClosingController.ts'), /router\.replace\(\{ pathname: '\/staff\/settlement', params: \{ operating_date: saved\.operating_date \} \}\)/);
   assert.match(source('app/(app)/staff/closing.tsx'), /Ada pembeli lagi\? Ubah sisa cups/);
   assert.doesNotMatch(source('app/(app)/staff/settlement.tsx'), /Ada pembeli lagi\? Ubah sisa cups/);
   assert.match(source('src/features/realtime/RealtimeProvider.tsx'), /riderSettlementKey/);
