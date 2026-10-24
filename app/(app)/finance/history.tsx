@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills } from '@/features/refill/queries';
-import { radius, semantic, space } from '@/theme';
+import { accent, radius, semantic, shadow, space } from '@/theme';
 import type { RefillRequest, RefillStatus } from '@/domain/types';
 
 /** Every terminal-or-in-flight status except SUBMITTED — a decision has already been made. */
@@ -34,10 +34,12 @@ export default function FinanceHistoryScreen() {
       <View style={styles.page}>
         <View style={styles.header}>
           <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
-          <Text variant="h2">Riwayat Approval</Text>
-          <Text variant="caption" color={semantic.textMuted}>
-            Semua keputusan beserta alasannya
-          </Text>
+          <View style={styles.hero}>
+            <Text variant="h2" color={semantic.textInverse}>Riwayat Approval</Text>
+            <Text variant="caption" color={semantic.textInverse}>
+              Semua keputusan beserta alasannya
+            </Text>
+          </View>
         </View>
 
         {refillsQuery.isLoading ? (
@@ -68,7 +70,7 @@ export default function FinanceHistoryScreen() {
                 <RefillCard refill={item} showCost index={index} />
                 {item.decision_reason ? (
                   <View style={styles.reasonBox}>
-                    <Text variant="caption" color={semantic.textMuted}>
+                    <Text variant="caption" color={accent[600]}>
                       Alasan: {item.decision_reason}
                     </Text>
                   </View>
@@ -91,15 +93,18 @@ export default function FinanceHistoryScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  header: { padding: space.lg, gap: space.xxs },
+  header: { padding: space.lg, gap: space.sm },
+  hero: { backgroundColor: semantic.primaryPressed, borderRadius: radius.card, padding: space.xl, gap: space.xs },
   listPad: { paddingHorizontal: space.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
-  itemCard: { gap: space.sm },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'], gap: space.lg },
+  itemCard: { gap: space.sm, borderRadius: radius.card },
   reasonBox: {
-    backgroundColor: semantic.surfaceSunken,
+    backgroundColor: accent[50],
     borderRadius: radius.md,
     padding: space.md,
+    marginHorizontal: space.xs,
+    ...shadow.card,
   },
 });

@@ -7,9 +7,11 @@ import { Card } from '@/components/ui/Card';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Banner } from '@/components/ui/Banner';
+import { Chip } from '@/components/ui/Badge';
+import { Appear } from '@/components/ui/Motion';
 import { Touchable } from '@/components/ui/Touchable';
 import { digits, useFinanceClearingController } from '@/features/clearing/financeController';
-import { brand, semantic, space } from '@/theme';
+import { brand, radius, semantic, space } from '@/theme';
 
 function money(value: number): string {
   return `Rp ${value.toLocaleString('id-ID')}`;
@@ -30,10 +32,12 @@ export default function FinanceClearingScreen() {
       void receipts.refetch();
     }}>
       <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
-      <Text variant="h2">Dana QRIS/transfer masuk</Text>
-      <Text variant="caption" color={semantic.textMuted}>Catat saat dana sudah masuk di rekening Bank.</Text>
+      <View style={styles.header}>
+        <Text variant="h2" color={semantic.textInverse}>Dana QRIS/transfer masuk</Text>
+        <Text variant="caption" color={semantic.textInverse}>Catat saat dana sudah masuk di rekening Bank.</Text>
+      </View>
 
-      <Card style={styles.card}>
+      <Appear index={0}><Card style={styles.card}>
         <Text variant="bodyStrong">Catat dana masuk</Text>
         <Input label="Tanggal dana masuk (YYYY-MM-DD)" value={date} onChangeText={setDate} editable={!locked} placeholder="YYYY-MM-DD" />
         <Input label="Nominal masuk rekening (Rp)" value={amount} onChangeText={(value) => setAmount(digits(value))}
@@ -56,9 +60,9 @@ export default function FinanceClearingScreen() {
         {error ? <Banner tone="danger" message={error} /> : null}
         {locked && canCancelDraft ? <Button label="Batalin draft yang ditolak" variant="secondary" onPress={() => void cancelDraft()} /> : null}
         <Button label="Catat dana masuk" icon="bank-transfer-in" loading={record.isPending} onPress={() => void submit()} />
-      </Card>
+      </Card></Appear>
 
-      <Card style={styles.card}>
+      <Appear index={1}><Card style={[styles.card, styles.agingCard]}>
         <Text variant="bodyStrong">Umur saldo kliring</Text>
         <Text variant="caption">0–1 hari: {money(aging?.buckets['0_1_minor'] ?? 0)}</Text>
         <Text variant="caption">2–3 hari: {money(aging?.buckets['2_3_minor'] ?? 0)}</Text>
@@ -68,20 +72,23 @@ export default function FinanceClearingScreen() {
         <Text variant="caption">Dana belum dipasangkan: {money(aging?.unmatched_credit_minor ?? 0)}</Text>
         <Text variant="caption">Saldo lain/penyesuaian: {money(aging?.unattributed_minor ?? 0)}</Text>
         <Text variant="caption">Saldo akun kliring: {money(aging?.net_balance_minor ?? 0)}</Text>
-      </Card>
+      </Card></Appear>
 
       <Text variant="bodyStrong">Riwayat dana masuk</Text>
-      {(receipts.data ?? []).map((receipt) => (
-        <Card key={receipt.id} style={styles.card}>
+      {(receipts.data ?? []).map((receipt, index) => (
+        <Appear key={receipt.id} index={index + 2}><Card style={styles.card}>
           <Text variant="bodyStrong">{receipt.received_on.slice(0, 10)} · {money(receipt.amount_minor)}</Text>
-          <Text variant="caption" color={semantic.textMuted}>MDR {money(receipt.mdr_minor)} · {receipt.status === 'POSTED' ? 'Tercatat' : 'Dibatalkan'}</Text>
+          <View style={styles.receiptStatus}>
+            <Text variant="caption" color={semantic.textMuted}>MDR {money(receipt.mdr_minor)}</Text>
+            <Chip tone={receipt.status === 'POSTED' ? 'brand' : 'neutral'} label={receipt.status === 'POSTED' ? 'Tercatat' : 'Dibatalkan'} />
+          </View>
           {receipt.status === 'POSTED' && receipt.amount_minor + receipt.mdr_minor > receipt.allocations.reduce((sum, row) => sum + row.amount_minor, 0)
             ? <Button label="Pasangkan hari" variant="secondary" onPress={() => { setMatchId(receipt.id); setMatchDates([]); }} /> : null}
           {receipt.status === 'POSTED' ? <Button label="Batalkan" variant="secondary" onPress={() => { setVoidId(receipt.id); setVoidReason(''); }} /> : null}
-        </Card>
+        </Card></Appear>
       ))}
       {matchId !== null ? (
-        <Card style={styles.card}>
+        <Appear><Card style={styles.card}>
           <Text variant="bodyStrong">Pasangkan dana #{matchId} ke hari penjualan</Text>
           {(aging?.rows ?? []).map((row) => (
             <Touchable key={row.sale_date} accessibilityRole="checkbox" accessibilityState={{ checked: matchDates.includes(row.sale_date) }}
@@ -93,15 +100,15 @@ export default function FinanceClearingScreen() {
           ))}
           <Button label="Simpan pasangan hari" loading={matchReceipt.isPending} onPress={() => void submitMatch()} />
           <Button label="Kembali" variant="secondary" onPress={() => setMatchId(null)} />
-        </Card>
+        </Card></Appear>
       ) : null}
       {voidId !== null ? (
-        <Card style={styles.card}>
+        <Appear><Card style={styles.card}>
           <Text variant="bodyStrong">Batalkan dana masuk #{voidId}</Text>
           <Input label="Alasan pembatalan" value={voidReason} onChangeText={setVoidReason} placeholder="Ceritakan yang perlu dikoreksi" />
           <Button label="Batalkan dana masuk" variant="danger" loading={voidReceipt.isPending} onPress={() => void confirmVoid()} />
           <Button label="Kembali" variant="secondary" onPress={() => setVoidId(null)} />
-        </Card>
+        </Card></Appear>
       ) : null}
     </Screen>
   );
@@ -109,5 +116,18 @@ export default function FinanceClearingScreen() {
 
 const styles = StyleSheet.create({
   card: { gap: space.md },
-  dateRow: { paddingVertical: space.sm },
+  header: {
+    gap: space.xs,
+    backgroundColor: brand[700],
+    borderRadius: radius?.card ?? 24,
+    padding: space.xl,
+  },
+  agingCard: { backgroundColor: semantic.surfaceSunken },
+  receiptStatus: { flexDirection: 'row', alignItems: 'center', gap: space.sm, flexWrap: 'wrap' },
+  dateRow: {
+    paddingHorizontal: space.md,
+    paddingVertical: space.md,
+    backgroundColor: semantic.bg,
+    borderRadius: radius?.md ?? 14,
+  },
 });

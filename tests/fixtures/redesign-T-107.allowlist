@@ -1,0 +1,5 @@
+app/(app)/finance/approvals.tsx
+app/(app)/finance/history.tsx
+app/(app)/finance/settlements.tsx
+app/(app)/finance/clearing.tsx
+tests/**

@@ -35,10 +35,12 @@ export default function FinanceApprovalsScreen() {
       <View style={styles.page}>
         <View style={styles.header}>
           <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
-          <Text variant="h2">Approval Refill</Text>
-          <Text variant="caption" color={semantic.textMuted}>
-            Permintaan menunggu keputusan Anda
-          </Text>
+          <View style={styles.hero}>
+            <Text variant="h2" color={semantic.textInverse}>Approval Refill</Text>
+            <Text variant="caption" color={semantic.textInverse}>
+              Permintaan menunggu keputusan Anda
+            </Text>
+          </View>
           <ConnectionBanner state={realtime.state} />
         </View>
 
@@ -214,25 +216,31 @@ function ApprovalCard({
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  header: { padding: space.lg, gap: space.xxs },
+  header: { padding: space.lg, gap: space.sm },
+  hero: {
+    backgroundColor: semantic.primaryPressed,
+    borderRadius: radius.card,
+    padding: space.xl,
+    gap: space.xs,
+  },
   listPad: { paddingHorizontal: space.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'], gap: space.lg },
 
-  card: { gap: space.md },
-  lines: { gap: space.md },
+  card: { gap: space.md, padding: space.md },
+  lines: { gap: space.sm },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.md,
     backgroundColor: neutral[50],
-    borderRadius: radius.sm,
-    padding: space.sm,
+    borderRadius: radius.md,
+    padding: space.md,
   },
   lineInfo: { flex: 1, gap: space.xxs },
 
-  actions: { flexDirection: 'row', gap: space.sm },
+  actions: { flexDirection: 'row', gap: space.sm, paddingBottom: space.xs },
   actionBtn: { flex: 1 },
 });

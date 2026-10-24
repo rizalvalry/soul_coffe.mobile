@@ -13,11 +13,12 @@ import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { SectionTitle } from '@/components/ui/Section';
+import { Appear } from '@/components/ui/Motion';
 import { Touchable } from '@/components/ui/Touchable';
 import { moneyDigits, rupiah, useDepositSheetController, useFinanceSettlementQueue } from '@/features/settlements/financeController';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import type { SettlementQueueRow } from '@/domain/types';
-import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
+import { brand, feedback, neutral, radius, semantic, shadow, space } from '@/theme';
 
 /**
  * Setoran — the Finance desk, on a phone, with a queue of riders in front of it.
@@ -72,7 +73,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
         ) : (
           <>
             {/* What the system already knows. Shown first, so nobody has to ask for it. */}
-            <Card style={styles.card}>
+            <Appear index={0}><Card style={styles.card}>
               <Text variant="bodyStrong">Hari ini menurut sistem</Text>
               <View style={styles.factRow}>
                 <View style={styles.fact}>
@@ -125,11 +126,11 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                   Rincian per metode belum tersedia. Total memakai data setoran yang ada.
                 </Text>
               )}
-            </Card>
+            </Card></Appear>
 
             {!settlementId || reRecord ? (
               <>
-                <Card style={styles.card}>
+                <Appear index={1}><Card style={styles.card}>
                   <Text variant="bodyStrong">Uang yang diterima</Text>
                   <Input
                     label="Tunai / Cash"
@@ -188,7 +189,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                       maxLength={500}
                     />
                   ) : null}
-                </Card>
+                </Card></Appear>
 
                 {error ? <Banner tone="danger" message={error} /> : null}
                 {error && draftLocked ? (
@@ -220,22 +221,22 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                 <Button label="Catat ulang setoran" variant="secondary" onPress={() => void reopenMoney()} />
 
                 {remainingLines.length === 0 ? (
-                  <Card style={styles.card}>
+                  <Appear index={1}><Card style={styles.card}>
                     <EmptyState
                       icon="cup-off-outline"
                       title="Tidak ada cups sisa"
                       subtitle="Stok Coffee Bike ini habis atau Produksi sudah menutupnya. Tinggal selesaikan setorannya."
                       tone="neutral"
                     />
-                  </Card>
+                  </Card></Appear>
                 ) : (
-                  remainingLines.map((line) => {
+                  remainingLines.map((line, index) => {
                     const good = returned[line.product_id] ?? 0;
                     const bad = rejected[line.product_id] ?? 0;
                     const left = line.qty_remaining - good - bad;
 
                     return (
-                      <Card key={line.product_id} style={styles.card}>
+                      <Appear key={line.product_id} index={index + 1}><Card style={styles.card}>
                         <View style={styles.lineHead}>
                           <ProductThumbnail product={line} />
                           <Text variant="bodyStrong" numberOfLines={1} style={styles.lineName}>
@@ -274,7 +275,7 @@ function DepositSheet({ row, date, onClose }: { row: SettlementQueueRow; date?: 
                             {left} {line.unit} belum ditentukan — akan tetap tercatat di Coffee Bike.
                           </Text>
                         ) : null}
-                      </Card>
+                      </Card></Appear>
                     );
                   })
                 )}
@@ -308,8 +309,8 @@ export default function FinanceSettlementsScreen() {
       </View>
 
       <View style={styles.headerBlock}>
-        <Text variant="h2">Setoran</Text>
-        <Text variant="caption" color={semantic.textMuted}>
+        <Text variant="h2" color={semantic.textInverse}>Setoran</Text>
+        <Text variant="caption" color={semantic.textInverse}>
           {waiting > 0 ? `${waiting} setoran Coffee Bike belum selesai` : 'Semua setoran Coffee Bike sudah selesai'}
         </Text>
       </View>
@@ -321,19 +322,19 @@ export default function FinanceSettlementsScreen() {
       {queueQuery.isLoading ? (
         <SkeletonList count={4} lines={2} />
       ) : queueQuery.isError ? (
-        <Card style={styles.card}>
+        <Appear><Card style={styles.card}>
           <EmptyState icon="wifi-off" title="Gagal memuat antrean" subtitle="Periksa koneksi Anda." tone="danger" />
           <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void queueQuery.refetch()} />
-        </Card>
+        </Card></Appear>
       ) : rows.length === 0 ? (
-        <Card style={styles.card}>
+        <Appear><Card style={styles.card}>
           <EmptyState
             icon="cash-remove"
             title={date ? `Belum ada Coffee Bike bertugas pada ${date}` : 'Belum ada Coffee Bike bertugas hari ini'}
             subtitle="Antrean setoran terisi setelah Produksi menyerahkan cups ke Coffee Bike."
             tone="neutral"
           />
-        </Card>
+        </Card></Appear>
       ) : (
         <>
           <SectionTitle title={date ? `Antrean ${date}` : 'Antrean hari ini'} caption={`${rows.length} Coffee Bike`} />
@@ -347,8 +348,7 @@ export default function FinanceSettlementsScreen() {
               : null;
 
             return (
-              <Touchable
-                key={row.cart_id}
+              <Appear key={row.cart_id} index={index}><Touchable
                 onPress={() => { if (!waitingClosing) setOpenCartId(row.cart_id); }}
                 accessibilityRole="button"
                 accessibilityLabel={`Setoran Coffee Bike ${row.cart_code}`}
@@ -396,7 +396,7 @@ export default function FinanceSettlementsScreen() {
                   label={done ? (row.settlement_status === 'RECONCILED' ? 'Selesai' : 'Uang masuk')
                     : waitingClosing ? 'Menunggu closing Rider' : row.arrived_at ? 'Tiba' : 'Siap setor'}
                 />
-              </Touchable>
+              </Touchable></Appear>
             );
           })}
         </>
@@ -411,7 +411,12 @@ export default function FinanceSettlementsScreen() {
 
 const styles = StyleSheet.create({
   top: { alignItems: 'flex-start' },
-  headerBlock: { gap: space.xxs },
+  headerBlock: {
+    gap: space.xs,
+    backgroundColor: semantic.primaryPressed,
+    borderRadius: radius.card,
+    padding: space.xl,
+  },
   card: { gap: space.md },
 
   queueRow: {
@@ -419,21 +424,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.md,
     backgroundColor: neutral[0],
-    borderRadius: radius.lg,
-    padding: space.md,
+    borderRadius: radius.card,
+    padding: space.lg,
+    ...shadow?.card,
   },
-  queueRowDone: { opacity: 0.75 },
+  queueRowDone: { backgroundColor: neutral[100] },
   queueIcon: {
     width: 40,
     height: 40,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: semantic.surfaceSunken,
+    backgroundColor: brand[50],
   },
   queueText: { flex: 1, gap: space.xxs },
 
-  factRow: { flexDirection: 'row', alignItems: 'center' },
+  factRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: brand[50],
+    borderRadius: radius.md,
+    paddingVertical: space.md,
+  },
   fact: { flex: 1, alignItems: 'center', gap: space.xxs },
   factDivider: { width: 1, height: 32, backgroundColor: semantic.border },
 
@@ -445,7 +457,7 @@ const styles = StyleSheet.create({
     borderTopColor: semantic.border,
     paddingTop: space.md,
   },
-  expectedMethods: { gap: space.sm },
+  expectedMethods: { gap: space.sm, backgroundColor: neutral[50], borderRadius: radius.md, padding: space.md },
   methodRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 
   lineHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
@@ -461,7 +473,7 @@ const styles = StyleSheet.create({
     padding: space.lg,
     borderBottomWidth: 1,
     borderBottomColor: semantic.border,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: neutral[0],
   },
   sheetContent: { padding: space.lg, gap: space.md },
 });

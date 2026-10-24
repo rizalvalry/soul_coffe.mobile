@@ -105,6 +105,8 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
     '@/components/ui/Screen': { Screen: 'Screen' },
     '@/components/ui/Text': { Text: 'Text' },
     '@/components/ui/Card': { Card: 'Card' },
+    '@/components/ui/Badge': { Chip: 'Chip' },
+    '@/components/ui/Motion': { Appear: 'Appear' },
     '@/components/ui/Button': { Button: 'Button', IconButton: 'IconButton' },
     '@/components/ui/Input': { Input: 'Input' },
     '@/components/ui/Banner': { Banner: 'Banner' },
