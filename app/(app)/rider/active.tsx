@@ -85,10 +85,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
       <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
         <Card style={styles.card}>
-          <View style={styles.sheetSummaryTop}>
-            <Text variant="h3">{refill.code}</Text>
-            <StatusBadge status={refill.status} />
-          </View>
+          <Text variant="h3">{refill.code}</Text>
           <View style={styles.metaChips}>
             <Chip
               label={refill.location_name ?? 'Lokasi tidak diketahui'}
@@ -429,7 +426,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg, backgroundColor: semantic.surfaceSunken,
   },
   productName: { flexShrink: 1 },
-  sheetSummaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',
