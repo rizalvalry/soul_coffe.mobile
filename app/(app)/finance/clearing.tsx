@@ -79,7 +79,7 @@ export default function FinanceClearingScreen() {
         <Appear key={receipt.id} index={index + 2}><Card style={styles.card}>
           <Text variant="bodyStrong">{receipt.received_on.slice(0, 10)} · {money(receipt.amount_minor)}</Text>
           <View style={styles.receiptStatus}>
-            <Text variant="caption" color={semantic.textMuted}>MDR {money(receipt.mdr_minor)}</Text>
+            <Text variant="caption" color={semantic.textMuted}>MDR {money(receipt.mdr_minor)} ·</Text>
             <Chip tone={receipt.status === 'POSTED' ? 'brand' : 'neutral'} label={receipt.status === 'POSTED' ? 'Tercatat' : 'Dibatalkan'} />
           </View>
           {receipt.status === 'POSTED' && receipt.amount_minor + receipt.mdr_minor > receipt.allocations.reduce((sum, row) => sum + row.amount_minor, 0)
