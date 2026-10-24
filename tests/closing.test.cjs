@@ -70,11 +70,12 @@ test('Closing shows saved commission and progress from the server response', () 
 test('Rider menu and route use Closing, with no new sale form', () => {
   const menu = source('src/features/navigation/menu.ts');
   const screen = source('app/(app)/staff/closing.tsx');
+  const controller = source('src/features/closing/useClosingController.ts');
   assert.match(menu, /label: 'Closing'/);
   assert.match(menu, /route: '\/staff\/closing'/);
   assert.doesNotMatch(menu, /Catat Penjualan|staff-sell/);
   assert.equal(existsSync(join(root, 'app/(app)/staff/sell.tsx')), false);
-  assert.match(screen, /useOfflineSalesQueue\(\)/);
+  assert.match(controller, /useOfflineSalesQueue\(\)/);
   assert.match(screen, /oldSales\.rejected/);
   assert.doesNotMatch(screen, /oldSales\.enqueue/);
   assert.match(screen, /ProductThumbnail product=\{productById\.get\(line\.product_id\) \?\? \{\}\}/);
@@ -82,10 +83,15 @@ test('Rider menu and route use Closing, with no new sale form', () => {
 
 test('Closing syncs old pending sales before submit and shows the queue when draft fails', () => {
   const screen = source('app/(app)/staff/closing.tsx');
+  const controller = source('src/features/closing/useClosingController.ts');
   const queue = source('src/features/sales/useOfflineSalesQueue.ts');
   assert.match(queue, /syncBeforeClosing/);
-  assert.ok(screen.indexOf('oldSales.syncBeforeClosing()') < screen.indexOf('record.mutateAsync'));
-  assert.match(screen, /closingSubmissionGate\(sync, \(\) => draft.refetch\(\)\)/);
+  const syncIndex = controller.indexOf('oldSales.syncBeforeClosing()');
+  const recordIndex = controller.indexOf('record.mutateAsync');
+  assert.ok(syncIndex >= 0);
+  assert.ok(recordIndex >= 0);
+  assert.ok(syncIndex < recordIndex);
+  assert.match(controller, /closingSubmissionGate\(sync, \(\) => draft.refetch\(\)\)/);
   assert.ok(screen.indexOf('oldSales.queue.length > 0') > screen.indexOf(') : null}'));
   assert.match(screen, /\(!needsFreshDraft && !totals.valid\)/);
 });
@@ -126,13 +132,14 @@ test('Closing, settlement, and Tutup Coffee Bike use the current name', () => {
 
 test('Tutup Coffee Bike waits for products and draft, and uses only today assigned carts', () => {
   const screen = source('app/(app)/kitchen/close-out.tsx');
+  const controller = source('src/features/showcase/useCloseOutController.ts');
   const queries = source('src/features/showcase/queries.ts');
-  assert.match(screen, /useCarts\(kitchenReady, 'close-out'\)/);
-  assert.match(screen, /productsQuery\.isSuccess && products\.length > 0/);
-  assert.match(screen, /closingDraft\.isSuccess/);
+  assert.match(controller, /useCarts\(kitchenReady, 'close-out'\)/);
+  assert.match(controller, /productsQuery\.isSuccess && products\.length > 0/);
+  assert.match(controller, /closingDraft\.isSuccess/);
   assert.match(screen, /productsQuery\.isError/);
   assert.match(screen, /productsQuery\.refetch\(\)/);
-  assert.match(screen, /kitchensQuery\.data\.length === 1 && kitchenId !== kitchensQuery\.data\[0\]\?\.id/);
-  assert.match(screen, /select\(kitchensQuery\.data\[0\]!\.id\)/);
+  assert.match(controller, /kitchensQuery\.data\.length === 1 && kitchenId !== kitchensQuery\.data\[0\]\?\.id/);
+  assert.match(controller, /select\(kitchensQuery\.data\[0\]!\.id\)/);
   assert.match(queries, /kitchenId: kitchenId \?\? undefined/);
 });
