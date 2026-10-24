@@ -211,6 +211,7 @@ test('delivery uploads handover photo first, then sends exact signature multipar
 test('incident compresses once and submits photo and line JSON with the same UUID in multipart and header', async () => {
   const calls = [];
   const incidents = load('src/features/incidents/queries.ts', {
+    react: { useRef: (value) => ({ current: value }) },
     '@tanstack/react-query': { useMutation: (options) => options, useQuery: (options) => options,
       useQueryClient: () => ({ invalidateQueries: async () => {} }) },
     '@/lib/api': { request: async () => [], uuidv4: () => 'incident-uuid',
