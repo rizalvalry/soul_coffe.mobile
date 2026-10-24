@@ -36,11 +36,13 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
       <View style={styles.lines}>
         {refill.lines.filter((line) => line.is_operational !== false).map((line) => (
           <View key={line.id} style={styles.lineRow}>
-            <ProductThumbnail product={line} />
-            <View style={styles.lineText}>
-              <Text variant="body" numberOfLines={1}>
-                {line.product_name}
-              </Text>
+            <View style={styles.lineHeading}>
+              <ProductThumbnail product={line} />
+              <View style={styles.lineText}>
+                <Text variant="body" numberOfLines={1}>
+                  {line.product_name}
+                </Text>
+              </View>
             </View>
             <QtyStepper
               value={qty[line.id] ?? 0}
@@ -77,7 +79,7 @@ export default function BaristaPreparingScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
-      <Text variant="h2" style={styles.header}>
+      <Text variant="display" style={styles.header}>
         Siapkan Pesanan
       </Text>
 
@@ -114,22 +116,21 @@ export default function BaristaPreparingScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  header: { padding: space.lg, paddingBottom: 0 },
+  header: { paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.sm },
   listPad: { paddingHorizontal: space.lg },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
-  listContent: { padding: space.lg, gap: space.md },
-  card: { gap: space.md },
+  listContent: { padding: space.lg, paddingBottom: space['2xl'], gap: space.lg },
+  card: { gap: space.lg },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
   topText: { flex: 1, gap: space.xxs },
-  lines: { gap: space.md },
+  lines: { gap: space.sm },
   lineRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'stretch',
     gap: space.sm,
-    backgroundColor: neutral[50],
-    borderRadius: radius.sm,
-    padding: space.sm,
+    backgroundColor: neutral[100],
+    borderRadius: radius.lg,
+    padding: space.md,
   },
+  lineHeading: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
   lineText: { flex: 1 },
 });

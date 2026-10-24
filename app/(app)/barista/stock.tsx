@@ -1,13 +1,16 @@
-import { FlatList, Image, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { enter } from '@/components/ui/Motion';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { useKitchenStock, useProducts } from '@/features/refill/queries';
-import { productImageSource } from '@/domain/productImages';
-import { brand, radius, semantic, shadow, space } from '@/theme';
+import { brand, productColor, radius, semantic, space } from '@/theme';
 
 /**
  * `on_hand` is a projection over the append-only stock ledger (R6) — never edited here, only
@@ -21,7 +24,7 @@ export default function BaristaStockScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
-      <Text variant="h2" style={styles.header}>
+      <Text variant="display" style={styles.header}>
         Stok Dapur
       </Text>
 
@@ -45,29 +48,25 @@ export default function BaristaStockScreen() {
             void stockQuery.refetch();
             void productsQuery.refetch();
           }}
-          renderItem={({ item }) => {
-            const image = productImageSource(productById.get(item.product_id) ?? {});
+          renderItem={({ item, index }) => {
+            const tone = productColor[item.product_name as keyof typeof productColor] ?? { bg: brand[50], fg: brand[700] };
             return (
-              <View style={styles.row}>
-                <View style={styles.rowIcon}>
-                  {image ? <Image source={image} style={styles.rowImage} /> : (
-                    <Text variant="micro" color={brand[700]}>
-                      {item.product_name.slice(0, 1).toUpperCase()}
+              <Animated.View entering={enter('below', index)}>
+                <Card style={styles.row}>
+                  <ProductThumbnail product={productById.get(item.product_id) ?? { product_name: item.product_name }} size={48} />
+                  <Text variant="bodyStrong" style={styles.colName} numberOfLines={1}>
+                    {item.product_name}
+                  </Text>
+                  <View style={[styles.qtyPill, { backgroundColor: tone.bg }]}>
+                    <Text variant="bodyStrong" color={tone.fg}>
+                      {item.on_hand}
                     </Text>
-                  )}
-                </View>
-                <Text variant="body" style={styles.colName} numberOfLines={1}>
-                  {item.product_name}
-                </Text>
-                <View style={styles.qtyPill}>
-                  <Text variant="bodyStrong" color={brand[700]}>
-                    {item.on_hand}
-                  </Text>
-                  <Text variant="caption" color={semantic.textMuted}>
-                    {item.unit}
-                  </Text>
-                </View>
-              </View>
+                    <Text variant="caption" color={semantic.textMuted}>
+                      {item.unit}
+                    </Text>
+                  </View>
+                </Card>
+              </Animated.View>
             );
           }}
           ListEmptyComponent={
@@ -81,29 +80,22 @@ export default function BaristaStockScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  header: { padding: space.lg, paddingBottom: space.sm },
+  header: { paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.sm },
   listPad: { paddingHorizontal: space.lg },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.sm },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'], gap: space.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.lg,
-    paddingVertical: space.md,
-    paddingHorizontal: space.md,
-    marginBottom: space.sm,
-    ...shadow.card,
+    borderRadius: radius.card,
+    padding: space.md,
   },
-  rowIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: brand[50], alignItems: 'center', justifyContent: 'center' },
-  rowImage: { width: 36, height: 36, borderRadius: radius.md },
   colName: { flex: 1 },
   qtyPill: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: space.xxs,
-    backgroundColor: brand[50],
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: space.xs,

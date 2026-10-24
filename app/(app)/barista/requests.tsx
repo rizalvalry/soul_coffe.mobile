@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/Button';
 import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { Chip } from '@/components/ui/Badge';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRequestsController } from '@/features/showcase/useRequestsController';
-import { semantic, space } from '@/theme';
+import { radius, semantic, space } from '@/theme';
 
 /**
  * The most subtle screen in the app: requirement 2 (barista sees the request immediately) and
@@ -24,7 +25,7 @@ export default function BaristaRequestsScreen() {
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
       <View style={styles.header}>
-        <Text variant="h2">Permintaan Refill</Text>
+        <Text variant="display">Permintaan Refill</Text>
         <ConnectionBanner state={realtime.state} />
       </View>
 
@@ -47,9 +48,9 @@ export default function BaristaRequestsScreen() {
           refreshing={refillsQuery.isRefetching}
           onRefresh={() => void refillsQuery.refetch()}
           renderSectionHeader={({ section }) => (
-            <Text variant="micro" color={semantic.textSubtle} style={styles.sectionTitle}>
-              {section.title.toUpperCase()}
-            </Text>
+            <View style={styles.sectionHeader}>
+              <Chip label={section.title.toUpperCase()} tone={section.key === 'APPROVED' ? 'amber' : 'brand'} />
+            </View>
           )}
           renderItem={({ item, index }) => (
             <View style={styles.item}>
@@ -82,11 +83,11 @@ export default function BaristaRequestsScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  header: { padding: space.lg, gap: space.md },
+  header: { paddingHorizontal: space.lg, paddingTop: space.lg, paddingBottom: space.md, gap: space.sm },
   listPad: { paddingHorizontal: space.lg },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg },
-  sectionTitle: { letterSpacing: 1, marginTop: space.md, marginBottom: space.xs },
-  item: { gap: space.sm, marginBottom: space.sm },
-  hint: { paddingHorizontal: space.xs },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'] },
+  sectionHeader: { alignItems: 'flex-start', marginTop: space.md, marginBottom: space.md },
+  item: { gap: space.sm, marginBottom: space.lg, borderRadius: radius.card },
+  hint: { paddingHorizontal: space.md },
 });
