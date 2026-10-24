@@ -137,7 +137,8 @@ function harness(options = {}) {
   }
   const button = (tree, label) => nodes(tree).find((node) => node.type === 'Button' && node.props.label === label);
   return { load, render, nodes, button, events, alerts, effects, ready, active, claim, upload,
-    report, failReport: () => { reportFails = true; } };
+    report, failReport: () => { reportFails = true; },
+    unmount: (component) => { states.delete(component); refs.delete(component); } };
 }
 
 const flush = () => new Promise(setImmediate);
@@ -274,4 +275,119 @@ test('ready list uses realtime invalidation and no polling interval', () => {
   assert.match(list, /invalidateQueries\(\{ queryKey: \['refills'\] \}\)/);
   assert.match(realtime, /invalidateRefillData\(client,/);
   assert.doesNotMatch(list, /refetchInterval\s*:/);
+});
+
+test('received quantity reaches delivery lines, and closing a successful sheet resets proof for the next refill', async () => {
+  const app = harness();
+  const opened = openSheet(app, 'Selesaikan Pengiriman');
+  let tree = app.render(opened.sheet, opened.props);
+  app.nodes(tree).find((node) => node.type === 'QtyStepper').props.onChange(1);
+  tree = app.render(opened.sheet, opened.props);
+  assert.equal(app.nodes(tree).find((node) => node.type === 'QtyStepper').props.value, 1);
+  app.button(tree, 'Ambil Foto').props.onPress();
+  await flush();
+  tree = app.render(opened.sheet, opened.props);
+  app.nodes(tree).find((node) => node.type === 'Touchable'
+    && node.props.accessibilityLabel === 'PIN rider').props.onPress();
+  tree = app.render(opened.sheet, opened.props);
+  app.nodes(tree).find((node) => node.type === 'Input').props.onChangeText('123456');
+  tree = app.render(opened.sheet, opened.props);
+  app.button(tree, 'Konfirmasi Pengiriman').props.onPress();
+  await flush();
+  assert.deepEqual(app.events.find((event) => event[0] === 'deliver')[1].lines,
+    [{ line_id: 4, qty_received: 1 }]);
+  assert.deepEqual(app.events.find((event) => event[0] === 'deliver')[1].signature,
+    { method: 'pin_fallback', staffPin: '123456' });
+  assert.equal(app.nodes(app.render(app.load('app/(app)/rider/active.tsx').default))
+    .filter((node) => node.type === 'Modal' && node.props.visible).length, 0);
+
+  // React unmounts DeliverySheet when the successful delivery closes its modal.
+  app.unmount(opened.sheet);
+  app.active.data = [refill({ id: 18, code: 'REF-18', lines: [line(6, 5)] })];
+  const next = openSheet(app, 'Selesaikan Pengiriman');
+  tree = app.render(next.sheet, next.props);
+  assert.equal(app.nodes(tree).find((node) => node.type === 'QtyStepper').props.value, 5);
+  assert.equal(app.button(tree, 'Konfirmasi Pengiriman').props.disabled, true);
+  assert.equal(app.nodes(tree).find((node) => node.type === 'Touchable'
+    && node.props.accessibilityLabel === 'Tanpa paraf').props.accessibilityState.selected, true);
+  assert.equal(app.nodes(tree).find((node) => node.type === 'Image'), undefined);
+});
+
+test('changing proof mode clears the prior signature and PIN', async () => {
+  const app = harness();
+  const { sheet, props } = openSheet(app, 'Selesaikan Pengiriman');
+  let tree = app.render(sheet, props);
+  app.button(tree, 'Ambil Foto').props.onPress();
+  await flush();
+  tree = app.render(sheet, props);
+  const choose = (label) => app.nodes(tree).find((node) => node.type === 'Touchable'
+    && node.props.accessibilityLabel === label).props.onPress();
+  choose('Paraf rider');
+  tree = app.render(sheet, props);
+  app.nodes(tree).find((node) => node.type === 'SignaturePad').props.onSigned(
+    { uri: 'signature://png', strokeCount: 3 });
+  tree = app.render(sheet, props);
+  assert.equal(app.button(tree, 'Konfirmasi Pengiriman').props.disabled, false);
+  choose('PIN rider');
+  tree = app.render(sheet, props);
+  assert.equal(app.button(tree, 'Konfirmasi Pengiriman').props.disabled, true);
+  assert.equal(app.nodes(tree).find((node) => node.type === 'Input').props.value, '');
+  app.nodes(tree).find((node) => node.type === 'Input').props.onChangeText('123456');
+  tree = app.render(sheet, props);
+  assert.equal(app.button(tree, 'Konfirmasi Pengiriman').props.disabled, false);
+  choose('Paraf rider');
+  tree = app.render(sheet, props);
+  assert.equal(app.button(tree, 'Konfirmasi Pengiriman').props.disabled, true);
+});
+
+test('incident timeout retries with the current fresh UUID behavior tracked by T-103', async () => {
+  const source = readFileSync(join(root, 'src/features/incidents/queries.ts'), 'utf8');
+  const code = ts.transpileModule(source, { compilerOptions: {
+    module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
+  } }).outputText;
+  const calls = [];
+  let sequence = 0;
+  const modules = {
+    '@tanstack/react-query': {
+      useMutation: (config) => config,
+      useQuery: () => { throw new Error('unexpected incident read'); },
+      useQueryClient: () => ({ invalidateQueries: async () => {} }),
+    },
+    '@/lib/api': {
+      request: () => { throw new Error('unexpected request'); },
+      uuidv4: () => `incident-attempt-${++sequence}`,
+      uploadFile: async (path, file, fields, part, operation) => {
+        calls.push(plain({ path, file, fields, part, operation }));
+        if (calls.length === 1) throw new Error('timeout');
+        return { id: 1 };
+      },
+    },
+    '@/lib/image': { compressForUpload: async (uri) => ({ uri }) },
+    '@/features/refill/queries': { invalidateRefillData: () => {} },
+  };
+  const module = { exports: {} };
+  vm.runInNewContext(code, { module, exports: module.exports, require: (name) => {
+    assert.ok(Object.hasOwn(modules, name), `unexpected import ${name}`);
+    return modules[name];
+  } });
+  const input = { refillId: 17, photoUri: 'camera://incident', takenAt: '2026-10-25T00:00:00Z',
+    lines: [{ line_id: 4, qty_damaged: 2 }], note: 'Jatuh' };
+  const mutation = module.exports.useReportIncident();
+  await assert.rejects(mutation.mutationFn(input), /timeout/);
+  await mutation.mutationFn(input);
+  assert.deepEqual(calls.map((call) => [call.path, call.part]), [
+    ['/refills/17/incident', 'photo'], ['/refills/17/incident', 'photo'],
+  ]);
+  assert.deepEqual(calls.map((call) => call.file), [
+    { uri: 'camera://incident', name: 'incident.jpg', type: 'image/jpeg' },
+    { uri: 'camera://incident', name: 'incident.jpg', type: 'image/jpeg' },
+  ]);
+  for (const call of calls) {
+    assert.equal(call.fields.uuid, call.operation);
+    assert.equal(call.fields.photo_taken_at, input.takenAt);
+    assert.equal(call.fields.lines, JSON.stringify(input.lines));
+    assert.equal(call.fields.note, input.note);
+  }
+  assert.notEqual(calls[0].operation, calls[1].operation);
+  assert.deepEqual({ ...calls[0].fields, uuid: null }, { ...calls[1].fields, uuid: null });
 });
