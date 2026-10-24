@@ -91,16 +91,17 @@ test('Rider request detail still offers Absen when the day gate requires it', ()
 
 test('other roles get a read-only attendance screen; Rider-only forms scope the gate', () => {
   const absen = source('app/(app)/absen.tsx');
+  const controller = source('src/features/showcase/useAbsenController.ts');
   assert.match(absen, /if \(!canAttend && !canOpenKitchen\) \{/);
   assert.match(absen, /\{canAttend \? \(/);
   assert.match(absen, /<Text variant="h2">Daftar Hadir<\/Text>/);
-  assert.match(absen, /if \(canAttend\) void locate\(\)/);
+  assert.match(controller, /if \(canAttend\) void locate\(\)/);
   for (const path of ['app/(app)/staff/refill/new.tsx']) {
     const file = source('src/features/refill/useNewRefillController.ts');
     assert.match(file, /useAttendanceStatus\(user\?\.role === 'STAFF'\)/);
     assert.match(file, /user\?\.role === 'STAFF' \? riderDayGate\(.*?\.data\) : 'legacy'/);
   }
-  assert.match(source('app/(app)/staff/closing.tsx'), /useClosingDraft\(\)/);
+  assert.match(source('src/features/closing/useClosingController.ts'), /useClosingDraft\(\)/);
 });
 
 test('only Produksi and Rider have an Absen menu entry', () => {

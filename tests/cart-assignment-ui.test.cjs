@@ -69,7 +69,7 @@ test('refill form refreshes /me on focus and offers the new no-cart copy and ret
 });
 
 test('Closing reads the current cart from its server draft', () => {
-  assert.match(source('app/(app)/staff/closing.tsx'), /useClosingDraft\(\)/);
+  assert.match(source('src/features/closing/useClosingController.ts'), /useClosingDraft\(\)/);
   assert.match(source('src/features/closing/queries.ts'), /request<ClosingDraft>\('\/me\/closing\/draft'\)/);
 });
 

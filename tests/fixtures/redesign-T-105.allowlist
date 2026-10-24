@@ -1,0 +1,5 @@
+app/(app)/barista/requests.tsx
+app/(app)/barista/preparing.tsx
+app/(app)/barista/stock.tsx
+app/(app)/barista/index.tsx
+tests/**

@@ -1,5 +1,4 @@
-app/(app)/barista/requests.tsx
-app/(app)/barista/preparing.tsx
-app/(app)/barista/stock.tsx
-app/(app)/barista/index.tsx
+app/(app)/rider/available.tsx
+app/(app)/rider/active.tsx
+app/(app)/rider/history.tsx
 tests/**

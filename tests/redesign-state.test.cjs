@@ -23,11 +23,15 @@ function loadModule(file, modules) {
   } }).outputText;
   const state = { exports: {} };
   vm.runInNewContext(code, { module: state, exports: state.exports, __DEV__: false, require: (name) => {
-    if (name === '@/features/refill/useNewRefillController' || name.startsWith('@/features/refill/useRunner')) {
+    if (name === '@/features/refill/useNewRefillController' || name.startsWith('@/features/refill/useRunner')
+      || name === '@/features/refill/approvalController') {
       return loadModule(`src/features/refill/${name.slice('@/features/refill/'.length)}.ts`, modules);
     }
     if (name === '@/features/showcase/usePreparingController') {
       return loadModule('src/features/showcase/usePreparingController.ts', modules);
+    }
+    if (name === '@/features/showcase/useAbsenController' || name === '@/features/kitchenReject/useKitchenRejectController') {
+      return loadModule(`src/features/${name.slice('@/features/'.length)}.ts`, modules);
     }
     assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
     return modules[name];

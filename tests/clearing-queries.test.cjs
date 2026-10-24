@@ -71,9 +71,15 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
   const jsx = (type, props) => ({ type, props: props ?? {} });
   const state = [];
   const refs = [];
+  const effects = [];
   let stateIndex = 0;
   let refIndex = 0;
   const posted = [];
+  const voidCalls = [];
+  const matchCalls = [];
+  let receiptRows = [];
+  let saleRows = [];
+  let actionCount = 0;
   let loseFirstResponse = true;
   let rejectNext = false;
   class ApiError extends Error {
@@ -82,7 +88,7 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
   }
   const modules = {
     react: {
-      useEffect: () => {},
+      useEffect: (fn) => { effects.push(fn); },
       useRef: (initial) => {
         const index = refIndex++;
         return refs[index] ??= { current: initial };
@@ -106,22 +112,27 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
     '@/features/auth/store': { useAuth: (select) => select({ session: { user: { id: 'finance-screen' } } }) },
     '@/features/clearing/attempt': attempt,
     '@/features/clearing/queries': {
-      useClearingOptions: () => ({ data: { bank_account_id: 2, aging: { rows: [],
+      useClearingOptions: () => ({ data: { bank_account_id: 2, aging: { rows: saleRows,
         buckets: { '0_1_minor': 0, '2_3_minor': 0, over_3_minor: 0 }, unmatched_credit_minor: 0,
         unattributed_minor: 0, net_balance_minor: 0 } }, isRefetching: false }),
-      useClearingReceipts: () => ({ data: [], isRefetching: false }),
+      useClearingReceipts: () => ({ data: receiptRows, isRefetching: false }),
       useRecordClearing: () => ({ isPending: false, mutateAsync: async (input) => {
         posted.push(input);
         if (rejectNext) { rejectNext = false; throw new ApiError('Nominal ditolak', 422); }
         if (loseFirstResponse) { loseFirstResponse = false; throw new Error('response lost after commit'); }
         return { id: 1 };
       } }),
-      useVoidClearing: () => ({ isPending: false }),
-      useMatchClearing: () => ({ isPending: false }),
+      useVoidClearing: () => ({ isPending: false, mutateAsync: async (input) => {
+        voidCalls.push(JSON.parse(JSON.stringify(input)));
+      } }),
+      useMatchClearing: () => ({ isPending: false, mutateAsync: async (input) => {
+        matchCalls.push(JSON.parse(JSON.stringify(input)));
+      } }),
     },
-    '@/lib/api': { ApiError, uuidv4: () => 'unused' },
+    '@/lib/api': { ApiError, uuidv4: () => `action-${++actionCount}` },
     '@/theme': { brand: { 700: '#123' }, semantic: { textMuted: '#666' }, space: { sm: 8, md: 12 } },
   };
+  modules['@/features/clearing/financeController'] = load('src/features/clearing/financeController.ts', modules);
   const source = readFileSync(join(__dirname, '..', 'app/(app)/finance/clearing.tsx'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
@@ -153,11 +164,20 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
   await new Promise(setImmediate);
   assert.equal(posted.length, 1);
   assert.equal((await attempt.readClearingAttempt('finance-screen')).uuid, posted[0].uuid);
-  assert.equal(find(render(), 'Button', 'Batalin draft yang ditolak'), undefined);
-  find(render(), 'Button', 'Catat dana masuk').props.onPress();
+  state.length = 0;
+  refs.length = 0;
+  render();
+  effects.at(-1)();
+  await new Promise(setImmediate);
+  const restored = render();
+  assert.equal(find(restored, 'Input', 'Nominal masuk rekening (Rp)').props.value, '900');
+  assert.equal(find(restored, 'Input', 'Nominal masuk rekening (Rp)').props.editable, false);
+  assert.equal(find(restored, 'Button', 'Batalin draft yang ditolak'), undefined);
+  find(restored, 'Button', 'Catat dana masuk').props.onPress();
   await new Promise(setImmediate);
   assert.equal(posted.length, 2);
   assert.equal(posted[1].uuid, posted[0].uuid);
+  assert.deepEqual(JSON.parse(JSON.stringify(posted[1])), JSON.parse(JSON.stringify(posted[0])));
   assert.equal(await attempt.readClearingAttempt('finance-screen'), null);
 
   // A rejected write can be edited, but cancel and retry cannot overlap in
@@ -173,4 +193,20 @@ test('lost receipt response keeps the draft key and hides cancellation until rep
   await new Promise(setImmediate);
   assert.equal(posted.length, 3);
   assert.equal(await attempt.readClearingAttempt('finance-screen'), null);
+
+  receiptRows = [{ id: 4, received_on: '2026-10-20', amount_minor: 900, mdr_minor: 0,
+    status: 'POSTED', allocations: [] }];
+  saleRows = [{ sale_date: '2026-10-18', outstanding_minor: 900 }];
+  find(render(), 'Button', 'Batalkan').props.onPress();
+  find(render(), 'Input', 'Alasan pembatalan').props.onChangeText('  Koreksi dana  ');
+  find(render(), 'Button', 'Batalkan dana masuk').props.onPress();
+  await new Promise(setImmediate);
+  assert.deepEqual(voidCalls, [{ id: 4, reason: 'Koreksi dana', key: 'action-1' }]);
+
+  find(render(), 'Button', 'Pasangkan hari').props.onPress();
+  render().filter((node) => node.type === 'Touchable' && node.props.accessibilityRole === 'checkbox').at(-1)
+    .props.onPress();
+  find(render(), 'Button', 'Simpan pasangan hari').props.onPress();
+  await new Promise(setImmediate);
+  assert.deepEqual(matchCalls, [{ id: 4, sale_dates: ['2026-10-18'], uuid: 'action-2' }]);
 });
