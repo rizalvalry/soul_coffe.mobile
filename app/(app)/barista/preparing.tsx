@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
@@ -12,40 +11,15 @@ import { Banner } from '@/components/ui/Banner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
-import { useMarkReady, useRefills } from '@/features/refill/queries';
-import { ApiError } from '@/lib/api';
+import { usePreparingCardController, usePreparingController } from '@/features/showcase/usePreparingController';
 import type { RefillRequest } from '@/domain/types';
 import { neutral, radius, semantic, space } from '@/theme';
 
 /** One request's own prepare-quantities form. Kept local so each card manages independent state
  * without a shared map keyed by request id. */
 function PreparingCard({ refill }: { refill: RefillRequest }) {
-  const markReady = useMarkReady();
-  const [qty, setQty] = useState<Record<number, number>>(() =>
-    Object.fromEntries(refill.lines.map((l) => [l.id, l.qty_approved ?? 0])),
-  );
-  const [shortfallReason, setShortfallReason] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const hasRetiredLines = refill.lines.some((line) => line.is_operational === false);
-
-  const hasShortfall = refill.lines.some((l) => (qty[l.id] ?? 0) < (l.qty_approved ?? 0));
-
-  const onSubmit = async () => {
-    setError(null);
-    if (hasShortfall && shortfallReason.trim().length === 0) {
-      setError('Alasan kekurangan wajib diisi karena ada jumlah yang kurang dari yang disetujui.');
-      return;
-    }
-    try {
-      await markReady.mutateAsync({
-        id: refill.id,
-        lines: refill.lines.map((l) => ({ line_id: l.id, qty_prepared: qty[l.id] ?? 0 })),
-        ...(hasShortfall ? { shortfallReason: shortfallReason.trim() } : {}),
-      });
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
-    }
-  };
+  const { markReady, qty, setLineQty, shortfallReason, setShortfallReason, error,
+    hasRetiredLines, hasShortfall, onSubmit } = usePreparingCardController(refill);
 
   return (
     <Card style={styles.card}>
@@ -70,7 +44,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
             </View>
             <QtyStepper
               value={qty[line.id] ?? 0}
-              onChange={(next) => setQty((prev) => ({ ...prev, [line.id]: next }))}
+              onChange={(next) => setLineQty(line.id, next)}
               max={line.qty_approved ?? 0}
               capHint={`maks. ${line.qty_approved ?? 0} (disetujui)`}
             />
@@ -99,7 +73,7 @@ function PreparingCard({ refill }: { refill: RefillRequest }) {
 }
 
 export default function BaristaPreparingScreen() {
-  const refillsQuery = useRefills('PREPARING', true);
+  const { refillsQuery } = usePreparingController();
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>

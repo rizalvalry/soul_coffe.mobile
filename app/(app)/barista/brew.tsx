@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { View } from 'react-native';
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -7,30 +6,12 @@ import { Button } from '@/components/ui/Button';
 import { QtyStepper } from '@/components/ui/QtyStepper';
 import { Banner } from '@/components/ui/Banner';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
-import { useProducts } from '@/features/refill/queries';
-import { useBrewIntoShowcase } from '@/features/showcase/queries';
+import { useBrewController } from '@/features/showcase/useBrewController';
 import { MAX_PRODUCTION_QTY } from '@/features/showcase/quantity';
-import { ApiError } from '@/lib/api';
 import { space } from '@/theme';
 
 export default function BrewScreen() {
-  const products = useProducts();
-  const brew = useBrewIntoShowcase();
-  const [quantities, setQuantities] = useState<Record<number, number>>({});
-  const [message, setMessage] = useState<string | null>(null);
-  const lines = Object.entries(quantities).filter(([, qty]) => qty > 0)
-    .map(([productId, qty]) => ({ product_id: Number(productId), qty }));
-
-  const submit = async () => {
-    setMessage(null);
-    try {
-      await brew.mutateAsync({ lines });
-      setQuantities({});
-      setMessage('Brew sudah tercatat dan stok dapur bertambah.');
-    } catch (error) {
-      setMessage(error instanceof ApiError ? error.message : 'Brew belum berhasil. Coba lagi ya.');
-    }
-  };
+  const { products, brew, quantities, setProductQty, message, lines, submit } = useBrewController();
 
   return (
     <Screen>
@@ -46,7 +27,7 @@ export default function BrewScreen() {
           </View>
           <View style={{ alignSelf: 'flex-end' }}>
             <QtyStepper value={quantities[product.id] ?? 0}
-              onChange={(qty) => setQuantities((old) => ({ ...old, [product.id]: qty }))}
+              onChange={(qty) => setProductQty(product.id, qty)}
               max={MAX_PRODUCTION_QTY} />
           </View>
         </Card>

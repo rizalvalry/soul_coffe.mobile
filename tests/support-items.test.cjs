@@ -35,7 +35,7 @@ test('field notes travel through refill, Closing, and handover requests and hist
   }
   assert.match(source('app/(app)/staff/requests/[id].tsx'), /refill\.note/);
   assert.match(source('app/(app)/finance/settlements.tsx'), /closing_note/);
-  assert.match(source('app/(app)/barista/add-stock.tsx'), /useHandoverHistory/);
+  assert.match(source('app/(app)/barista/add-stock.tsx') + source('src/features/showcase/useAddStockController.ts'), /useHandoverHistory/);
 });
 
 test('demo supports close-out cart picker, draft, and submission', () => {
