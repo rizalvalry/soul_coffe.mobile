@@ -7,7 +7,7 @@ import { Text } from './Text';
 import { Touchable } from './Touchable';
 import { clampQty, formatQty, parseQtyInput } from './quantity';
 import { enter } from './Motion';
-import { brand, feedback, neutral, pressScale, radius, semantic, space, spring, timing, touch } from '@/theme';
+import { brand, feedback, fontFamily, neutral, pressScale, radius, semantic, space, spring, timing, touch } from '@/theme';
 
 export type QtyStepperProps = {
   value: number;
@@ -79,7 +79,7 @@ export function QtyStepper({ value, onChange, max, min = 0, disabled = false, ca
             editable={!disabled}
             selectTextOnFocus
             accessibilityLabel="Jumlah cups"
-            style={[styles.input, Math.max(value, max) >= 1000 && styles.inputWide, disabled && styles.inputDisabled]}
+            style={[styles.input, Math.max(value, max) >= 1000 && styles.inputWide, value === 0 && styles.inputZero, disabled && styles.inputDisabled]}
           />
         </Animated.View>
 
@@ -90,9 +90,9 @@ export function QtyStepper({ value, onChange, max, min = 0, disabled = false, ca
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Tambah jumlah"
-          style={[styles.step, (disabled || atMax) && styles.stepInert]}
+          style={[styles.step, styles.stepPrimary, (disabled || atMax) && styles.stepInert]}
         >
-          <MaterialCommunityIcons name="plus" size={20} color={disabled || atMax ? semantic.textSubtle : brand[700]} />
+          <MaterialCommunityIcons name="plus" size={20} color={disabled || atMax ? semantic.textSubtle : neutral[0]} />
         </Touchable>
       </View>
 
@@ -108,7 +108,7 @@ export function QtyStepper({ value, onChange, max, min = 0, disabled = false, ca
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
+  row: { flexDirection: 'row', alignItems: 'center', gap: space.xs, alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: semantic.surfaceSunken, padding: space.xxs },
   // Circular, like the reference design's quantity controls. The diameter is still the full
   // touch minimum, so rounding the corners costs no reachable area.
   step: {
@@ -116,24 +116,27 @@ const styles = StyleSheet.create({
     height: touch.minTarget,
     borderRadius: touch.minTarget / 2,
     borderWidth: 1,
-    borderColor: brand[200],
-    backgroundColor: brand[50],
+    borderColor: semantic.border,
+    backgroundColor: neutral[0],
     alignItems: 'center',
     justifyContent: 'center',
   },
+  stepPrimary: { backgroundColor: brand[700], borderColor: brand[700] },
   stepInert: { backgroundColor: neutral[100], borderColor: semantic.border },
   input: {
     width: 58,
     height: touch.minTarget,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 0,
-    backgroundColor: neutral[100],
+    backgroundColor: 'transparent',
     textAlign: 'center',
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: fontFamily.extraBold,
+    fontWeight: '800',
     color: semantic.text,
   },
   inputWide: { width: 76 },
+  inputZero: { color: semantic.textSubtle },
   inputDisabled: { backgroundColor: neutral[100], color: semantic.textMuted },
   hint: { marginTop: space.xxs },
 });

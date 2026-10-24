@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   Animated,
   Image,
   Pressable,
@@ -11,10 +12,13 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
+import Reanimated from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text';
+import { Touchable } from '@/components/ui/Touchable';
+import { enter } from '@/components/ui/Motion';
 import { useNewsFeed } from '@/features/news/queries';
-import { brand, neutral, radius, semantic, space } from '@/theme';
+import { brand, neutral, pressScale, radius, semantic, shadow, space } from '@/theme';
 import type { NewsPost } from '@/domain/types';
 
 const CARD_HEIGHT = 188;
@@ -43,6 +47,15 @@ export function NewsSlider() {
   const feed = useNewsFeed(true);
   const scrollX = useRef(new Animated.Value(0)).current;
   const [index, setIndex] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const update = (enabled: boolean) => { if (active) setReduceMotion(enabled); };
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', update);
+    void AccessibilityInfo.isReduceMotionEnabled().then(update);
+    return () => { active = false; subscription.remove(); };
+  }, []);
 
   const cardWidth = Math.round(width - space.lg * 2);
   const snap = cardWidth + GAP;
@@ -94,7 +107,7 @@ export function NewsSlider() {
           const range = [(i - 1) * snap, i * snap, (i + 1) * snap];
           const scale = scrollX.interpolate({
             inputRange: range,
-            outputRange: [0.94, 1, 0.94],
+            outputRange: [pressScale.surface, 1, pressScale.surface],
             extrapolate: 'clamp',
           });
           const opacity = scrollX.interpolate({
@@ -104,8 +117,10 @@ export function NewsSlider() {
           });
 
           return (
-            <Animated.View style={{ width: cardWidth, transform: [{ scale }], opacity }}>
-              <NewsCard post={item} onPress={() => router.push(`/news/${item.id}`)} />
+            <Animated.View style={reduceMotion ? { width: cardWidth } : { width: cardWidth, transform: [{ scale }], opacity }}>
+              <Reanimated.View entering={enter('scale', i)}>
+                <NewsCard post={item} onPress={() => router.push(`/news/${item.id}`)} />
+              </Reanimated.View>
             </Animated.View>
           );
         }}
@@ -126,58 +141,61 @@ function NewsCard({ post, onPress }: { post: NewsPost; onPress: () => void }) {
   const accent = accentOf(post);
 
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityLabel={post.title}
-      accessibilityHint={post.excerpt ?? undefined}
-      style={({ pressed }) => [styles.card, { backgroundColor: accent }, pressed && styles.pressed]}
-    >
-      {post.cover_url ? (
-        <Image source={{ uri: post.cover_url }} style={styles.cover} resizeMode="cover" />
-      ) : null}
-
-      {/* A flat wash rather than a gradient: the app ships no gradient library, and a solid scrim
-          at this opacity keeps white text legible over any photograph a creator uploads. */}
-      <View style={[styles.scrim, !post.cover_url && styles.scrimSolid]} />
-
-      <View style={styles.cardBody}>
-        {post.kicker ? (
-          <View style={styles.kicker}>
-            <Text variant="micro" color={accent}>
-              {post.kicker.toUpperCase()}
-            </Text>
-          </View>
+    <View style={styles.cardShadow}>
+      <Touchable
+        onPress={onPress}
+        scaleTo={pressScale.surface}
+        dim={false}
+        accessibilityRole="button"
+        accessibilityLabel={post.title}
+        accessibilityHint={post.excerpt ?? undefined}
+        style={[styles.card, { backgroundColor: accent }]}
+      >
+        {post.cover_url ? (
+          <Image source={{ uri: post.cover_url }} style={styles.cover} resizeMode="cover" />
         ) : null}
 
-        <Text variant="h3" color={neutral[0]} numberOfLines={2}>
-          {post.title}
-        </Text>
+        {/* A flat wash rather than a gradient keeps white text legible over CMS photographs. */}
+        <View style={[styles.scrim, !post.cover_url && styles.scrimSolid]} />
 
-        {post.excerpt ? (
-          <Text variant="caption" color={neutral[0]} numberOfLines={2} style={styles.excerpt}>
-            {post.excerpt}
-          </Text>
-        ) : null}
-
-        <View style={styles.metaRow}>
-          {post.tags.slice(0, 2).map((tag) => (
-            <View key={tag} style={styles.tag}>
-              <Text variant="micro" color={neutral[0]}>
-                #{tag}
-              </Text>
-            </View>
-          ))}
-          {post.is_read ? null : (
-            <View style={styles.newBadge}>
+        <View style={styles.cardBody}>
+          {post.kicker ? (
+            <View style={styles.kicker}>
               <Text variant="micro" color={accent}>
-                BARU
+                {post.kicker.toUpperCase()}
               </Text>
             </View>
-          )}
+          ) : null}
+
+          <Text variant="h3" color={neutral[0]} numberOfLines={2}>
+            {post.title}
+          </Text>
+
+          {post.excerpt ? (
+            <Text variant="caption" color={neutral[0]} numberOfLines={2} style={styles.excerpt}>
+              {post.excerpt}
+            </Text>
+          ) : null}
+
+          <View style={styles.metaRow}>
+            {post.tags.slice(0, 2).map((tag) => (
+              <View key={tag} style={styles.tag}>
+                <Text variant="micro" color={neutral[0]}>
+                  #{tag}
+                </Text>
+              </View>
+            ))}
+            {post.is_read ? null : (
+              <Reanimated.View entering={enter('scale')} style={styles.newBadge}>
+                <Text variant="micro" color={accent}>
+                  BARU
+                </Text>
+              </Reanimated.View>
+            )}
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </Touchable>
+    </View>
   );
 }
 
@@ -188,13 +206,13 @@ const styles = StyleSheet.create({
 
   track: { gap: GAP },
 
+  cardShadow: { borderRadius: radius.card, ...shadow.card },
   card: {
     height: CARD_HEIGHT,
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     overflow: 'hidden',
     justifyContent: 'flex-end',
   },
-  pressed: { opacity: 0.9 },
   cover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   scrim: {
     position: 'absolute',

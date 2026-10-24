@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
-  ReduceMotion,
+  cancelAnimation,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -13,7 +13,7 @@ import Animated, {
 import { Text } from '@/components/ui/Text';
 import { statusLabel } from '@/components/ui/Badge';
 import { enter } from '@/components/ui/Motion';
-import { neutral, radius, semantic, space, statusColor, type RefillStatus } from '@/theme';
+import { radius, semantic, space, statusColor, timing, type RefillStatus } from '@/theme';
 import { formatTime } from './RefillCard';
 import type { RefillRequest } from '@/domain/types';
 
@@ -139,7 +139,7 @@ export function RefillTimeline({ refill }: { refill: RefillRequest }) {
           <Animated.View key={step.status} entering={enter('below', index, 8)} style={styles.row}>
             <View style={styles.rail}>
               <TimelineDot status={step.status} pulsing={isCurrent} />
-              {!isLast ? <View style={styles.line} /> : null}
+              {!isLast ? <View style={[styles.line, { backgroundColor: statusColor[step.status].fg }]} /> : null}
             </View>
 
             <View style={[styles.content, !isLast && styles.contentSpacing]}>
@@ -160,15 +160,20 @@ function TimelineDot({ status, pulsing }: { status: RefillStatus; pulsing: boole
   const pulse = useSharedValue(0);
 
   useEffect(() => {
-    if (!pulsing) return;
+    if (!pulsing) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
     pulse.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 1000, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.System }),
-        withTiming(0, { duration: 1000, easing: Easing.in(Easing.quad), reduceMotion: ReduceMotion.System }),
+        withTiming(1, { ...timing.ambient, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { ...timing.ambient, easing: Easing.in(Easing.quad) }),
       ),
       -1,
       false,
     );
+    return () => { cancelAnimation(pulse); pulse.value = 0; };
   }, [pulsing, pulse]);
 
   const haloStyle = useAnimatedStyle(() => ({
@@ -177,28 +182,26 @@ function TimelineDot({ status, pulsing }: { status: RefillStatus; pulsing: boole
   }));
 
   return (
-    <View style={styles.dotWrap}>
+    <View style={[styles.dotWrap, { backgroundColor: color.bg }]}>
       {pulsing ? <Animated.View style={[styles.halo, { backgroundColor: color.fg }, haloStyle]} pointerEvents="none" /> : null}
-      <View style={[styles.dot, { backgroundColor: color.fg, borderColor: color.border }]} />
+      <View style={[styles.dot, { backgroundColor: color.fg }]} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row' },
-  rail: { width: 24, alignItems: 'center' },
-  dotWrap: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  rail: { width: 36, alignItems: 'center' },
+  dotWrap: { width: 24, height: 24, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   dot: {
-    width: 14,
-    height: 14,
+    width: 10,
+    height: 10,
     borderRadius: radius.pill,
-    borderWidth: 2,
   },
-  halo: { position: 'absolute', width: 14, height: 14, borderRadius: radius.pill },
+  halo: { position: 'absolute', width: 24, height: 24, borderRadius: radius.pill },
   line: {
     flex: 1,
     width: 2,
-    backgroundColor: neutral[200],
     marginTop: space.xxs,
     marginBottom: space.xxs,
   },
