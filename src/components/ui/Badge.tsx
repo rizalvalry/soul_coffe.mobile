@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
+  cancelAnimation,
   Easing,
-  ReduceMotion,
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
@@ -12,7 +12,7 @@ import Animated, {
 
 import { Text } from './Text';
 import { enter } from './Motion';
-import { accent, neutral, radius, semantic, space, statusColor, type RefillStatus } from '@/theme';
+import { accent, brand, neutral, radius, semantic, space, statusColor, timing, type RefillStatus } from '@/theme';
 
 /** Indonesian label for each state in the refill state machine (§6). */
 export const statusLabel: Record<RefillStatus, string> = {
@@ -50,15 +50,20 @@ export function StatusBadge({ status }: { status: RefillStatus }) {
   const pulse = useSharedValue(0);
 
   useEffect(() => {
-    if (!isLive) return;
+    if (!isLive) {
+      cancelAnimation(pulse);
+      pulse.value = 0;
+      return;
+    }
     pulse.value = withRepeat(
       withSequence(
-        withTiming(1, { duration: 900, easing: Easing.out(Easing.quad), reduceMotion: ReduceMotion.System }),
-        withTiming(0, { duration: 900, easing: Easing.in(Easing.quad), reduceMotion: ReduceMotion.System }),
+        withTiming(1, { ...timing.ambient, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { ...timing.ambient, easing: Easing.in(Easing.quad) }),
       ),
       -1,
       false,
     );
+    return () => cancelAnimation(pulse);
   }, [isLive, pulse]);
 
   const haloStyle = useAnimatedStyle(() => ({
@@ -79,7 +84,7 @@ export function StatusBadge({ status }: { status: RefillStatus }) {
         <View style={[styles.dot, { backgroundColor: c.fg }]} />
       </View>
 
-      <Text variant="micro" color={c.fg} numberOfLines={1}>
+      <Text variant="micro" color={c.fg} style={styles.badgeLabel}>
         {statusLabel[status].toUpperCase()}
       </Text>
     </View>
@@ -103,7 +108,7 @@ export function CountBadge({ count, style }: { count: number; style?: StyleProp<
       accessibilityRole="text"
       accessibilityLabel={`${count} item menunggu`}
     >
-      <Text variant="micro" color={neutral[0]}>
+      <Text variant="micro" color={accent[600]}>
         {count > 99 ? '99+' : String(count)}
       </Text>
     </Animated.View>
@@ -124,7 +129,7 @@ export function Chip({
 }) {
   const palette = {
     neutral: { bg: semantic.surfaceSunken, fg: semantic.textMuted, border: 'transparent' },
-    brand: { bg: '#EBF8F8', fg: semantic.primary, border: 'transparent' },
+    brand: { bg: brand[50], fg: semantic.primary, border: 'transparent' },
     amber: { bg: accent[50], fg: accent[600], border: 'transparent' },
     translucent: { bg: 'rgba(255,255,255,0.16)', fg: neutral[0], border: 'rgba(255,255,255,0.26)' },
   }[tone];
@@ -132,7 +137,7 @@ export function Chip({
   return (
     <View style={[styles.chip, { backgroundColor: palette.bg, borderColor: palette.border }, style]}>
       {icon}
-      <Text variant="captionStrong" color={palette.fg} numberOfLines={1}>
+      <Text variant="captionStrong" color={palette.fg} style={styles.chipLabel}>
         {label}
       </Text>
     </View>
@@ -145,12 +150,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.xs,
     alignSelf: 'flex-start',
+    flexShrink: 1,
     maxWidth: '100%',
     borderRadius: radius.pill,
     borderWidth: 1,
     paddingHorizontal: space.sm,
     paddingVertical: space.xxs,
   },
+  badgeLabel: { flexShrink: 1, minWidth: 0 },
   dotWrap: { width: 7, height: 7, alignItems: 'center', justifyContent: 'center' },
   dot: { width: 7, height: 7, borderRadius: radius.pill },
   halo: { position: 'absolute', width: 7, height: 7, borderRadius: radius.pill },
@@ -159,7 +166,7 @@ const styles = StyleSheet.create({
     minWidth: 22,
     height: 22,
     borderRadius: radius.pill,
-    backgroundColor: accent[600],
+    backgroundColor: accent[300],
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: space.xs,
@@ -176,4 +183,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
     paddingVertical: space.xs,
   },
+  chipLabel: { flexShrink: 1, minWidth: 0 },
 });

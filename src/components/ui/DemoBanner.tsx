@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     borderColor: feedback.warningBorder,
     borderRadius: radius.pill,
     paddingHorizontal: space.sm,
-    minHeight: touch.minTarget * 0.6,
+    minHeight: touch.minTarget,
   },
   chipActive: { backgroundColor: feedback.warningFg, borderColor: feedback.warningFg },
 });

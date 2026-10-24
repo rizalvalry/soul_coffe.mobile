@@ -11,6 +11,8 @@ export type TouchableProps = Omit<PressableProps, 'style'> & {
   scaleTo?: number;
   /** Dim on press as well as squash. Off for surfaces that already darken via an overlay. */
   dim?: boolean;
+  /** Submit controls settle immediately; other surfaces bounce back. */
+  springBack?: 'press' | 'bouncy';
   style?: StyleProp<ViewStyle>;
   children?: React.ReactNode;
 };
@@ -33,7 +35,7 @@ export type TouchableProps = Omit<PressableProps, 'style'> & {
  * the shared spring config.
  */
 export const Touchable = forwardRef<View, TouchableProps>(function Touchable(
-  { scaleTo = pressScale.surface, dim = true, style, children, disabled, onPressIn, onPressOut, ...rest },
+  { scaleTo = pressScale.surface, dim = true, springBack = 'bouncy', style, children, disabled, onPressIn, onPressOut, ...rest },
   ref,
 ) {
   const progress = useSharedValue(0);
@@ -48,10 +50,10 @@ export const Touchable = forwardRef<View, TouchableProps>(function Touchable(
 
   const handlePressOut = useCallback<NonNullable<PressableProps['onPressOut']>>(
     (event) => {
-      progress.value = withSpring(0, spring.press);
+      progress.value = withSpring(0, spring[springBack]);
       onPressOut?.(event);
     },
-    [progress, onPressOut],
+    [progress, onPressOut, springBack],
   );
 
   const animatedStyle = useAnimatedStyle(() => ({

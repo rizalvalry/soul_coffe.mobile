@@ -62,8 +62,8 @@ export function Screen({
               <RefreshControl
                 refreshing={refreshing ?? false}
                 onRefresh={onRefresh}
-                colors={[brand[600]]}
-                tintColor={brand[600]}
+                colors={[brand[700]]}
+                tintColor={brand[700]}
               />
             ),
           }

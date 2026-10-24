@@ -47,10 +47,10 @@ export function SoulLogo({ size = 96, showWordmark = true, variant = 'mark' }: S
       />
       {showWordmark && variant === 'mark' ? (
         <View style={styles.wordmark}>
-          <Text variant="h1" color={brand[600]} style={styles.soul}>
+          <Text variant="h1" color={brand[700]} style={styles.soul}>
             SOUL
           </Text>
-          <Text variant="micro" color={brand[500]} style={styles.tagline}>
+          <Text variant="micro" color={brand[700]} style={styles.tagline}>
             COFFEEMATE
           </Text>
         </View>

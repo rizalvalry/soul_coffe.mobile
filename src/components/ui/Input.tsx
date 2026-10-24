@@ -6,7 +6,7 @@ import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTimin
 import { Text } from './Text';
 import { Touchable } from './Touchable';
 import { enter } from './Motion';
-import { brand, feedback, neutral, pressScale, radius, semantic, space, timing, touch } from '@/theme';
+import { brand, feedback, neutral, pressScale, radius, semantic, space, timing, touch, type } from '@/theme';
 
 export type InputProps = Omit<TextInputProps, 'style'> & {
   label: string;
@@ -91,10 +91,10 @@ export function Input({
         {secure ? (
           <Touchable
             onPress={() => setRevealed((v) => !v)}
-            scaleTo={pressScale.icon}
-            hitSlop={12}
+            scaleTo={pressScale.control}
             accessibilityRole="button"
             accessibilityLabel={revealed ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+            style={styles.reveal}
           >
             <MaterialCommunityIcons
               name={revealed ? 'eye-off-outline' : 'eye-outline'}
@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
   label: { marginBottom: space.xs },
   field: {
     minHeight: touch.inputHeight,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 2,
     backgroundColor: neutral[100],
     flexDirection: 'row',
@@ -135,11 +135,13 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: type.body.fontSize,
+    lineHeight: type.body.lineHeight,
+    fontFamily: type.body.fontFamily,
     color: semantic.text,
     paddingVertical: space.md,
   },
+  reveal: { minWidth: touch.minTarget, minHeight: touch.minTarget, alignItems: 'center', justifyContent: 'center' },
   messageRow: { flexDirection: 'row', alignItems: 'center', gap: space.xs, marginTop: space.xs },
   messageText: { flex: 1 },
   hint: { marginTop: space.xs },
