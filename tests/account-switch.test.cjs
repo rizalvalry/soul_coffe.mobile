@@ -31,6 +31,7 @@ function renderRiderForm(path, useAuth, offlineEntries = {}) {
       useCallback: (callback) => callback,
       useEffect() {},
       useMemo: (callback) => callback(),
+      useRef: (value) => ({ current: value }),
       useState: (initial) => [initial, () => {}],
     },
     'react/jsx-runtime': {
