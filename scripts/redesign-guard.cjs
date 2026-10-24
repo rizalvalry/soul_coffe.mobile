@@ -57,6 +57,13 @@ function run(args) {
   // A rename must expose both the old protected path and the new destination.
   const changed = git(['diff', '--no-renames', '--name-only', '-z', `${base}...HEAD`]).split('\0').filter(Boolean)
     .map((file) => file.replaceAll('\\', '/'));
+  // Additive dry-run path for proving a task's protected-path failure without
+  // creating or committing a runtime dummy file.
+  const checkIndex = args.indexOf('--check-path');
+  if (checkIndex >= 0) {
+    if (!args[checkIndex + 1]) throw new Error('--check-path needs a repository-relative file.');
+    changed.push(args[checkIndex + 1].replaceAll('\\', '/'));
+  }
   const branch = git(['branch', '--show-current']).trim();
   const failures = validatePaths(changed, allowlist, branch);
   if (failures.length) throw new Error(`Redesign guard failed:\n${failures.join('\n')}`);

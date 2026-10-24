@@ -4,6 +4,7 @@ const { readFileSync } = fs;
 const { join } = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
+const { spawnSync } = require('node:child_process');
 const ts = require('typescript');
 const { snapshot } = require('../scripts/api-contract-snapshot.cjs');
 const { validatePaths } = require('../scripts/redesign-guard.cjs');
@@ -86,6 +87,14 @@ test('bootstrap exception is exact to T-090 scripts and its branch', () => {
   assert.match(validatePaths([allow[0]], allow, 'task/T-092-visual').join(''), /denylist/);
   assert.match(validatePaths(['scripts/other.cjs'], ['scripts/other.cjs'],
     'task/T-090-redesign-safety-net').join(''), /denylist/);
+});
+
+test('guard CLI rejects a dry-run protected runtime path without changing the repository', () => {
+  const result = spawnSync(process.execPath, [join(root, 'scripts/redesign-guard.cjs'),
+    '--base', 'HEAD', '--allow', join(root, 'tests/fixtures/redesign-task.allowlist'),
+    '--check-path', 'src/features/visual-dummy.ts'], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /src\/features\/visual-dummy\.ts: denylist/);
 });
 
 test('refill evidence upload precedes submit and preserves multipart names and GPS unavailable payload', async () => {
