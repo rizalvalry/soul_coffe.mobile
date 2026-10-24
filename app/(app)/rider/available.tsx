@@ -1,4 +1,4 @@
-import { Alert, FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -7,10 +7,7 @@ import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { RefillCard } from '@/components/refill/RefillCard';
-import { useClaimRefill, useRefills } from '@/features/refill/queries';
-import { useRealtimeState } from '@/features/realtime/RealtimeProvider';
-import { ApiError } from '@/lib/api';
-import type { RefillRequest } from '@/domain/types';
+import { useRunnerAvailableController } from '@/features/refill/useRunnerAvailableController';
 import { space } from '@/theme';
 
 /**
@@ -18,22 +15,7 @@ import { space } from '@/theme';
  * the loser gets a 409, never a silent double-claim.
  */
 export default function RiderAvailableScreen() {
-  const refillsQuery = useRefills('READY_TO_PICK');
-  const claim = useClaimRefill();
-  const realtime = useRealtimeState();
-
-  const onClaim = async (refill: RefillRequest) => {
-    try {
-      await claim.mutateAsync({ id: refill.id });
-    } catch (e) {
-      if (e instanceof ApiError && e.isConflict) {
-        Alert.alert('Sudah diambil runner lain.');
-        void refillsQuery.refetch();
-      } else if (e instanceof ApiError) {
-        Alert.alert('Gagal mengambil pesanan', e.message);
-      }
-    }
-  };
+  const { refillsQuery, claimPending, realtime, onClaim, refresh, claimDisabled } = useRunnerAvailableController();
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
@@ -49,7 +31,7 @@ export default function RiderAvailableScreen() {
       ) : refillsQuery.isError ? (
         <View style={styles.center}>
           <EmptyState icon="wifi-off" title="Gagal memuat pesanan" subtitle={(refillsQuery.error as Error).message} tone="danger">
-            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={refresh} />
           </EmptyState>
         </View>
       ) : (
@@ -58,7 +40,7 @@ export default function RiderAvailableScreen() {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
           refreshing={refillsQuery.isRefetching}
-          onRefresh={() => void refillsQuery.refetch()}
+          onRefresh={refresh}
           renderItem={({ item, index }) => (
             <View style={styles.item}>
               {/* R15 — cost never shown to Runner. */}
@@ -67,8 +49,8 @@ export default function RiderAvailableScreen() {
                 label="Ambil"
                 icon="package-variant-closed"
                 onPress={() => void onClaim(item)}
-                disabled={!item.can.claim}
-                loading={claim.isPending}
+                disabled={claimDisabled(item)}
+                loading={claimPending}
               />
             </View>
           )}

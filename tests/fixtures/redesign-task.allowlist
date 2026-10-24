@@ -1,10 +1,6 @@
-src/components/refill/RefillCard.tsx
-src/components/refill/ProductPickerCard.tsx
-src/components/refill/RefillTimeline.tsx
-src/components/ui/QtyStepper.tsx
-src/components/ui/ProductThumbnail.tsx
-src/components/ui/AnimatedNumber.tsx
-src/components/ui/NotificationBell.tsx
-src/components/ui/Gradient.tsx
-src/components/news/NewsSlider.tsx
+app/(app)/menu.tsx
+app/(app)/staff/stock.tsx
+app/(app)/staff/refill/new.tsx
+app/(app)/staff/requests/[id].tsx
+app/(app)/staff/requests/index.tsx
 tests/**

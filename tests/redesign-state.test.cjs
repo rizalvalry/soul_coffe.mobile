@@ -23,8 +23,8 @@ function loadModule(file, modules) {
   } }).outputText;
   const state = { exports: {} };
   vm.runInNewContext(code, { module: state, exports: state.exports, __DEV__: false, require: (name) => {
-    if (name === '@/features/refill/useNewRefillController') {
-      return loadModule('src/features/refill/useNewRefillController.ts', modules);
+    if (name === '@/features/refill/useNewRefillController' || name.startsWith('@/features/refill/useRunner')) {
+      return loadModule(`src/features/refill/${name.slice('@/features/refill/'.length)}.ts`, modules);
     }
     if (name === '@/features/showcase/usePreparingController') {
       return loadModule('src/features/showcase/usePreparingController.ts', modules);

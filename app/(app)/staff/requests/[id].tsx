@@ -82,19 +82,24 @@ function RequestDetail({
       <Animated.View entering={enter('below', 0)}>
         <Card style={styles.headerCard}>
           <View style={styles.headerRow}>
+            <View style={styles.heroIcon}>
+              <MaterialCommunityIcons name="moped-outline" size={26} color={feedback.infoFg} />
+            </View>
             <View style={styles.headerText}>
-              <Text variant="h2">{refill.code}</Text>
-              <Text variant="caption" color={semantic.textMuted}>
+              <Text variant="h1" color={neutral[0]}>{refill.code}</Text>
+              <Text variant="caption" color={neutral[0]}>
                 Coffee Bike {refill.cart_code} · {refill.staff_name}
               </Text>
             </View>
-            <StatusBadge status={refill.status} />
           </View>
+          <StatusBadge status={refill.status} />
 
           {typeof refill.total_cost === 'number' ? (
-            <MetaRow label="Nilai Permintaan" value={formatRupiah(refill.total_cost)} emphasis />
+            <View style={styles.valuePanel}>
+              <MetaRow label="Nilai Permintaan" value={formatRupiah(refill.total_cost)} emphasis />
+            </View>
           ) : null}
-          {refill.note ? <Text variant="body">Catatan lapangan: {refill.note}</Text> : null}
+          {refill.note ? <Text variant="body" color={neutral[0]}>Catatan lapangan: {refill.note}</Text> : null}
         </Card>
       </Animated.View>
 
@@ -221,16 +226,18 @@ const styles = StyleSheet.create({
   top: { alignItems: 'flex-start' },
   stateCard: { gap: space.md },
 
-  headerCard: { gap: space.md },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
+  headerCard: { gap: space.md, backgroundColor: feedback.infoFg, borderRadius: radius.hero },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   headerText: { flex: 1, gap: space.xxs },
+  heroIcon: { width: 52, height: 52, borderRadius: radius.pill, backgroundColor: neutral[0], alignItems: 'center', justifyContent: 'center' },
+  valuePanel: { backgroundColor: neutral[0], borderRadius: radius.lg, padding: space.md },
 
   reasonCard: { gap: space.sm, borderColor: feedback.dangerBorder, backgroundColor: feedback.dangerBg },
   expiredCard: { gap: space.sm, borderColor: feedback.warningBorder, backgroundColor: feedback.warningBg },
   reasonHeader: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
 
   evidenceCard: { gap: space.md },
-  photo: { width: '100%', height: 200, borderRadius: radius.md, backgroundColor: neutral[100] },
+  photo: { width: '100%', height: 200, borderRadius: radius.lg, backgroundColor: neutral[100] },
 
   linesCard: { gap: space.sm },
   tableHead: { flexDirection: 'row', gap: space.xs, paddingHorizontal: space.sm },
@@ -241,7 +248,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.xs,
     backgroundColor: semantic.surfaceSunken,
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: space.sm,
     paddingHorizontal: space.sm,
   },
@@ -250,7 +257,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: space.xs,
     backgroundColor: brand[50],
-    borderRadius: radius.sm,
+    borderRadius: radius.lg,
     paddingVertical: space.sm,
     paddingHorizontal: space.sm,
     marginTop: space.xxs,

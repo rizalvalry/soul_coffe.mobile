@@ -5,7 +5,8 @@ const test = require('node:test');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF', isManagement = role === 'MANAGEMENT') {
+function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF',
+  isManagement = role === 'MANAGEMENT', refillInvalidator = () => {}) {
   const source = readFileSync(join(__dirname, '..', 'src/features/realtime/RealtimeProvider.tsx'), 'utf8');
   const javascript = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
@@ -56,7 +57,10 @@ function mountRealtimeProvider(claimEvent = () => true, role = 'STAFF', isManage
       user.isSuperAdmin === true || user.abilities?.[module]?.includes(ability) === true },
     '@/lib/api': { apiBaseUrl: () => 'http://localhost' },
     '@/features/refill/queries': {
-      invalidateRefillData: () => { refillInvalidations++; },
+      invalidateRefillData: (queryClient, refillId) => {
+        refillInvalidations++;
+        refillInvalidator(queryClient, refillId);
+      },
       qk: { myStock: ['me', 'stock'], kitchenStock: ['kitchen', 'stock'], allocationsToday: ['allocations', 'today'] },
     },
     '@/features/showcase/queries': { showcaseKeys: { absenStatus: ['absen', 'status'], stock: ['showcase', 'stock'],
@@ -150,6 +154,37 @@ test('Produksi refill approval event invalidates the queue once through realtime
   assert.equal(app.refillInvalidations(), 1);
   app.channelCallbacks[1](event);
   assert.equal(app.refillInvalidations(), 1);
+  app.cleanup();
+});
+
+test('Runner ready event invalidates the ready list once via realtime without polling', () => {
+  const source = readFileSync(join(__dirname, '..', 'src/features/refill/queries.ts'), 'utf8');
+  const file = ts.createSourceFile('queries.ts', source, ts.ScriptTarget.ES2020, true);
+  const helper = file.statements.find((node) => ts.isFunctionDeclaration(node)
+    && node.name?.text === 'invalidateRefillData');
+  assert.ok(helper, 'production refill invalidation helper exists');
+  const helperCode = ts.transpileModule(`
+    const qk = {
+      badges: ['badges'], notifications: ['notifications'],
+      refill: (id) => ['refill', id],
+    };
+    ${helper.getText(file)}
+  `, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText;
+  const loaded = { exports: {} };
+  vm.runInNewContext(helperCode, { module: loaded, exports: loaded.exports });
+  const app = mountRealtimeProvider(() => false, 'RIDER', false, loaded.exports.invalidateRefillData);
+  const event = { event_id: 'ready-17', type: 'RefillReadyToPick',
+    refill_request_id: 17, status: 'READY_TO_PICK' };
+  app.channelCallbacks[0](event);
+  assert.equal(app.refillInvalidations(), 1);
+  assert.deepEqual(app.calls.map((key) => Array.from(key)), [
+    ['refills'], ['badges'], ['notifications'], ['refill', 17],
+  ]);
+  app.channelCallbacks[1](event);
+  assert.equal(app.refillInvalidations(), 1);
+  assert.equal(app.calls.length, 4);
+  assert.match(source, /queryKey: qk\.refills\(\{ \.\.\.\(status \? \{ status \} : \{\}\)/);
+  assert.doesNotMatch(source, /refetchInterval\s*:/);
   app.cleanup();
 });
 

@@ -440,13 +440,25 @@ test('delivery sheet reuses the handover upload when delivery times out', async 
     'Banner', 'EmptyState', 'Skeleton', 'ProductThumbnail', 'Touchable', 'SignaturePad']) {
     modules[`@/components/ui/${name}`] = ui;
   }
+  const loadController = (name) => {
+    const path = join(__dirname, '..', 'src/features/refill', `${name.slice('@/features/refill/'.length)}.ts`);
+    const code = ts.transpileModule(readFileSync(path, 'utf8'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020,
+        jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
+    }).outputText;
+    const controller = { exports: {} };
+    vm.runInNewContext(code, { module: controller, exports: controller.exports, require: resolve });
+    return controller.exports;
+  };
+  const resolve = (name) => {
+    if (name.startsWith('@/features/refill/useRunner')) return loadController(name);
+    assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
+    return modules[name];
+  };
   const module = { exports: {} };
   vm.runInNewContext(`${screenJavaScript}\nmodule.exports.DeliverySheet = DeliverySheet;`, {
     module, exports: module.exports,
-    require: (name) => {
-      assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
-      return modules[name];
-    },
+    require: resolve,
   });
   function findSubmit(node) {
     if (Array.isArray(node)) return node.map(findSubmit).find(Boolean);
