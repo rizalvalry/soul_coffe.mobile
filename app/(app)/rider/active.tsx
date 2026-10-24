@@ -1,8 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
+import { FlatList, Image, Modal, ScrollView, StyleSheet, View } from 'react-native';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import * as ImagePicker from 'expo-image-picker';
-import * as Location from 'expo-location';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
@@ -16,10 +13,11 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { Touchable } from '@/components/ui/Touchable';
-import { SignaturePad, type SignatureResult } from '@/components/ui/SignaturePad';
-import { useDeliverRefill, useRefills, useUploadHandoverPhoto } from '@/features/refill/queries';
-import { useReportIncident } from '@/features/incidents/queries';
-import { ApiError } from '@/lib/api';
+import { SignaturePad } from '@/components/ui/SignaturePad';
+import { useRunnerActiveController } from '@/features/refill/useRunnerActiveController';
+import { useRunnerDeliveryController, type ProofMode } from '@/features/refill/useRunnerDeliveryController';
+import { useRunnerIncidentController } from '@/features/refill/useRunnerIncidentController';
+import type { Photo } from '@/features/refill/useRunnerEvidence';
 import type { RefillRequest } from '@/domain/types';
 import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
 
@@ -32,50 +30,6 @@ import { brand, feedback, neutral, radius, semantic, space } from '@/theme';
  * collected at all, which meant a runner holding a crate in the street could be unable to close a
  * delivery that had plainly happened, and a dispute had nothing but a squiggle to look at.
  */
-type ProofMode = 'none' | 'staff_signature' | 'pin_fallback';
-type GpsCoords = { lat: number; lng: number };
-type Photo = { uri: string; takenAt: string };
-
-function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
-  return Promise.race([promise, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
-}
-
-/** Never a hard block (E10) — any denial, error, or timeout resolves to `null`, not a rejection. */
-async function captureGps(): Promise<GpsCoords | null> {
-  try {
-    const permission = await Location.requestForegroundPermissionsAsync();
-    if (!permission.granted) return null;
-    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-    return { lat: position.coords.latitude, lng: position.coords.longitude };
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Camera only, never the gallery.
- *
- * The same rule the refill evidence photo lives under (R3): there is no `launchImageLibraryAsync`
- * anywhere in this flow, because a photo that can come from the gallery proves nothing about
- * where anyone was.
- */
-async function capturePhoto(): Promise<Photo | null> {
-  const permission = await ImagePicker.requestCameraPermissionsAsync();
-  if (!permission.granted) {
-    throw new Error('Izin kamera ditolak. Aktifkan izin kamera di pengaturan HP.');
-  }
-
-  const result = await ImagePicker.launchCameraAsync({
-    mediaTypes: ['images'],
-    quality: 0.6,
-    allowsEditing: false,
-  });
-
-  if (result.canceled || !result.assets?.[0]) return null;
-
-  return { uri: result.assets[0].uri, takenAt: new Date().toISOString() };
-}
-
 function PhotoField({
   photo,
   title,
@@ -111,101 +65,11 @@ function PhotoField({
 }
 
 function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: () => void }) {
-  const uploadPhoto = useUploadHandoverPhoto();
-  const deliver = useDeliverRefill();
-  const uploadedPhoto = useRef<{ uri: string; takenAt: string; id: number } | null>(null);
-  const delivering = useRef(false);
-
-  const [qty, setQty] = useState<Record<number, number>>(() =>
-    Object.fromEntries(refill.lines.map((l) => [l.id, l.qty_prepared ?? 0])),
-  );
-  const [photo, setPhoto] = useState<Photo | null>(null);
-  const [proof, setProof] = useState<ProofMode>('none');
-  const [signature, setSignature] = useState<SignatureResult | null>(null);
-  const [staffPin, setStaffPin] = useState('');
-  const [gps, setGps] = useState<GpsCoords | null>(null);
-  const [gpsStatus, setGpsStatus] = useState<'loading' | 'ok' | 'unavailable'>('loading');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void withTimeout(captureGps(), 8000, null).then((coords) => {
-      if (cancelled) return;
-      setGps(coords);
-      setGpsStatus(coords ? 'ok' : 'unavailable');
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const isSubmitting = uploadPhoto.isPending || deliver.isPending;
-
-  // The photo is the only requirement. A chosen proof mode has to be complete, but choosing one
-  // at all is optional.
-  const canSubmit =
-    photo !== null &&
-    (proof === 'none' ||
-      (proof === 'staff_signature' && signature !== null) ||
-      (proof === 'pin_fallback' && staffPin.length === 6));
-
-  const takePhoto = async () => {
-    setError(null);
-    try {
-      const taken = await capturePhoto();
-      if (taken) setPhoto(taken);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Tidak dapat membuka kamera.');
-    }
-  };
-
-  const onSubmit = async () => {
-    if (delivering.current) return;
-    setError(null);
-
-    if (!photo) {
-      setError('Foto serah terima wajib diambil dulu.');
-      return;
-    }
-
-    delivering.current = true;
-    try {
-      // Uploaded first, then referenced by id: this request may also carry a signature file, and
-      // the client streams one file per request on purpose (see lib/api.ts).
-      let media = uploadedPhoto.current;
-      if (!media || media.uri !== photo.uri || media.takenAt !== photo.takenAt) {
-        const uploaded = await uploadPhoto.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
-        media = { uri: photo.uri, takenAt: photo.takenAt, id: uploaded.id };
-        uploadedPhoto.current = media;
-      }
-
-      const result = await deliver.mutateAsync({
-        id: refill.id,
-        handoverMediaId: media.id,
-        lines: refill.lines.map((l) => ({ line_id: l.id, qty_received: qty[l.id] ?? 0 })),
-        gps,
-        ...(proof === 'staff_signature' && signature
-          ? { signature: { method: 'staff_signature' as const, uri: signature.uri, strokeCount: signature.strokeCount } }
-          : {}),
-        ...(proof === 'pin_fallback' ? { signature: { method: 'pin_fallback' as const, staffPin } } : {}),
-      });
-
-      // 202 means the delivery is recorded but the stock ledger post is still being retried
-      // (E19) — the request stays DELIVERED and is never silently closed.
-      const isRetryPosting = result.ledgerPending;
-      Alert.alert(
-        isRetryPosting ? 'Pengiriman Tercatat' : 'Pengiriman Selesai',
-        isRetryPosting
-          ? 'Pengiriman tercatat, posting stok sedang diproses ulang.'
-          : `${refill.code} telah diterima ${refill.staff_name}.`,
-      );
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
-    } finally {
-      delivering.current = false;
-    }
-  };
+  const {
+    qty, photo, proof, staffPin, gpsStatus, error,
+    isSubmitting, submitDisabled, isUploading, changeQty, maxReceived, selectProof,
+    setSignature, clearSignature, changeStaffPin, takePhoto, onSubmit,
+  } = useRunnerDeliveryController(refill, onClose);
 
   return (
     <View style={styles.sheetRoot}>
@@ -249,8 +113,8 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
               </Text>
               <QtyStepper
                 value={qty[line.id] ?? 0}
-                onChange={(next) => setQty((prev) => ({ ...prev, [line.id]: next }))}
-                max={line.qty_prepared ?? 0}
+                onChange={(next) => changeQty(line.id, next)}
+                max={maxReceived(line)}
                 capHint={`maks. ${line.qty_prepared ?? 0} (dikirim)`}
               />
             </View>
@@ -297,12 +161,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
               return (
                 <Touchable
                   key={option.mode}
-                  onPress={() => {
-                    setProof(option.mode);
-                    setSignature(null);
-                    setStaffPin('');
-                    setError(null);
-                  }}
+                  onPress={() => selectProof(option.mode)}
                   disabled={isSubmitting}
                   accessibilityRole="button"
                   accessibilityLabel={option.label}
@@ -323,14 +182,14 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           </View>
 
           {proof === 'staff_signature' ? (
-            <SignaturePad onSigned={setSignature} onClear={() => setSignature(null)} />
+            <SignaturePad onSigned={setSignature} onClear={clearSignature} />
           ) : null}
 
           {proof === 'pin_fallback' ? (
             <Input
               label="PIN Rider (6 digit)"
               value={staffPin}
-              onChangeText={(t) => setStaffPin(t.replace(/\D/g, '').slice(0, 6))}
+              onChangeText={changeStaffPin}
               keyboardType="number-pad"
               maxLength={6}
               placeholder="123456"
@@ -344,13 +203,13 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           label="Konfirmasi Pengiriman"
           icon="check-circle-outline"
           onPress={() => void onSubmit()}
-          disabled={!canSubmit || isSubmitting}
+          disabled={submitDisabled}
           loading={isSubmitting}
         />
 
         {isSubmitting ? (
           <Text variant="caption" color={semantic.textSubtle} center>
-            {uploadPhoto.isPending ? 'Mengunggah foto serah terima...' : 'Menyelesaikan pengiriman...'}
+            {isUploading ? 'Mengunggah foto serah terima...' : 'Menyelesaikan pengiriman...'}
           </Text>
         ) : null}
       </ScrollView>
@@ -367,61 +226,10 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
  * screen collects the facts and says plainly that somebody else will answer.
  */
 function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: () => void }) {
-  const report = useReportIncident();
-
-  const [photo, setPhoto] = useState<Photo | null>(null);
-  const [damaged, setDamaged] = useState<Record<number, number>>({});
-  const [note, setNote] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const totalDamaged = useMemo(() => Object.values(damaged).reduce((sum, n) => sum + n, 0), [damaged]);
-  const allDamaged = useMemo(
-    () => refill.lines.every((line) => (damaged[line.id] ?? 0) >= (line.qty_prepared ?? 0)),
-    [refill.lines, damaged],
-  );
-
-  const takePhoto = async () => {
-    setError(null);
-    try {
-      const taken = await capturePhoto();
-      if (taken) setPhoto(taken);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Tidak dapat membuka kamera.');
-    }
-  };
-
-  const onSubmit = async () => {
-    setError(null);
-
-    if (!photo) {
-      setError('Foto kerusakan wajib diambil dulu.');
-      return;
-    }
-    if (totalDamaged <= 0) {
-      setError('Isi dulu jumlah cups yang rusak.');
-      return;
-    }
-
-    try {
-      await report.mutateAsync({
-        refillId: refill.id,
-        photoUri: photo.uri,
-        takenAt: photo.takenAt,
-        lines: Object.entries(damaged)
-          .map(([lineId, qty]) => ({ line_id: Number(lineId), qty_damaged: qty }))
-          .filter((line) => line.qty_damaged > 0),
-        note: note.trim() || undefined,
-      });
-
-      Alert.alert(
-        'Laporan Terkirim',
-        'Finance dan Administrator sudah diberi tahu. Tunggu keputusan mereka: pengantaran dibatalkan, atau lanjut dengan cups yang masih layak.',
-      );
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Terjadi kesalahan tidak terduga.');
-    }
-  };
+  const {
+    photo, damaged, note, error, totalDamaged, allDamaged,
+    isSubmitting, submitDisabled, changeDamaged, maxDamaged, setNote, takePhoto, onSubmit,
+  } = useRunnerIncidentController(refill, onClose);
 
   return (
     <View style={styles.sheetRoot}>
@@ -445,7 +253,7 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           photo={photo}
           title="Foto Kerusakan (wajib)"
           hint="Foto cups yang rusak / tumpah, sedekat mungkin. Ini yang dilihat Finance saat memutuskan."
-          disabled={report.isPending}
+          disabled={isSubmitting}
           onCapture={() => void takePhoto()}
         />
 
@@ -463,8 +271,8 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
               </Text>
               <QtyStepper
                 value={damaged[line.id] ?? 0}
-                onChange={(next) => setDamaged((prev) => ({ ...prev, [line.id]: next }))}
-                max={line.qty_prepared ?? 0}
+                onChange={(next) => changeDamaged(line.id, next)}
+                max={maxDamaged(line)}
                 capHint={`maks. ${line.qty_prepared ?? 0} (dikirim)`}
               />
             </View>
@@ -499,8 +307,8 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           label="Kirim Laporan"
           icon="alert-outline"
           onPress={() => void onSubmit()}
-          disabled={report.isPending || !photo || totalDamaged <= 0}
-          loading={report.isPending}
+          disabled={submitDisabled}
+          loading={isSubmitting}
         />
       </ScrollView>
     </View>
@@ -508,13 +316,11 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 }
 
 export default function RiderActiveScreen() {
-  const refillsQuery = useRefills('PICKED_UP');
-  const [deliverId, setDeliverId] = useState<number | null>(null);
-  const [incidentId, setIncidentId] = useState<number | null>(null);
-
-  const active = refillsQuery.data ?? [];
-  const deliverRefill = active.find((r) => r.id === deliverId) ?? null;
-  const incidentRefill = active.find((r) => r.id === incidentId) ?? null;
+  const {
+    refillsQuery, active, deliverRefill, incidentRefill, refresh,
+    openDelivery, closeDelivery, openIncident, closeIncident,
+    hasInactiveProducts, deliveryDisabled, incidentDisabled,
+  } = useRunnerActiveController();
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
@@ -529,7 +335,7 @@ export default function RiderActiveScreen() {
       ) : refillsQuery.isError ? (
         <View style={styles.center}>
           <EmptyState icon="wifi-off" title="Gagal memuat pengiriman" subtitle={(refillsQuery.error as Error).message} tone="danger">
-            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={() => void refillsQuery.refetch()} />
+            <Button label="Coba Lagi" icon="refresh" variant="secondary" onPress={refresh} />
           </EmptyState>
         </View>
       ) : (
@@ -538,7 +344,7 @@ export default function RiderActiveScreen() {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={styles.listContent}
           refreshing={refillsQuery.isRefetching}
-          onRefresh={() => void refillsQuery.refetch()}
+          onRefresh={refresh}
           renderItem={({ item }) => (
             <Card style={styles.card}>
               <View style={styles.top}>
@@ -558,8 +364,8 @@ export default function RiderActiveScreen() {
                 <Chip label={`${item.total_requested} cups`} icon={<MaterialCommunityIcons name="cup-outline" size={14} color={semantic.textMuted} />} />
               </View>
 
-              {item.lines.some((line) => line.is_operational === false) ? <Banner tone="warning" message="Request lama ini punya produk yang sudah tidak dipakai. Minta Finance cek dulu ya." /> : null}
-              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => setDeliverId(item.id)} disabled={!item.can.deliver || item.lines.some((line) => line.is_operational === false)} />
+              {hasInactiveProducts(item) ? <Banner tone="warning" message="Request lama ini punya produk yang sudah tidak dipakai. Minta Finance cek dulu ya." /> : null}
+              <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => openDelivery(item)} disabled={deliveryDisabled(item)} />
 
               {/* Second, quieter action: something went wrong on the road. Deliberately on the
                   same card as the delivery, because a runner standing over a spilled crate should
@@ -569,8 +375,8 @@ export default function RiderActiveScreen() {
                 icon="alert-outline"
                 variant="ghost"
                 size="sm"
-                onPress={() => setIncidentId(item.id)}
-                disabled={item.lines.some((line) => line.is_operational === false)}
+                onPress={() => openIncident(item)}
+                disabled={incidentDisabled(item)}
               />
             </Card>
           )}
@@ -580,12 +386,12 @@ export default function RiderActiveScreen() {
         />
       )}
 
-      <Modal visible={deliverRefill !== null} animationType="slide" onRequestClose={() => setDeliverId(null)}>
-        {deliverRefill ? <DeliverySheet refill={deliverRefill} onClose={() => setDeliverId(null)} /> : null}
+      <Modal visible={deliverRefill !== null} animationType="slide" onRequestClose={closeDelivery}>
+        {deliverRefill ? <DeliverySheet refill={deliverRefill} onClose={closeDelivery} /> : null}
       </Modal>
 
-      <Modal visible={incidentRefill !== null} animationType="slide" onRequestClose={() => setIncidentId(null)}>
-        {incidentRefill ? <IncidentSheet refill={incidentRefill} onClose={() => setIncidentId(null)} /> : null}
+      <Modal visible={incidentRefill !== null} animationType="slide" onRequestClose={closeIncident}>
+        {incidentRefill ? <IncidentSheet refill={incidentRefill} onClose={closeIncident} /> : null}
       </Modal>
     </Screen>
   );
