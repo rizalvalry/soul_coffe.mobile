@@ -142,6 +142,17 @@ test('push-first event still refreshes Absen and duplicate socket channels do no
   assert.equal(app.refillInvalidations(), 1);
 });
 
+test('Produksi refill approval event invalidates the queue once through realtime', () => {
+  const app = mountRealtimeProvider(() => true, 'BARISTA');
+  assert.ok(app.channelNames.includes('role.BARISTA'));
+  const event = { event_id: 'refill-approved', type: 'RefillRequestApproved', refill_request_id: 8 };
+  app.channelCallbacks[0](event);
+  assert.equal(app.refillInvalidations(), 1);
+  app.channelCallbacks[1](event);
+  assert.equal(app.refillInvalidations(), 1);
+  app.cleanup();
+});
+
 test('connection and foreground transitions refresh once without an interval', () => {
   const app = mountRealtimeProvider();
   app.connectionCallbacks.get('connected')();
