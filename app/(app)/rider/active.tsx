@@ -73,7 +73,7 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
   return (
     <View style={styles.sheetRoot}>
-      <View style={styles.sheetHeader}>
+      <Card style={styles.sheetHeader}>
         <View>
           <Text variant="h3">Selesaikan Pengiriman</Text>
           <Text variant="caption" color={semantic.textMuted}>
@@ -81,11 +81,14 @@ function DeliverySheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           </Text>
         </View>
         <IconButton icon="close" label="Tutup" onPress={onClose} />
-      </View>
+      </Card>
 
       <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
         <Card style={styles.card}>
-          <Text variant="h3">{refill.code}</Text>
+          <View style={styles.sheetSummaryTop}>
+            <Text variant="h3">{refill.code}</Text>
+            <StatusBadge status={refill.status} />
+          </View>
           <View style={styles.metaChips}>
             <Chip
               label={refill.location_name ?? 'Lokasi tidak diketahui'}
@@ -233,7 +236,7 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
 
   return (
     <View style={styles.sheetRoot}>
-      <View style={styles.sheetHeader}>
+      <Card style={styles.sheetHeader}>
         <View>
           <Text variant="h3">Laporkan Insiden</Text>
           <Text variant="caption" color={semantic.textMuted}>
@@ -241,7 +244,7 @@ function IncidentSheet({ refill, onClose }: { refill: RefillRequest; onClose: ()
           </Text>
         </View>
         <IconButton icon="close" label="Tutup" onPress={onClose} />
-      </View>
+      </Card>
 
       <ScrollView contentContainerStyle={styles.sheetContent} keyboardShouldPersistTaps="handled">
         <Banner
@@ -324,9 +327,9 @@ export default function RiderActiveScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
-      <Text variant="h2" style={styles.header}>
-        Pengiriman Saya
-      </Text>
+      <Card style={styles.header}>
+        <Text variant="h2">Pengiriman Saya</Text>
+      </Card>
 
       {refillsQuery.isLoading ? (
         <View style={styles.listPad}>
@@ -364,6 +367,17 @@ export default function RiderActiveScreen() {
                 <Chip label={`${item.total_requested} cups`} icon={<MaterialCommunityIcons name="cup-outline" size={14} color={semantic.textMuted} />} />
               </View>
 
+              <View style={styles.productGrid}>
+                {item.lines.filter((line) => line.is_operational !== false).map((line) => (
+                  <View key={line.id} style={styles.productItem}>
+                    <ProductThumbnail product={line} size={36} />
+                    <Text variant="captionStrong" numberOfLines={1} style={styles.productName}>
+                      {line.product_name}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
               {hasInactiveProducts(item) ? <Banner tone="warning" message="Request lama ini punya produk yang sudah tidak dipakai. Minta Finance cek dulu ya." /> : null}
               <Button label="Selesaikan Pengiriman" icon="flag-checkered" onPress={() => openDelivery(item)} disabled={deliveryDisabled(item)} />
 
@@ -399,27 +413,36 @@ export default function RiderActiveScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  header: { padding: space.lg, paddingBottom: space.sm },
+  header: { margin: space.lg, marginBottom: space.md },
   listPad: { paddingHorizontal: space.lg },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
-  card: { gap: space.md },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'], gap: space.lg },
+  card: { gap: space.lg },
   top: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: space.sm },
   topText: { flex: 1, gap: space.xxs },
   metaChips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  productGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  productItem: {
+    flexDirection: 'row', alignItems: 'center', gap: space.sm,
+    minWidth: '45%', maxWidth: '100%', flexGrow: 1,
+    padding: space.xs, paddingRight: space.sm,
+    borderRadius: radius.lg, backgroundColor: semantic.surfaceSunken,
+  },
+  productName: { flexShrink: 1 },
+  sheetSummaryTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
   lineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.sm,
-    backgroundColor: neutral[50],
-    borderRadius: radius.sm,
-    padding: space.sm,
+    backgroundColor: semantic.surfaceSunken,
+    borderRadius: radius.lg,
+    padding: space.md,
   },
   lineText: { flex: 1 },
   gpsRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.xs },
 
-  photoFrame: { borderRadius: radius.md, overflow: 'hidden', backgroundColor: neutral[100] },
+  photoFrame: { borderRadius: radius.lg, overflow: 'hidden', backgroundColor: neutral[100] },
   photo: { width: '100%', height: 190 },
 
   proofRow: { flexDirection: 'row', gap: space.sm },
@@ -429,10 +452,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: space.xxs,
     paddingVertical: space.sm,
-    borderRadius: radius.md,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: brand[200],
     backgroundColor: brand[50],
+    minHeight: 48,
   },
   proofOptionOn: { backgroundColor: brand[700], borderColor: brand[700] },
 
@@ -441,10 +465,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: space.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: semantic.border,
-    backgroundColor: '#FFFFFF',
+    margin: space.lg,
+    marginBottom: space.md,
   },
-  sheetContent: { padding: space.lg, gap: space.md },
+  sheetContent: { paddingHorizontal: space.lg, paddingBottom: space['3xl'], gap: space.lg },
 });
