@@ -1,14 +1,16 @@
-import { FlatList, Image, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import Animated from 'react-native-reanimated';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
 import { Button, IconButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
+import { enter } from '@/components/ui/Motion';
 import { useMyStock, useProducts } from '@/features/refill/queries';
-import { productImageSource } from '@/domain/productImages';
-import { brand, radius, semantic, shadow, space } from '@/theme';
+import { brand, neutral, productColor, radius, semantic, shadow, space } from '@/theme';
 import type { CartStockRow } from '@/domain/types';
 
 export default function StaffStockScreen() {
@@ -50,29 +52,23 @@ export default function StaffStockScreen() {
               void stockQuery.refetch();
               void productsQuery.refetch();
             }}
-            renderItem={({ item }: { item: CartStockRow }) => {
-              const image = productImageSource(productById.get(item.product_id) ?? {});
+            renderItem={({ item, index }: { item: CartStockRow; index: number }) => {
+              const tone = productColor[item.product_name as keyof typeof productColor] ?? { bg: brand[50], fg: brand[700] };
               return (
-                <View style={styles.row}>
-                  <View style={styles.rowIcon}>
-                    {image ? <Image source={image} style={styles.rowImage} /> : (
-                      <Text variant="micro" color={brand[700]}>
-                        {item.product_name.slice(0, 1).toUpperCase()}
-                      </Text>
-                    )}
-                  </View>
-                  <Text variant="body" style={styles.colName} numberOfLines={1}>
+                <Animated.View entering={enter('below', index)} style={[styles.row, { backgroundColor: tone.bg }]}>
+                  <ProductThumbnail product={{ product_name: item.product_name, image_url: productById.get(item.product_id)?.image_url }} size={48} />
+                  <Text variant="bodyStrong" color={tone.fg} style={styles.colName} numberOfLines={1}>
                     {item.product_name}
                   </Text>
                   <View style={styles.qtyPill}>
-                    <Text variant="bodyStrong" color={brand[700]}>
+                    <Text variant="bodyStrong" color={tone.fg}>
                       {item.on_hand}
                     </Text>
                     <Text variant="caption" color={semantic.textMuted}>
                       {item.unit}
                     </Text>
                   </View>
-                </View>
+                </Animated.View>
               );
             }}
             ListEmptyComponent={
@@ -87,29 +83,26 @@ export default function StaffStockScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  header: { padding: space.lg, gap: space.xxs },
+  header: { padding: space.lg, gap: space.xs },
   listPad: { paddingHorizontal: space.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.sm },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    backgroundColor: '#FFFFFF',
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     paddingVertical: space.md,
     paddingHorizontal: space.md,
     ...shadow.card,
   },
-  rowIcon: { width: 36, height: 36, borderRadius: radius.md, backgroundColor: brand[50], alignItems: 'center', justifyContent: 'center' },
-  rowImage: { width: 36, height: 36, borderRadius: radius.md },
   colName: { flex: 1 },
   qtyPill: {
     flexDirection: 'row',
     alignItems: 'baseline',
     gap: space.xxs,
-    backgroundColor: brand[50],
+    backgroundColor: neutral[0],
     borderRadius: radius.pill,
     paddingHorizontal: space.md,
     paddingVertical: space.xs,

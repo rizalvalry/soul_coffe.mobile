@@ -59,11 +59,11 @@ export default function MenuScreen() {
               <MaterialCommunityIcons name={meta.icon as never} size={26} color={neutral[0]} />
             </View>
             <View style={styles.roleText}>
-              <Text variant="micro" color={brand[700]}>
+              <Text variant="micro" color={brand[100]}>
                 ROLE {meta.priority} DARI {ROLES.length}
               </Text>
-              <Text variant="h2">{accountRoleLabel(user)}</Text>
-              <Text variant="caption" color={semantic.textMuted}>
+              <Text variant="h1" color={neutral[0]}>{accountRoleLabel(user)}</Text>
+              <Text variant="caption" color={brand[100]}>
                 {meta.description}
               </Text>
             </View>
@@ -73,16 +73,16 @@ export default function MenuScreen() {
             <View style={styles.contextStrip}>
               {user.cartCode ? (
                 <Chip
-                  tone="brand"
+                  tone="translucent"
                   label={`Kode Sepeda ${user.cartCode}`}
-                  icon={<MaterialCommunityIcons name="moped-outline" size={14} color={brand[700]} />}
+                  icon={<MaterialCommunityIcons name="moped-outline" size={14} color={neutral[0]} />}
                 />
               ) : null}
               {user.kitchenName ? (
                 <Chip
-                  tone="brand"
+                  tone="translucent"
                   label={user.kitchenName}
-                  icon={<MaterialCommunityIcons name="store-outline" size={14} color={brand[700]} />}
+                  icon={<MaterialCommunityIcons name="store-outline" size={14} color={neutral[0]} />}
                 />
               ) : null}
             </View>
@@ -118,18 +118,18 @@ export default function MenuScreen() {
             style={[styles.primaryTile, isGatedTransaction(item) && styles.disabledTile]}
           >
             <View style={styles.primaryIcon}>
-              <MaterialCommunityIcons name={item.icon as never} size={28} color={neutral[0]} />
+              <MaterialCommunityIcons name={item.icon as never} size={28} color={brand[700]} />
             </View>
             <View style={styles.primaryText}>
-              <Text variant="h3" color={neutral[0]}>
+              <Text variant="h3" color={semantic.text}>
                 {item.label}
               </Text>
-              <Text variant="caption" color={brand[100]}>
+              <Text variant="caption" color={semantic.textMuted}>
                 {isGatedTransaction(item) ? gateMessage : tileSubtitle(item)}
               </Text>
             </View>
             {item.badge ? <CountBadge count={badges[item.badge] ?? 0} /> : null}
-            <MaterialCommunityIcons name="chevron-right" size={24} color={neutral[0]} />
+            <MaterialCommunityIcons name="chevron-right" size={24} color={brand[700]} />
           </Touchable>
         </Animated.View>
       ))}
@@ -194,13 +194,13 @@ const styles = StyleSheet.create({
   headerText: { flex: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
 
-  roleCard: { gap: space.lg },
+  roleCard: { gap: space.lg, backgroundColor: brand[900], borderColor: brand[900], borderRadius: radius.hero },
   roleRow: { flexDirection: 'row', alignItems: 'center', gap: space.md },
   roleIcon: {
     width: 52,
     height: 52,
     borderRadius: radius.md,
-    backgroundColor: brand[700],
+    backgroundColor: 'rgba(255,255,255,0.16)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: space.sm,
     borderTopWidth: 1,
-    borderTopColor: semantic.border,
+    borderTopColor: 'rgba(255,255,255,0.26)',
     paddingTop: space.md,
   },
 
@@ -220,8 +220,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.md,
-    backgroundColor: brand[700],
-    borderRadius: radius.lg,
+    backgroundColor: neutral[0],
+    borderRadius: radius.card,
     padding: space.lg,
     minHeight: touch.tileMinHeight,
     ...shadow.card,
@@ -230,9 +230,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: radius.md,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.26)',
+    backgroundColor: brand[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -243,7 +241,7 @@ const styles = StyleSheet.create({
   tile: {
     minHeight: touch.tileMinHeight,
     backgroundColor: neutral[0],
-    borderRadius: radius.lg,
+    borderRadius: radius.card,
     ...shadow.card,
     padding: space.md,
     gap: space.xs,
