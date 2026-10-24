@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { request, uploadFile, uuidv4 } from '@/lib/api';
@@ -35,19 +36,60 @@ export type ReportIncidentInput = {
   note?: string;
 };
 
+type IncidentAttempt = {
+  uuid: string;
+  photoUri: string;
+  takenAt: string;
+  lines: string;
+  note?: string;
+};
+
 /**
  * Files the report. One request with one file, so `uploadFile` carries it — see its docblock for
  * why this client streams multipart rather than using React Native's own FormData.
  *
- * The `uuid` is generated here and sent in the body as well as in the Idempotency-Key header: a
- * runner standing over a spilled crate on a bad connection will tap this twice, and one accident
- * must not become two reports (R14).
+ * A failed upload keeps its UUID, multipart fields, and compressed photo for the next tap. A new
+ * form has a new hook instance; changed input starts a new attempt (R14).
  */
 export function useReportIncident() {
   const client = useQueryClient();
+  const attemptRef = useRef<{ fingerprint: string; prepared: Promise<IncidentAttempt> } | null>(null);
 
   return useMutation({
-    mutationFn: (input: ReportIncidentInput) => reportIncident(input),
+    mutationFn: async (input: ReportIncidentInput) => {
+      const fingerprint = JSON.stringify(input);
+      let entry = attemptRef.current;
+      if (!entry || entry.fingerprint !== fingerprint) {
+        entry = { fingerprint, prepared: prepareIncidentAttempt(input) };
+        attemptRef.current = entry;
+      }
+
+      let attempt: IncidentAttempt;
+      try {
+        attempt = await entry.prepared;
+      } catch (error) {
+        if (attemptRef.current === entry) attemptRef.current = null;
+        throw error;
+      }
+
+      const result = await uploadFile<DeliveryIncident>(
+        `/refills/${input.refillId}/incident`,
+        { uri: attempt.photoUri, name: 'incident.jpg', type: 'image/jpeg' },
+        {
+          uuid: attempt.uuid,
+          photo_taken_at: attempt.takenAt,
+          // Multipart has no array-of-objects encoding this client can rely on, so the lines travel
+          // as JSON — the same way they do on the delivery endpoint.
+          lines: attempt.lines,
+          ...(attempt.note ? { note: attempt.note } : {}),
+        },
+        // The endpoint names this part `photo`, not `file`.
+        'photo',
+        attempt.uuid,
+      );
+      if (attemptRef.current === entry) attemptRef.current = null;
+      return result;
+    },
     onSuccess: (_incident, input) => {
       void client.invalidateQueries({ queryKey: incidentKeys.mine });
       // The delivery itself is untouched for now — Finance decides what happens to it — but the
@@ -57,23 +99,11 @@ export function useReportIncident() {
   });
 }
 
-async function reportIncident(input: ReportIncidentInput): Promise<DeliveryIncident> {
-  const compressed = await compressForUpload(input.photoUri);
+async function prepareIncidentAttempt(input: ReportIncidentInput): Promise<IncidentAttempt> {
   const uuid = uuidv4();
-
-  return uploadFile<DeliveryIncident>(
-    `/refills/${input.refillId}/incident`,
-    { uri: compressed.uri, name: 'incident.jpg', type: 'image/jpeg' },
-    {
-      uuid,
-      photo_taken_at: input.takenAt,
-      // Multipart has no array-of-objects encoding this client can rely on, so the lines travel
-      // as JSON — the same way they do on the delivery endpoint.
-      lines: JSON.stringify(input.lines),
-      ...(input.note ? { note: input.note } : {}),
-    },
-    // The endpoint names this part `photo`, not `file`.
-    'photo',
-    uuid,
-  );
+  const takenAt = input.takenAt;
+  const lines = JSON.stringify(input.lines);
+  const note = input.note;
+  const compressed = await compressForUpload(input.photoUri);
+  return { uuid, photoUri: compressed.uri, takenAt, lines, note };
 }

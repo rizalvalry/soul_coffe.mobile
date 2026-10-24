@@ -340,7 +340,7 @@ test('changing proof mode clears the prior signature and PIN', async () => {
   assert.equal(app.button(tree, 'Konfirmasi Pengiriman').props.disabled, true);
 });
 
-test('incident timeout retries with the current fresh UUID behavior tracked by T-103', async () => {
+test('incident timeout retries with the same UUID and multipart body', async () => {
   const source = readFileSync(join(root, 'src/features/incidents/queries.ts'), 'utf8');
   const code = ts.transpileModule(source, { compilerOptions: {
     module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
@@ -348,6 +348,7 @@ test('incident timeout retries with the current fresh UUID behavior tracked by T
   const calls = [];
   let sequence = 0;
   const modules = {
+    react: { useRef: (value) => ({ current: value }) },
     '@tanstack/react-query': {
       useMutation: (config) => config,
       useQuery: () => { throw new Error('unexpected incident read'); },
@@ -388,6 +389,6 @@ test('incident timeout retries with the current fresh UUID behavior tracked by T
     assert.equal(call.fields.lines, JSON.stringify(input.lines));
     assert.equal(call.fields.note, input.note);
   }
-  assert.notEqual(calls[0].operation, calls[1].operation);
-  assert.deepEqual({ ...calls[0].fields, uuid: null }, { ...calls[1].fields, uuid: null });
+  assert.equal(calls[0].operation, calls[1].operation);
+  assert.deepEqual(calls[0].fields, calls[1].fields);
 });
