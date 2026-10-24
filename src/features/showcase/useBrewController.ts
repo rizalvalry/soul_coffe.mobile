@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useProducts } from '@/features/refill/queries';
 import { useBrewIntoShowcase } from '@/features/showcase/queries';
+import { MAX_PRODUCTION_QTY } from '@/features/showcase/quantity';
 import { ApiError } from '@/lib/api';
 
 export function useBrewController() {
@@ -24,5 +25,6 @@ export function useBrewController() {
     }
   };
 
-  return { products, brew, quantities, setProductQty, message, lines, submit };
+  return { products, brew, quantities, setProductQty, maxQty: MAX_PRODUCTION_QTY,
+    message, lines, submit };
 }

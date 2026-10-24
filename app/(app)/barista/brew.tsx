@@ -7,11 +7,10 @@ import { QtyStepper } from '@/components/ui/QtyStepper';
 import { Banner } from '@/components/ui/Banner';
 import { ProductThumbnail } from '@/components/ui/ProductThumbnail';
 import { useBrewController } from '@/features/showcase/useBrewController';
-import { MAX_PRODUCTION_QTY } from '@/features/showcase/quantity';
 import { space } from '@/theme';
 
 export default function BrewScreen() {
-  const { products, brew, quantities, setProductQty, message, lines, submit } = useBrewController();
+  const { products, brew, quantities, setProductQty, maxQty, message, lines, submit } = useBrewController();
 
   return (
     <Screen>
@@ -28,7 +27,7 @@ export default function BrewScreen() {
           <View style={{ alignSelf: 'flex-end' }}>
             <QtyStepper value={quantities[product.id] ?? 0}
               onChange={(qty) => setProductQty(product.id, qty)}
-              max={MAX_PRODUCTION_QTY} />
+              max={maxQty} />
           </View>
         </Card>
       ))}
