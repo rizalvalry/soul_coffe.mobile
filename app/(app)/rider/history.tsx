@@ -21,9 +21,9 @@ export default function RiderHistoryScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
-      <Text variant="h2" style={styles.header}>
-        Riwayat Pengiriman
-      </Text>
+      <Card style={styles.header}>
+        <Text variant="h2">Riwayat Pengiriman</Text>
+      </Card>
 
       {refillsQuery.isLoading ? (
         <View style={styles.listPad}>
@@ -75,12 +75,12 @@ export default function RiderHistoryScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  header: { padding: space.lg, paddingBottom: space.sm },
+  header: { margin: space.lg, marginBottom: space.md },
   listPad: { paddingHorizontal: space.lg },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
-  item: { gap: space.sm },
-  signatureCard: { gap: space.sm },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'], gap: space.lg },
+  item: { gap: space.md },
+  signatureCard: { gap: space.md },
   signatureHeader: { flexDirection: 'row', alignItems: 'center', gap: space.xs },
-  signatureImage: { width: '100%', height: touch.tileMinHeight * 1.25, borderRadius: radius.sm, backgroundColor: neutral[0] },
+  signatureImage: { width: '100%', height: touch.tileMinHeight * 1.25, borderRadius: radius.lg, backgroundColor: neutral[100] },
 });

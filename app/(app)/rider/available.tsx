@@ -2,6 +2,7 @@ import { FlatList, StyleSheet, View } from 'react-native';
 
 import { Screen } from '@/components/ui/Screen';
 import { Text } from '@/components/ui/Text';
+import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { ConnectionBanner } from '@/components/ui/ConnectionBanner';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -19,10 +20,10 @@ export default function RiderAvailableScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
-      <View style={styles.header}>
+      <Card style={styles.header}>
         <Text variant="h2">Siap Diambil</Text>
         <ConnectionBanner state={realtime.state} />
-      </View>
+      </Card>
 
       {refillsQuery.isLoading ? (
         <View style={styles.listPad}>
@@ -65,9 +66,9 @@ export default function RiderAvailableScreen() {
 
 const styles = StyleSheet.create({
   screen: { padding: 0 },
-  header: { padding: space.lg, gap: space.md },
+  header: { margin: space.lg, marginBottom: space.md, gap: space.sm },
   listPad: { paddingHorizontal: space.lg },
   center: { alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
-  listContent: { paddingHorizontal: space.lg, paddingBottom: space.lg, gap: space.md },
-  item: { gap: space.sm },
+  listContent: { paddingHorizontal: space.lg, paddingBottom: space['2xl'], gap: space.lg },
+  item: { gap: space.md },
 });
