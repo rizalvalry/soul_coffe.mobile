@@ -1,5 +1,7 @@
-# T-090 bootstrap files only. Visual tasks must provide their own exact allowlist.
 package.json
-scripts/api-contract-snapshot.cjs
-scripts/redesign-guard.cjs
+package-lock.json
+src/theme/tokens.ts
+src/theme/motion.ts
+src/theme/index.ts
+app/_layout.tsx
 tests/**

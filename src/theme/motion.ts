@@ -26,9 +26,9 @@ export const duration = {
   fast: 140,
   base: 220,
   slow: 320,
-  slower: 480,
-  /** Ambient loops — shimmer, pulse, glow. Long on purpose so they read as breathing. */
-  ambient: 1400,
+  slower: 400,
+  /** One ambient cycle; callers can repeat it without delaying a user action. */
+  ambient: 400,
 } as const;
 
 /**
@@ -117,11 +117,17 @@ export const timing = {
 /** Press-state scale targets. Small values — a 0.9 squash on a full-width card looks broken. */
 export const pressScale = {
   /** Cards, tiles, list rows. */
-  surface: 0.975,
+  surface: 0.95,
   /** Buttons and chips. */
-  control: 0.96,
+  control: 0.95,
   /** Icon buttons, which are small enough to need a visible squash. */
   icon: 0.9,
+} as const;
+
+/** V2 arrivals and badge pop; consumers use these only for presentation. */
+export const entrance = {
+  rise: 14,
+  badgePeak: 1.22,
 } as const;
 
 /**
@@ -131,6 +137,6 @@ export const pressScale = {
  * wait a full second before appearing, and a list that fills in slowly reads as a slow app.
  * Beyond the cap everything remaining lands together, which nobody notices.
  */
-export function staggerDelay(index: number, step = 55, max = 420): number {
+export function staggerDelay(index: number, step = 40, max = 320): number {
   return Math.min(index * step, max);
 }

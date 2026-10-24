@@ -626,6 +626,10 @@ test('root query provider changes with the account token even when auth status s
     'react/jsx-runtime': { jsx: element, jsxs: element },
     'react-native': { StyleSheet: { absoluteFill: {} }, View: 'View' },
     'expo-router': { Stack: 'Stack' },
+    'expo-font': { useFonts: () => [true, null] },
+    '@expo-google-fonts/plus-jakarta-sans/500Medium': { PlusJakartaSans_500Medium: 500 },
+    '@expo-google-fonts/plus-jakarta-sans/700Bold': { PlusJakartaSans_700Bold: 700 },
+    '@expo-google-fonts/plus-jakarta-sans/800ExtraBold': { PlusJakartaSans_800ExtraBold: 800 },
     'expo-status-bar': { StatusBar: 'StatusBar' },
     'expo-splash-screen': { preventAutoHideAsync() {}, hideAsync() {} },
     'react-native-safe-area-context': { SafeAreaProvider: 'SafeAreaProvider' },
@@ -637,7 +641,7 @@ test('root query provider changes with the account token even when auth status s
       return value;
     } },
     '@/features/onboarding/store': { useOnboarding: (selector) => selector({ status: 'loaded', load() {} }) },
-    '@/theme': { semantic: { bg: '#fff' } },
+    '@/theme': { fontFamily: { medium: 'medium', bold: 'bold', extraBold: 'extraBold' }, semantic: { bg: '#fff' } },
     '@/lib/queryClient': queryModule,
   }).default;
   const providerA = root();
