@@ -1,0 +1,911 @@
+{
+  "calls": [
+    {
+      "file": "app/(app)/barista/index.tsx",
+      "transport": "request",
+      "method": "GET",
+      "path": "/showcase/kitchens",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "app/(app)/kitchen/close-out.tsx",
+      "transport": "request",
+      "method": "GET",
+      "path": "/showcase/kitchens",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "app/(app)/kitchen/reject.tsx",
+      "transport": "request",
+      "method": "GET",
+      "path": "/kitchen-rejects",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "app/(app)/kitchen/reject.tsx",
+      "transport": "request",
+      "method": "GET",
+      "path": "/kitchen-rejects/kitchens",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "app/(app)/kitchen/reject.tsx",
+      "transport": "request",
+      "method": "GET",
+      "path": "/kitchen-rejects/stock",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "app/(app)/kitchen/reject.tsx",
+      "transport": "uploadFile",
+      "method": "POST",
+      "path": "/kitchen-rejects",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "kitchen_id",
+        "lines",
+        "note",
+        "photo",
+        "photo_taken_at",
+        "reason_code"
+      ]
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "DELETE",
+      "path": "`${apiBaseUrl()}/me/login-pin`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "password"
+      ]
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "GET",
+      "path": "`${apiBaseUrl()}/me`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "POST",
+      "path": "`${apiBaseUrl()}/auth/login-pin`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "app_version",
+        "device_id",
+        "device_name",
+        "model",
+        "os_version",
+        "phone",
+        "pin"
+      ]
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "POST",
+      "path": "`${apiBaseUrl()}/auth/logout`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "POST",
+      "path": "`${apiBaseUrl()}/auth/pin-reset-requests`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "email",
+        "password",
+        "phone"
+      ]
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "POST",
+      "path": "`${apiBaseUrl()}/me/login-pin`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "password",
+        "pin"
+      ]
+    },
+    {
+      "file": "src/features/auth/api.ts",
+      "transport": "fetch",
+      "method": "POST",
+      "path": "`${base}/auth/login`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "app_version",
+        "device_id",
+        "device_name",
+        "model",
+        "os_version",
+        "password",
+        "phone"
+      ]
+    },
+    {
+      "file": "src/features/clearing/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/clearing-receipts",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/clearing/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/clearing-receipts/options",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/clearing/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/clearing-receipts",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "amount_minor",
+        "bank_account_id",
+        "mdr_minor",
+        "received_on",
+        "sale_dates",
+        "uuid"
+      ]
+    },
+    {
+      "file": "src/features/clearing/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/clearing-receipts/${input.id}/match`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "sale_dates",
+        "uuid"
+      ]
+    },
+    {
+      "file": "src/features/clearing/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/clearing-receipts/${input.id}/void`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "reason"
+      ]
+    },
+    {
+      "file": "src/features/closing/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/me/closing/draft",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/closing/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/me/closing",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "gps_lat",
+        "gps_lng",
+        "gps_unavailable",
+        "lines",
+        "note",
+        "qris",
+        "transfer"
+      ]
+    },
+    {
+      "file": "src/features/incidents/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/incidents${openOnly ? '?open=1' : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/incidents/queries.ts",
+      "transport": "uploadFile",
+      "method": "POST",
+      "path": "`/refills/${input.refillId}/incident`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "lines",
+        "note",
+        "photo",
+        "photo_taken_at",
+        "uuid"
+      ]
+    },
+    {
+      "file": "src/features/location/reporter.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/me/location",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "device_id",
+        "pings"
+      ]
+    },
+    {
+      "file": "src/features/news/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/news/${id}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/news/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/news${highlighted ? '?highlighted=1' : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/news/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/news/${id}/react`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "reaction"
+      ]
+    },
+    {
+      "file": "src/features/news/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/news/${id}/read`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/push/api.ts",
+      "transport": "request",
+      "method": "DELETE",
+      "path": "/me/devices",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "token"
+      ]
+    },
+    {
+      "file": "src/features/push/api.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/me/devices",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "device_name",
+        "platform",
+        "token"
+      ]
+    },
+    {
+      "file": "src/features/realtime/RealtimeProvider.tsx",
+      "transport": "fetch",
+      "method": "POST",
+      "path": "`${apiBaseUrl()}/broadcasting/auth`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "channel_name",
+        "socket_id"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request via useTransition",
+      "method": "POST",
+      "path": "`/refills/${i.id}/approve`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "lines",
+        "partial_reason"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request via useTransition",
+      "method": "POST",
+      "path": "`/refills/${i.id}/cancel`",
+      "idempotencyKey": true,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request via useTransition",
+      "method": "POST",
+      "path": "`/refills/${i.id}/claim`",
+      "idempotencyKey": true,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request via useTransition",
+      "method": "POST",
+      "path": "`/refills/${i.id}/ready`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "lines",
+        "shortfall_reason"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request via useTransition",
+      "method": "POST",
+      "path": "`/refills/${i.id}/reject`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "reason"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request via useTransition",
+      "method": "POST",
+      "path": "`/refills/${i.id}/start-preparing`",
+      "idempotencyKey": true,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/allocations/today",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/badges",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/kitchen/stock",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/me/stock",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/products",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/products",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/notifications${unreadOnly ? '?unread=1' : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/refills/${id}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/refills${statusParam(status)}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/notifications/read-all",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/refills",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "cart_id",
+        "client_submitted_at",
+        "evidence_media_id",
+        "gps_lat",
+        "gps_lng",
+        "gps_unavailable",
+        "lines",
+        "note",
+        "uuid"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/notifications/${notificationId}/read`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "buildPath(input)",
+      "idempotencyKey": true,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "requestWithStatus",
+      "method": "POST",
+      "path": "`/refills/${input.id}/deliver`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "gps_lat",
+        "gps_lng",
+        "gps_unavailable",
+        "handover_media_id",
+        "lines",
+        "signature_method",
+        "staff_pin",
+        "stroke_count"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "uploadFile",
+      "method": "POST",
+      "path": "/media/evidence",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "file",
+        "taken_at"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "uploadFile",
+      "method": "POST",
+      "path": "/media/handover",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "file",
+        "taken_at"
+      ]
+    },
+    {
+      "file": "src/features/refill/queries.ts",
+      "transport": "uploadFileWithStatus",
+      "method": "POST",
+      "path": "`/refills/${input.id}/deliver`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "gps_lat",
+        "gps_lng",
+        "gps_unavailable",
+        "handover_media_id",
+        "lines",
+        "signature",
+        "signature_method",
+        "stroke_count"
+      ]
+    },
+    {
+      "file": "src/features/riderLocation/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/locations",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/riderLocation/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/rider-location-setups",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/riderLocation/queries.ts",
+      "transport": "request",
+      "method": "PATCH",
+      "path": "`/rider-location-setups/${input.riderId}`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "basis",
+        "location_id"
+      ]
+    },
+    {
+      "file": "src/features/sales/offlineQueue.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/absen/status",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/sales/offlineQueue.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/sales",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "cart_id",
+        "device_id",
+        "gps_lat",
+        "gps_lng",
+        "gps_unavailable",
+        "lines",
+        "note",
+        "payment_method",
+        "uuid"
+      ]
+    },
+    {
+      "file": "src/features/sales/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/sales",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/sales/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/sales",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "cart_id",
+        "device_id",
+        "gps_lat",
+        "gps_lng",
+        "gps_unavailable",
+        "lines",
+        "note",
+        "payment_method",
+        "uuid"
+      ]
+    },
+    {
+      "file": "src/features/sales/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/sales/${saleId}/void`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "reason"
+      ]
+    },
+    {
+      "file": "src/features/settlements/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/settlements/draft/${cartId}${date ? `?date=${date}` : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/settlements/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/settlements/queue${date ? `?date=${date}` : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/settlements/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/settlements${date ? `?date=${date}` : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/settlements/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/settlements/${input.settlementId}/approve`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "lines",
+        "note"
+      ]
+    },
+    {
+      "file": "src/features/settlements/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "`/settlements${input.date ? `?date=${input.date}` : ''}`",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "cart_id",
+        "cash",
+        "qris",
+        "transfer",
+        "variance_reason"
+      ]
+    },
+    {
+      "file": "src/features/settlements/rider.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "'/me/settlement' + (operatingDate ? `?operating_date=${encodeURIComponent(operatingDate)}` : '')",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "'/showcase/close-out/draft/' + cartId",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/absen/status",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/products",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/showcase/handovers",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/showcase/staff",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "/showcase/stock",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/absen${date ? `?date=${date}` : ''}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/carts?scope=${scope}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "GET",
+      "path": "`/showcase/allowance/${cartId}`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/absen",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "gps_lat",
+        "gps_lng"
+      ]
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/absen/open",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/allocations",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "cart_id",
+        "correction_reason",
+        "lines",
+        "location_id",
+        "operating_date",
+        "staff_id"
+      ]
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/showcase/brew",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "lines"
+      ]
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/showcase/close-out",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "cart_id",
+        "rejected",
+        "returned"
+      ]
+    },
+    {
+      "file": "src/features/showcase/queries.ts",
+      "transport": "request",
+      "method": "POST",
+      "path": "/showcase/hand-to-cart",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "allowance_amount",
+        "cart_id",
+        "lines",
+        "location_id",
+        "note",
+        "staff_id"
+      ]
+    },
+    {
+      "file": "src/lib/api.ts",
+      "transport": "fetch",
+      "method": "GET",
+      "path": "`${apiBaseUrl()}/me`",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/lib/api.ts",
+      "transport": "fetch",
+      "method": "method",
+      "path": "`${apiBaseUrl()}${path}`",
+      "idempotencyKey": false,
+      "bodyFields": [
+        "body",
+        "undefined"
+      ]
+    },
+    {
+      "file": "src/lib/api.ts",
+      "transport": "requestWithStatus",
+      "method": "GET",
+      "path": "path",
+      "idempotencyKey": false,
+      "bodyFields": []
+    },
+    {
+      "file": "src/lib/api.ts",
+      "transport": "uploadFileWithStatus",
+      "method": "POST",
+      "path": "path",
+      "idempotencyKey": true,
+      "bodyFields": [
+        "fieldName",
+        "fields"
+      ]
+    }
+  ],
+  "subscriptions": [
+    {
+      "file": "src/features/realtime/RealtimeProvider.tsx",
+      "kind": "private",
+      "channel": "`cart.${cartId}`",
+      "event": ".soul.event",
+      "when": "role === 'STAFF' && cartId",
+      "via": "channelsFor( session.user.role, session.user.id, session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId, session.user.cartId ?? null, canUse(session.user, 'kitchen_operations'), session.user.isManagement === true, )"
+    },
+    {
+      "file": "src/features/realtime/RealtimeProvider.tsx",
+      "kind": "private",
+      "channel": "`kitchen.${kitchenId}`",
+      "event": ".soul.event",
+      "when": "canViewKitchen && kitchenId",
+      "via": "channelsFor( session.user.role, session.user.id, session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId, session.user.cartId ?? null, canUse(session.user, 'kitchen_operations'), session.user.isManagement === true, )"
+    },
+    {
+      "file": "src/features/realtime/RealtimeProvider.tsx",
+      "kind": "private",
+      "channel": "`role.${role}`",
+      "event": ".soul.event",
+      "when": "role !== 'MANAGEMENT'",
+      "via": "channelsFor( session.user.role, session.user.id, session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId, session.user.cartId ?? null, canUse(session.user, 'kitchen_operations'), session.user.isManagement === true, )"
+    },
+    {
+      "file": "src/features/realtime/RealtimeProvider.tsx",
+      "kind": "private",
+      "channel": "`user.${userId}`",
+      "event": ".soul.event",
+      "when": null,
+      "via": "channelsFor( session.user.role, session.user.id, session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId, session.user.cartId ?? null, canUse(session.user, 'kitchen_operations'), session.user.isManagement === true, )"
+    },
+    {
+      "file": "src/features/realtime/RealtimeProvider.tsx",
+      "kind": "private",
+      "channel": "role.MANAGEMENT",
+      "event": ".soul.event",
+      "when": "isManagement",
+      "via": "channelsFor( session.user.role, session.user.id, session.user.role === 'BARISTA' ? session.user.kitchenId ?? null : selectedKitchenId, session.user.cartId ?? null, canUse(session.user, 'kitchen_operations'), session.user.isManagement === true, )"
+    }
+  ]
+}
