@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -69,6 +69,8 @@ export default function NewRefillScreen() {
   const attendance = useAttendanceStatus(user?.role === 'STAFF');
   const uploadEvidence = useUploadEvidence();
   const submitRefill = useSubmitRefill();
+  const uploadedEvidence = useRef<{ uri: string; takenAt: string; id: number } | null>(null);
+  const submitting = useRef(false);
 
   const [qty, setQty] = useState<Record<number, number>>({});
   const [photo, setPhoto] = useState<Photo | null>(null);
@@ -160,6 +162,7 @@ export default function NewRefillScreen() {
   }, []);
 
   const onSubmit = useCallback(async () => {
+    if (submitting.current) return;
     setFormError(null);
 
     if (gateMessage) {
@@ -181,9 +184,17 @@ export default function NewRefillScreen() {
     }
 
     const cartId = user.cartId;
+    submitting.current = true;
 
     try {
-      const evidence = await uploadEvidence.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
+      // The first upload may have succeeded even when /refills times out. Reuse its media id so
+      // the retry reaches the saved submit attempt instead of trying to upload spent evidence.
+      let evidence = uploadedEvidence.current;
+      if (!evidence || evidence.uri !== photo.uri || evidence.takenAt !== photo.takenAt) {
+        const media = await uploadEvidence.mutateAsync({ uri: photo.uri, takenAt: photo.takenAt });
+        evidence = { uri: photo.uri, takenAt: photo.takenAt, id: media.id };
+        uploadedEvidence.current = evidence;
+      }
 
       const lines = Object.entries(qty)
         .map(([productId, requested]) => ({ product_id: Number(productId), qty_requested: requested }))
@@ -214,6 +225,8 @@ export default function NewRefillScreen() {
       } else {
         setFormError('Terjadi kesalahan tidak terduga. Coba lagi.');
       }
+    } finally {
+      submitting.current = false;
     }
   }, [user, totalCups, photo, qty, gps, note, uploadEvidence, submitRefill, router, gateMessage, attendance, refreshUser]);
 
