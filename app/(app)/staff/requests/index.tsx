@@ -6,10 +6,11 @@ import { Text } from '@/components/ui/Text';
 import { Button, IconButton } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { SkeletonList } from '@/components/ui/Skeleton';
+import { Chip } from '@/components/ui/Badge';
 import { RefillCard } from '@/components/refill/RefillCard';
 import { useRefills } from '@/features/refill/queries';
 import { useRealtimeState } from '@/features/realtime/RealtimeProvider';
-import { semantic, space } from '@/theme';
+import { space } from '@/theme';
 import type { RefillRequest } from '@/domain/types';
 
 /** requirement 3 — status updates with no reload. */
@@ -24,9 +25,7 @@ export default function StaffRequestsScreen() {
         <View style={styles.header}>
           <IconButton icon="chevron-left" label="Kembali" onPress={() => router.back()} />
           <Text variant="h2">Status Permintaan</Text>
-          <Text variant="caption" color={semantic.textMuted}>
-            {isRealtime ? 'Realtime aktif' : 'Realtime terputus — tarik untuk memperbarui'}
-          </Text>
+          <Chip tone={isRealtime ? 'brand' : 'amber'} label={isRealtime ? 'Realtime aktif' : 'Realtime terputus — tarik untuk memperbarui'} />
         </View>
 
         {refillsQuery.isLoading ? (
@@ -66,7 +65,7 @@ export default function StaffRequestsScreen() {
 
 const styles = StyleSheet.create({
   page: { flex: 1 },
-  header: { padding: space.lg, gap: space.xxs },
+  header: { padding: space.lg, gap: space.sm },
   listPad: { paddingHorizontal: space.lg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: space.lg, gap: space.md },
   list: { flex: 1 },
