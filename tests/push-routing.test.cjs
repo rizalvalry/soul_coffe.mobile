@@ -120,7 +120,15 @@ test('inbox mapping preserves incident status so push and inbox share role desti
     assert.equal(routeFor(notification, role), routeFor(payload, role));
     assert.equal(routeFor(notification, role), role === 'RIDER' ? '/rider/active' : '/finance/history');
   }
-  assert.match(readFileSync(join(__dirname, '..', 'app/(app)/notifications.tsx'), 'utf8'), /status: n\.status/);
+  assert.match(readFileSync(join(__dirname, '..', 'src/features/push/useNotificationsController.ts'), 'utf8'), /status: n\.status/);
+});
+
+test('partial delivery incidents and PIN change events keep their existing destinations', () => {
+  assert.equal(routeFor({ type: 'DeliveryIncidentPartial', refill_request_id: 4,
+    status: 'PICKED_UP' }, 'RIDER'), '/rider/active');
+  for (const role of ['STAFF', 'RIDER', 'BARISTA', 'FINANCE', 'ADMINISTRATOR', 'CONTENT_CREATOR']) {
+    assert.equal(routeFor({ type: 'LoginPinChanged' }, role), '/menu');
+  }
 });
 
 test('attendance notifications never open Absen for roles without attendance', () => {

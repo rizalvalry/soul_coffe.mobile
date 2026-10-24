@@ -33,6 +33,9 @@ function loadModule(file, modules) {
     if (name === '@/features/showcase/useAbsenController' || name === '@/features/kitchenReject/useKitchenRejectController') {
       return loadModule(`src/features/${name.slice('@/features/'.length)}.ts`, modules);
     }
+    if (name === '@/features/auth/useLoginController') {
+      return loadModule('src/features/auth/useLoginController.ts', modules);
+    }
     assert.ok(Object.hasOwn(modules, name), `unexpected import: ${name}`);
     return modules[name];
   } });

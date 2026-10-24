@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
@@ -9,7 +9,7 @@ import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useMarkNewsRead, useNewsPost, useReactToNews } from '@/features/news/queries';
+import { useNewsDetailController } from '@/features/news/useNewsDetailController';
 import { NEWS_REACTIONS, type NewsReaction } from '@/domain/types';
 import { brand, neutral, radius, semantic, space } from '@/theme';
 
@@ -61,22 +61,8 @@ function articleHtml(body: string): string {
 
 export default function NewsDetailScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const postId = Number(id);
   const { width } = useWindowDimensions();
-
-  const postQuery = useNewsPost(postId);
-  const markRead = useMarkNewsRead();
-  const react = useReactToNews();
-
-  const post = postQuery.data;
-
-  // Fires once per opened article. `mutate`, not `mutateAsync`: a failed read receipt is the
-  // writer's bookkeeping and must never interrupt someone who is already reading.
-  useEffect(() => {
-    if (post && !post.is_read) markRead.mutate(post.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.id]);
+  const { postQuery, react, post } = useNewsDetailController();
 
   const html = useMemo(() => (post?.body ? articleHtml(post.body) : null), [post?.body]);
 

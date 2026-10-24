@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { useRouter, type Href } from 'expo-router';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 
 import { Screen } from '@/components/ui/Screen';
@@ -7,9 +6,7 @@ import { Text } from '@/components/ui/Text';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications } from '@/features/refill/queries';
-import { routeFor } from '@/features/push/usePushNotifications';
-import { useAuth } from '@/features/auth/store';
+import { useNotificationsController } from '@/features/push/useNotificationsController';
 import { brand, neutral, radius, shadow, semantic, space } from '@/theme';
 import type { AppNotification } from '@/domain/types';
 
@@ -27,22 +24,7 @@ function formatWhen(iso: string): string {
  * banner or the toast that announced it live.
  */
 export default function NotificationsScreen() {
-  const router = useRouter();
-  const user = useAuth((s) => s.session?.user);
-  const inbox = useNotifications();
-  const markRead = useMarkNotificationRead();
-  const markAllRead = useMarkAllNotificationsRead();
-
-  const rows = inbox.data ?? [];
-  const unread = rows.filter((n) => !n.read_at).length;
-
-  const open = (n: AppNotification) => {
-    if (!n.read_at) markRead.mutate(n.id);
-
-    const target = user ? routeFor({ refill_request_id: n.refill_request_id, type: n.type, status: n.status },
-      user.role, user.abilities, user.isSuperAdmin) : null;
-    if (target) router.push(target as Href);
-  };
+  const { router, inbox, markAllRead, rows, unread, open } = useNotificationsController();
 
   return (
     <Screen refreshing={inbox.isRefetching} onRefresh={() => void inbox.refetch()}>
